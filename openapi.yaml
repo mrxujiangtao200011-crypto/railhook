@@ -284,17 +284,16 @@ paths:
         "404":
           description: "No such URL, or it has expired"
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests to this URL
           content:
-            '*/*':
+            application/json:
               schema:
                 type: object
-                additionalProperties: {}
+                additionalProperties: true
     put:
       tags:
       - Webhook Tester
@@ -323,17 +322,16 @@ paths:
         "404":
           description: "No such URL, or it has expired"
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests to this URL
           content:
-            '*/*':
+            application/json:
               schema:
                 type: object
-                additionalProperties: {}
+                additionalProperties: true
     post:
       tags:
       - Webhook Tester
@@ -362,17 +360,16 @@ paths:
         "404":
           description: "No such URL, or it has expired"
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests to this URL
           content:
-            '*/*':
+            application/json:
               schema:
                 type: object
-                additionalProperties: {}
+                additionalProperties: true
     delete:
       tags:
       - Webhook Tester
@@ -401,17 +398,16 @@ paths:
         "404":
           description: "No such URL, or it has expired"
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests to this URL
           content:
-            '*/*':
+            application/json:
               schema:
                 type: object
-                additionalProperties: {}
+                additionalProperties: true
     patch:
       tags:
       - Webhook Tester
@@ -440,17 +436,16 @@ paths:
         "404":
           description: "No such URL, or it has expired"
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests to this URL
           content:
-            '*/*':
+            application/json:
               schema:
                 type: object
-                additionalProperties: {}
+                additionalProperties: true
   /tunnel/{slug}:
     get:
       tags:
@@ -1446,9 +1441,9 @@ paths:
         "404":
           description: Destination not found
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/IncomingDestinationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1493,9 +1488,9 @@ paths:
         "404":
           description: Destination not found
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/IncomingDestinationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1560,9 +1555,9 @@ paths:
         "404":
           description: Source not found
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/IncomingSourceResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1601,9 +1596,9 @@ paths:
         "404":
           description: Source not found
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/IncomingSourceResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2163,9 +2158,9 @@ paths:
         "401":
           description: Not authenticated
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/UserResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /ingress/{token}:
@@ -2319,27 +2314,27 @@ paths:
         "400":
           description: The challenge was not passed
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: The demo is not enabled on this server
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many demo sessions from this address
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
         "503":
           description: The demo data is still being prepared
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/public/contact:
     post:
       tags:
@@ -2367,28 +2362,22 @@ paths:
         "400":
           description: "A field is invalid, or the challenge was not passed"
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
-                additionalProperties:
-                  type: string
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: "Too many messages from this address, or the form's daily ceiling\
             \ is reached"
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
-                additionalProperties:
-                  type: string
+                $ref: "#/components/schemas/ErrorResponse"
         "503":
           description: This deployment has no support address
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
-                additionalProperties:
-                  type: string
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/public/bins:
     post:
       tags:
@@ -2414,22 +2403,22 @@ paths:
         "400":
           description: The challenge was not passed
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: "Too many URLs made from this address, or it already holds\
             \ three live ones"
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
         "503":
           description: The tester holds as many live URLs as it allows; try later
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/projects:
     get:
       tags:
@@ -3509,9 +3498,9 @@ paths:
         "404":
           description: Event not found
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/ReplayEventResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3546,9 +3535,9 @@ paths:
         "404":
           description: Source not found
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/IncomingBulkReplayResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4265,9 +4254,9 @@ paths:
         "409":
           description: A consumer with this externalId already exists
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/ConsumerResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4600,9 +4589,9 @@ paths:
         "402":
           description: The project has reached its plan's endpoint limit
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PortalEndpointResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - portalSession: []
   /api/v1/portal/endpoints/{endpointId}/rotate-secret:
@@ -4648,6 +4637,10 @@ paths:
           description: Retry scheduled
         "409":
           description: An attempt at this delivery is under way
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - portalSession: []
   /api/v1/orgs/{orgId}/members:
@@ -4854,9 +4847,9 @@ paths:
         "404":
           description: "Expired, already answered, or never existed"
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/McpConsentDecisionResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/oauth/requests/{requestId}/approve:
@@ -4893,15 +4886,15 @@ paths:
         "403":
           description: The caller's role may not grant READ_WRITE
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/McpConsentDecisionResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: "Request expired or answered, or project not found"
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/McpConsentDecisionResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/events:
@@ -4935,9 +4928,9 @@ paths:
         "401":
           description: Invalid or missing API key
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Rate limit exceeded
           content:
@@ -4983,9 +4976,9 @@ paths:
         "409":
           description: An attempt at this delivery is under way
           content:
-            '*/*':
+            application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5137,6 +5130,10 @@ paths:
           description: Email verified successfully
         "400":
           description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/switch-organization:
     post:
       tags:
@@ -5169,15 +5166,15 @@ paths:
         "401":
           description: "Not authenticated, or no live session"
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: Caller is not a member of that organization
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/auth/sessions/revoke-all:
@@ -5193,6 +5190,10 @@ paths:
           description: All sessions revoked
         "401":
           description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/auth/reset-password:
@@ -5213,6 +5214,10 @@ paths:
           description: Password reset successfully
         "400":
           description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/resend-verification:
     post:
       tags:
@@ -5231,10 +5236,22 @@ paths:
           description: Verification email sent
         "400":
           description: Email already verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/register:
     post:
       tags:
@@ -5258,9 +5275,9 @@ paths:
         "400":
           description: Invalid request or email already exists
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/refresh:
     post:
       tags:
@@ -5289,9 +5306,9 @@ paths:
         "401":
           description: Invalid or expired refresh token
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/oauth/exchange:
     post:
       tags:
@@ -5326,15 +5343,15 @@ paths:
           description: "The code has been used, has expired, or was opened in another\
             \ browser"
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/logout:
     post:
       tags:
@@ -5358,6 +5375,10 @@ paths:
           description: Logged out successfully
         "401":
           description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/auth/login:
@@ -5383,9 +5404,9 @@ paths:
         "401":
           description: Invalid credentials
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/forgot-password:
     post:
       tags:
@@ -5404,6 +5425,10 @@ paths:
           description: "If the email exists, a reset link has been sent"
         "429":
           description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/email-change:
     get:
       tags:
@@ -5453,27 +5478,27 @@ paths:
         "400":
           description: "Wrong password, failed CAPTCHA or invalid address"
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/EmailChangeResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: A passwordless account has not signed in recently
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/EmailChangeResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: Email already exists
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/EmailChangeResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests or daily cap reached
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/EmailChangeResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
     delete:
@@ -5520,8 +5545,16 @@ paths:
           description: Email changed
         "400":
           description: "Invalid, used or expired link"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/email-change/cancel:
     post:
       tags:
@@ -5569,15 +5602,15 @@ paths:
         "403":
           description: Authorization denied
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "410":
           description: Code expired
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/device/deny:
     post:
       tags:
@@ -5598,6 +5631,10 @@ paths:
           description: Device code denied
         "404":
           description: Code not found or already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/auth/device/code:
@@ -5634,8 +5671,16 @@ paths:
           description: Device code approved
         "404":
           description: Code not found or already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "410":
           description: Code expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/auth/change-password:
@@ -5656,8 +5701,16 @@ paths:
           description: Password changed successfully
         "400":
           description: Current password incorrect or validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/admin/organizations/{organizationId}/suspend:
@@ -5693,21 +5746,21 @@ paths:
         "400":
           description: No reason given — the tenant is shown it
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AdminOrganizationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AdminOrganizationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No such organization
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AdminOrganizationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -5741,15 +5794,15 @@ paths:
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AdminOrganizationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No such organization
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AdminOrganizationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -5779,9 +5832,9 @@ paths:
         "403":
           description: Forbidden — requires the platform-admin operator credential
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/EncryptionRotationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: Rotation already in progress on another node
           content:
@@ -6027,9 +6080,9 @@ paths:
         "404":
           description: "No such URL, or it has expired"
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PublicBinResponse"
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/projects/{projectId}/workflows/{id}/executions:
     get:
       tags:
@@ -6622,9 +6675,9 @@ paths:
         "404":
           description: Event not found
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/IncomingEventResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -6677,9 +6730,9 @@ paths:
         "404":
           description: Event not found
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageIncomingForwardAttemptResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -7358,9 +7411,9 @@ paths:
         "403":
           description: Forbidden — requires OWNER role
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/GdprExportDto"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -7390,9 +7443,9 @@ paths:
         "404":
           description: "Expired, already answered, or never existed"
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/McpConsentRequestResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/deliveries:
@@ -7743,11 +7796,9 @@ paths:
         "401":
           description: Not authenticated
           content:
-            '*/*':
+            application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/SessionResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/auth/providers:
@@ -7793,8 +7844,16 @@ paths:
           description: Redirect to Google
         "404":
           description: Google sign-in is not configured on this deployment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/oauth/google/callback:
     get:
       tags:
@@ -7830,8 +7889,16 @@ paths:
           description: Redirect to the dashboard or back to the sign-in page
         "404":
           description: Google sign-in is not configured on this deployment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/auth/me:
     get:
       tags:
@@ -7849,9 +7916,9 @@ paths:
         "401":
           description: Not authenticated
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/CurrentUserResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
     delete:
@@ -7870,8 +7937,16 @@ paths:
           description: Account erased
         "401":
           description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: Last owner of an organization that has other members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
   /api/v1/audit-log:
@@ -7997,15 +8072,15 @@ paths:
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageAdminUserResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many platform admin requests
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageAdminUserResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -8028,15 +8103,15 @@ paths:
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PlatformOverviewResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: Too many platform admin requests
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PlatformOverviewResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -8075,9 +8150,9 @@ paths:
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageAdminOrganizationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -8106,15 +8181,15 @@ paths:
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AdminOrganizationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No such organization
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AdminOrganizationResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -8145,15 +8220,15 @@ paths:
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/UsageResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No such organization
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/UsageResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -8187,15 +8262,15 @@ paths:
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageAdminProjectResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No such organization
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageAdminProjectResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -8229,15 +8304,15 @@ paths:
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageAdminMemberResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No such organization
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageAdminMemberResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -8271,15 +8346,15 @@ paths:
         "403":
           description: Forbidden — requires the platform admin
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageAdminAuditEntryResponse"
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No such organization
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/PageAdminAuditEntryResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
       - platformAdminToken: []
@@ -8301,9 +8376,9 @@ paths:
         "403":
           description: Forbidden — requires the platform-admin operator credential
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/EncryptionStatusResponse"
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - platformAdminToken: []
   /api/v1/tunnels/{sessionId}:
@@ -8424,8 +8499,16 @@ paths:
           description: Session revoked
         "401":
           description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: No such session for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
 components:

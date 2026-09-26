@@ -45,7 +45,8 @@ public class PublicBinCaptureController {
     @ApiResponse(responseCode = "200", description = "Recorded")
     @ApiResponse(responseCode = "404", description = "No such URL, or it has expired")
     @ApiResponse(responseCode = "429", description = "Too many requests to this URL",
-            content = @Content(mediaType = "application/json", schema = @Schema(type = "object")))
+            content = @Content(mediaType = "application/json", schema = @Schema(type = "object",
+                    additionalProperties = Schema.AdditionalPropertiesValue.TRUE)))
     @RequestMapping(value = "/{slug}", method = { RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
             RequestMethod.PATCH, RequestMethod.DELETE })
     public ResponseEntity<Map<String, Object>> capture(@PathVariable("slug") String slug, HttpServletRequest request)
