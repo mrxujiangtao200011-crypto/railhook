@@ -4,6 +4,7 @@ import com.webhook.platform.api.security.AuthContextArgumentResolver;
 import com.webhook.platform.api.security.PortalContextArgumentResolver;
 import com.webhook.platform.api.security.OrganizationRateLimitInterceptor;
 import com.webhook.platform.api.security.ScopeEnforcementInterceptor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -12,22 +13,13 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import java.util.List;
 
 @Configuration
+@RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
 
     private final AuthContextArgumentResolver authContextArgumentResolver;
     private final PortalContextArgumentResolver portalContextArgumentResolver;
     private final ScopeEnforcementInterceptor scopeEnforcementInterceptor;
     private final OrganizationRateLimitInterceptor organizationRateLimitInterceptor;
-
-    public WebConfig(AuthContextArgumentResolver authContextArgumentResolver,
-                     PortalContextArgumentResolver portalContextArgumentResolver,
-                     ScopeEnforcementInterceptor scopeEnforcementInterceptor,
-                     OrganizationRateLimitInterceptor organizationRateLimitInterceptor) {
-        this.authContextArgumentResolver = authContextArgumentResolver;
-        this.portalContextArgumentResolver = portalContextArgumentResolver;
-        this.scopeEnforcementInterceptor = scopeEnforcementInterceptor;
-        this.organizationRateLimitInterceptor = organizationRateLimitInterceptor;
-    }
 
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {

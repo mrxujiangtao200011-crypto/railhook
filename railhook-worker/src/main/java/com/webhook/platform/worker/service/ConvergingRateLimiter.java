@@ -2,6 +2,8 @@ package com.webhook.platform.worker.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.redisson.api.RRateLimiter;
 import org.redisson.api.RateLimiterConfig;
 import org.redisson.api.RateType;
@@ -15,6 +17,7 @@ import java.time.Duration;
  * remembered locally, so a steady rate costs one round trip. A limiter evicted under allkeys-lru
  * makes Redisson throw "RateLimiter is not initialized", which is re-created and retried once.
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 final class ConvergingRateLimiter {
 
     private static final Duration INTERVAL = Duration.ofSeconds(1);
@@ -26,11 +29,6 @@ final class ConvergingRateLimiter {
             .maximumSize(10_000)
             .expireAfterWrite(Duration.ofMinutes(1))
             .build();
-
-    ConvergingRateLimiter(RedissonClient redissonClient, Duration keepAlive) {
-        this.redissonClient = redissonClient;
-        this.keepAlive = keepAlive;
-    }
 
     boolean tryAcquire(String key, long ratePerSecond) {
         RRateLimiter limiter = redissonClient.getRateLimiter(key);

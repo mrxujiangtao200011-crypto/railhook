@@ -18,6 +18,7 @@ import com.webhook.platform.api.dto.BulkReplayResponse;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
 import com.webhook.platform.api.dto.DryRunReplayResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class DeliveryService {
 
     private static final int BULK_REPLAY_MAX_LIMIT = 5000;
@@ -58,25 +60,6 @@ public class DeliveryService {
     private final ObjectMapper objectMapper;
     private final DeliveryDispatch deliveryDispatch;
     private final PiiMaskingService piiMaskingService;
-
-    public DeliveryService(
-            DeliveryRepository deliveryRepository,
-            DeliveryAttemptRepository deliveryAttemptRepository,
-            EndpointRepository endpointRepository,
-            EventRepository eventRepository,
-            ProjectRepository projectRepository,
-            ObjectMapper objectMapper,
-            DeliveryDispatch deliveryDispatch,
-            PiiMaskingService piiMaskingService) {
-        this.deliveryRepository = deliveryRepository;
-        this.deliveryAttemptRepository = deliveryAttemptRepository;
-        this.endpointRepository = endpointRepository;
-        this.eventRepository = eventRepository;
-        this.projectRepository = projectRepository;
-        this.objectMapper = objectMapper;
-        this.deliveryDispatch = deliveryDispatch;
-        this.piiMaskingService = piiMaskingService;
-    }
 
     // Same masking as every other screen: partial masking is trusted, so worse than none.
     private String mask(UUID projectId, String body) {

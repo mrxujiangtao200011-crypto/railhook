@@ -8,11 +8,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Signature v3 only, since v1 and v2 carry no timestamp. The signed URI is rebuilt from the
  * ingress base URL rather than trusting Host headers behind a proxy.
  */
+@RequiredArgsConstructor
 public class HubSpotVerifier implements WebhookVerificationStrategy {
 
     private static final String SIGNATURE_HEADER = "X-HubSpot-Signature-v3";
@@ -27,10 +29,6 @@ public class HubSpotVerifier implements WebhookVerificationStrategy {
             Map.entry("%2A", "*"), Map.entry("%2C", ","), Map.entry("%3B", ";"));
 
     private final String ingressBaseUrl;
-
-    public HubSpotVerifier(String ingressBaseUrl) {
-        this.ingressBaseUrl = ingressBaseUrl;
-    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

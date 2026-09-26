@@ -10,6 +10,7 @@ import com.webhook.platform.api.dto.DeliveryStatusCounts;
 import com.webhook.platform.api.dto.EventResponse;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class EventService {
 
     private final EventRepository eventRepository;
@@ -38,29 +40,6 @@ public class EventService {
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
     private final SchemaValidationGate schemaValidationGate;
-
-    public EventService(
-            EventRepository eventRepository,
-            ProjectRepository projectRepository,
-            EventIntake eventIntake,
-            DeliveryRepository deliveryRepository,
-            OutboxMessageRepository outboxMessageRepository,
-            ObjectMapper objectMapper,
-            DeliveryDispatch deliveryDispatch,
-            MeterRegistry meterRegistry,
-            SequenceGeneratorService sequenceGeneratorService,
-            SchemaValidationGate schemaValidationGate) {
-        this.eventRepository = eventRepository;
-        this.projectRepository = projectRepository;
-        this.eventIntake = eventIntake;
-        this.deliveryRepository = deliveryRepository;
-        this.outboxMessageRepository = outboxMessageRepository;
-        this.objectMapper = objectMapper;
-        this.deliveryDispatch = deliveryDispatch;
-        this.meterRegistry = meterRegistry;
-        this.sequenceGeneratorService = sequenceGeneratorService;
-        this.schemaValidationGate = schemaValidationGate;
-    }
 
     public Page<EventResponse> listEvents(UUID projectId, Pageable pageable) {
         return listEvents(projectId, null, pageable);

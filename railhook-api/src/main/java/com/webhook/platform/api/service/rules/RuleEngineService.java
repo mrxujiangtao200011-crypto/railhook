@@ -11,6 +11,7 @@ import com.webhook.platform.api.domain.repository.RuleExecutionLogRepository;
 import com.webhook.platform.api.domain.repository.RuleRepository;
 import com.webhook.platform.api.dto.ConditionNode;
 import com.webhook.platform.common.util.EventTypeMatcher;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 /** Rules are compiled per project and held in memory, so evaluation never hits the database. */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class RuleEngineService {
 
     private final RuleRepository ruleRepository;
@@ -29,14 +31,6 @@ public class RuleEngineService {
     private final ObjectMapper objectMapper;
 
     private final ConcurrentHashMap<UUID, ProjectRulePlan> planCache = new ConcurrentHashMap<>();
-
-    public RuleEngineService(RuleRepository ruleRepository,
-                             RuleExecutionLogRepository executionLogRepository,
-                             ObjectMapper objectMapper) {
-        this.ruleRepository = ruleRepository;
-        this.executionLogRepository = executionLogRepository;
-        this.objectMapper = objectMapper;
-    }
 
     public List<RuleMatch> evaluate(UUID projectId, String eventType, JsonNode eventJson, UUID eventId) {
         ProjectRulePlan plan = planCache.get(projectId);

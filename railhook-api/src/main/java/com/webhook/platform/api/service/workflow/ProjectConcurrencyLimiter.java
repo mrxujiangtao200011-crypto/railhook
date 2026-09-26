@@ -4,19 +4,18 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Caps running workflows per project on the shared pool. Semaphores never evicted: counters with
  * check-then-increment and eviction at zero let threads pass the cap and drift permanently.
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class ProjectConcurrencyLimiter {
 
     private final int maxConcurrentPerProject;
     private final Map<UUID, Semaphore> permits = new ConcurrentHashMap<>();
-
-    ProjectConcurrencyLimiter(int maxConcurrentPerProject) {
-        this.maxConcurrentPerProject = maxConcurrentPerProject;
-    }
 
     /** @return true holding a slot, which the caller must {@link #release} in a finally */
     boolean tryAdmit(UUID projectId) {

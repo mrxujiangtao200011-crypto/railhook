@@ -7,20 +7,19 @@ import java.io.InputStream;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 
 /**
  * One script, input and expected output that {@code TransformParityTest} in both api and worker
  * run, so preview and delivery cannot drift. The same script is published in the docs.
  */
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TransformContractExample {
 
     private static final String RESOURCE = "transform/contract-example.json";
 
     private final JsonNode root;
-
-    private TransformContractExample(JsonNode root) {
-        this.root = root;
-    }
 
     public static TransformContractExample load(ObjectMapper objectMapper) {
         try (InputStream in = TransformContractExample.class.getClassLoader()

@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.domain.enums.ReplaySessionStatus;
 import com.webhook.platform.api.domain.repository.ReplaySessionRepository;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,6 +20,7 @@ import java.util.List;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class ReplaySessionRecoveryJob {
 
     static final Duration STALE_AFTER = Duration.ofMinutes(15);
@@ -27,10 +29,6 @@ public class ReplaySessionRecoveryJob {
             ReplaySessionStatus.PENDING, ReplaySessionStatus.ESTIMATING, ReplaySessionStatus.RUNNING);
 
     private final ReplaySessionRepository replaySessionRepository;
-
-    public ReplaySessionRecoveryJob(ReplaySessionRepository replaySessionRepository) {
-        this.replaySessionRepository = replaySessionRepository;
-    }
 
     @SystemTenant("sweeps every organization's replay sessions")
     @Scheduled(fixedDelayString = "PT5M")

@@ -1,8 +1,10 @@
 package com.webhook.platform.common.retry;
 
 import java.util.BitSet;
-import java.util.Objects;
 import java.util.Locale;
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Which HTTP statuses earn another Attempt. {@link RetryLadder} says when; this says whether.
@@ -12,6 +14,8 @@ import java.util.Locale;
  * {@code >=500}/{@code >500}/{@code <=408}/{@code <400}. A {@code !} prefix excludes. Exclusions
  * win regardless of order, so {@code 5xx,!501} equals {@code !501,5xx}.
  */
+@EqualsAndHashCode
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public final class RetryableStatuses {
 
     /**
@@ -27,10 +31,6 @@ public final class RetryableStatuses {
     public static final int MAX_TERMS = 32;
 
     private final BitSet retryable;
-
-    private RetryableStatuses(BitSet retryable) {
-        this.retryable = retryable;
-    }
 
     public static RetryableStatuses parse(String spec) {
         return new RetryableStatuses(compile(spec, "retryableStatuses"));
@@ -153,16 +153,6 @@ public final class RetryableStatuses {
                 to = from - 1;
             }
         }
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        return o instanceof RetryableStatuses other && retryable.equals(other.retryable);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(retryable);
     }
 
     @Override

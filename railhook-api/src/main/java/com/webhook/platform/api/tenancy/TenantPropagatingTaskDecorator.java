@@ -1,5 +1,7 @@
 package com.webhook.platform.api.tenancy;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.task.TaskDecorator;
 
 import java.util.List;
@@ -61,13 +63,10 @@ public class TenantPropagatingTaskDecorator implements TaskDecorator {
     }
 
     /** Decorating {@code execute} is enough: the other submit forms all route through it. */
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     private static final class TenantPropagatingExecutorService extends AbstractExecutorService {
 
         private final ExecutorService delegate;
-
-        private TenantPropagatingExecutorService(ExecutorService delegate) {
-            this.delegate = delegate;
-        }
 
         @Override
         public void execute(Runnable command) {

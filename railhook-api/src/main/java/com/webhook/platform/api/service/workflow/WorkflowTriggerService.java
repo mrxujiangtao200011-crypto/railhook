@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.repository.WorkflowExecutionRepository;
 import com.webhook.platform.api.domain.repository.WorkflowRepository;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.util.EventTypeMatcher;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,6 +21,7 @@ import java.util.UUID;
 /** Runs from the trigger outbox; a unique (workflow_id, trigger_event_id) index makes redelivery harmless. */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class WorkflowTriggerService {
 
     // Lets an event created by a workflow carry the depth of the chain that created it.
@@ -29,20 +31,8 @@ public class WorkflowTriggerService {
     private final WorkflowExecutionRepository executionRepository;
     private final WorkflowEngine workflowEngine;
     private final ObjectMapper objectMapper;
+    @Value("${workflow.execution.max-recursion-depth:3}")
     private final int maxRecursionDepth;
-
-    public WorkflowTriggerService(
-            WorkflowRepository workflowRepository,
-            WorkflowExecutionRepository executionRepository,
-            WorkflowEngine workflowEngine,
-            ObjectMapper objectMapper,
-            @Value("${workflow.execution.max-recursion-depth:3}") int maxRecursionDepth) {
-        this.workflowRepository = workflowRepository;
-        this.executionRepository = executionRepository;
-        this.workflowEngine = workflowEngine;
-        this.objectMapper = objectMapper;
-        this.maxRecursionDepth = maxRecursionDepth;
-    }
 
     public static int getCurrentDepth() {
         return CURRENT_DEPTH.get();

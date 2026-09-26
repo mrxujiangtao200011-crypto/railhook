@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.UUID;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class OnboardingMailService {
 
     static final Duration NUDGE_AFTER = Duration.ofHours(48);
@@ -32,17 +34,8 @@ public class OnboardingMailService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final Clock clock;
-    private boolean enabled;
-
-    public OnboardingMailService(UserRepository userRepository,
-                                 EmailService emailService,
-                                 Clock clock,
-                                 @Value("${app.onboarding-emails.enabled:false}") boolean enabled) {
-        this.userRepository = userRepository;
-        this.emailService = emailService;
-        this.clock = clock;
-        this.enabled = enabled;
-    }
+    @Value("${app.onboarding-emails.enabled:false}")
+    private final boolean enabled;
 
     // The mail goes only after the verifying transaction commits, so a rollback sends nothing.
     public void welcome(User user) {

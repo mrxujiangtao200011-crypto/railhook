@@ -8,6 +8,7 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class GdprExportService {
 
     private static final String EXPORT_VERSION = "1.0";
@@ -37,29 +39,6 @@ public class GdprExportService {
     private final ApiKeyRepository apiKeyRepository;
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
-
-    public GdprExportService(
-            OrganizationRepository organizationRepository,
-            MembershipRepository membershipRepository,
-            ProjectRepository projectRepository,
-            EndpointRepository endpointRepository,
-            SubscriptionRepository subscriptionRepository,
-            IncomingSourceRepository incomingSourceRepository,
-            IncomingDestinationRepository incomingDestinationRepository,
-            ApiKeyRepository apiKeyRepository,
-            AuditLogRepository auditLogRepository,
-            UserRepository userRepository) {
-        this.organizationRepository = organizationRepository;
-        this.membershipRepository = membershipRepository;
-        this.projectRepository = projectRepository;
-        this.endpointRepository = endpointRepository;
-        this.subscriptionRepository = subscriptionRepository;
-        this.incomingSourceRepository = incomingSourceRepository;
-        this.incomingDestinationRepository = incomingDestinationRepository;
-        this.apiKeyRepository = apiKeyRepository;
-        this.auditLogRepository = auditLogRepository;
-        this.userRepository = userRepository;
-    }
 
     /** GDPR Article 20. Audited because the file leaves the platform, and who took a copy must be answerable later. */
     @Auditable(action = AuditAction.DATA_EXPORTED, resourceType = "Organization")

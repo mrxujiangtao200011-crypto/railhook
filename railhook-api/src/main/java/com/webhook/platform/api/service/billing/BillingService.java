@@ -9,6 +9,7 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -32,6 +33,7 @@ public class BillingService {
     private static final List<PaymentStatus> SETTLED_BY_FAILURE = List.of(
             PaymentStatus.FAILED, PaymentStatus.SUCCEEDED, PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED);
 
+    @Getter
     private final boolean billingEnabled;
     private final BillingProviderRegistry providerRegistry;
     private final PlanRepository planRepository;
@@ -78,8 +80,6 @@ public class BillingService {
             }
         });
     }
-
-    public boolean isBillingEnabled() { return billingEnabled; }
 
     public String getDefaultProviderCode() { return providerRegistry.getDefault().getProviderCode(); }
 

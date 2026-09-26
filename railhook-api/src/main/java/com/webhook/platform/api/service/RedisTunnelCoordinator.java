@@ -7,6 +7,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBucket;
 import org.redisson.api.RTopic;
@@ -35,6 +36,7 @@ public class RedisTunnelCoordinator {
     private final RedissonClient redissonClient;
     private final ObjectMapper objectMapper;
     private final TunnelRegistry tunnelRegistry;
+    @Getter
     private final String instanceId;
 
     private final ConcurrentHashMap<String, CompletableFuture<TunnelResponseMessage>> remotePending = new ConcurrentHashMap<>();
@@ -270,9 +272,5 @@ public class RedisTunnelCoordinator {
         } catch (Exception e) {
             log.error("Error handling remote tunnel response: {}", e.getMessage(), e);
         }
-    }
-
-    public String getInstanceId() {
-        return instanceId;
     }
 }

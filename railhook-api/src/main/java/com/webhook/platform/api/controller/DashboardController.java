@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,15 +23,11 @@ import java.util.UUID;
 @Tag(name = "Dashboard", description = "Project dashboard, statistics and analytics")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class DashboardController {
     
     private final DashboardService dashboardService;
     private final AnalyticsService analyticsService;
-    
-    public DashboardController(DashboardService dashboardService, AnalyticsService analyticsService) {
-        this.dashboardService = dashboardService;
-        this.analyticsService = analyticsService;
-    }
     
     @Operation(summary = "Get project dashboard", description = "Returns delivery statistics for a project")
     @GetMapping("/projects/{projectId}")

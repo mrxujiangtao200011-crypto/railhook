@@ -7,6 +7,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import lombok.RequiredArgsConstructor;
 
 public final class PiiSanitizer {
 
@@ -332,29 +333,18 @@ public final class PiiSanitizer {
         return sb.toString();
     }
 
+    @RequiredArgsConstructor
     public static class Rule {
         public final String patternName;
         public final String jsonPath;
         public final MaskStyle maskStyle;
         public final boolean enabled;
-
-        public Rule(String patternName, String jsonPath, MaskStyle maskStyle, boolean enabled) {
-            this.patternName = patternName;
-            this.jsonPath = jsonPath;
-            this.maskStyle = maskStyle;
-            this.enabled = enabled;
-        }
     }
 
+    @RequiredArgsConstructor
     public static class PiiMatch {
         public final String patternName;
         public final String fieldName;
         public final String value;
-
-        public PiiMatch(String patternName, String fieldName, String value) {
-            this.patternName = patternName;
-            this.fieldName = fieldName;
-            this.value = value;
-        }
     }
 }

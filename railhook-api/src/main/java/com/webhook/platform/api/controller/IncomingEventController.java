@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -34,13 +35,10 @@ import java.util.UUID;
 @Tag(name = "Incoming Events", description = "Incoming webhook events monitoring")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class IncomingEventController {
 
     private final IncomingEventService eventService;
-
-    public IncomingEventController(IncomingEventService eventService) {
-        this.eventService = eventService;
-    }
 
     @Operation(operationId = "listIncomingEvents", summary = "List incoming events", description = "Returns paginated incoming events for the project")
     @ApiResponse(responseCode = "200", description = "Events retrieved")

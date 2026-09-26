@@ -36,11 +36,14 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Deterministic from now and a fixed seed. Every row is finished, so no worker or workflow job
  * ever acts on demo data and contacts its URLs.
  */
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 final class DemoHistory {
 
     static final Duration WINDOW = Duration.ofHours(36);
@@ -96,10 +99,6 @@ final class DemoHistory {
     private final Instant now;
     private int orderNumber = 10_400;
     private int warehouseDeliveries;
-
-    private DemoHistory(Instant now) {
-        this.now = now;
-    }
 
     static DemoHistory generate(Instant now) {
         DemoHistory history = new DemoHistory(now);

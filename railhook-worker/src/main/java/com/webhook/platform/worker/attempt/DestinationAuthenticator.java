@@ -4,24 +4,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Base64;
 import java.util.Map;
 
 @Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class DestinationAuthenticator {
 
     private final IncomingDestination destination;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final ObjectMapper objectMapper;
-
-    DestinationAuthenticator(IncomingDestination destination, EncryptionKeyRegistry encryptionKeyRegistry,
-            ObjectMapper objectMapper) {
-        this.destination = destination;
-        this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.objectMapper = objectMapper;
-    }
 
     @SuppressWarnings("unchecked")
     void authenticate(Map<String, String> headers) {

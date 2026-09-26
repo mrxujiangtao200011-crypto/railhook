@@ -9,6 +9,9 @@ import com.webhook.platform.api.domain.entity.WorkflowExecution.ExecutionStatus;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,16 +70,13 @@ class WorkflowEngineTest {
         }
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     private static class RecordingExecutor implements NodeExecutor {
+        @Getter
         private final String type;
         private final BiFunction<JsonNode, JsonNode, StepResult> fn;
         final List<JsonNode> receivedInputs = new CopyOnWriteArrayList<>();
         final AtomicInteger invocationCount = new AtomicInteger();
-
-        RecordingExecutor(String type, BiFunction<JsonNode, JsonNode, StepResult> fn) {
-            this.type = type;
-            this.fn = fn;
-        }
 
         static RecordingExecutor passthrough(String type) {
             return new RecordingExecutor(type, (config, input) -> StepResult.success(input));
@@ -84,11 +84,6 @@ class WorkflowEngineTest {
 
         static RecordingExecutor fixed(String type, StepResult result) {
             return new RecordingExecutor(type, (config, input) -> result);
-        }
-
-        @Override
-        public String getType() {
-            return type;
         }
 
         @Override

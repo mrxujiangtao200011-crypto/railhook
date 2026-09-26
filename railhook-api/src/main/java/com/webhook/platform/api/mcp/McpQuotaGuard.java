@@ -6,6 +6,7 @@ import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.EndpointService;
 import com.webhook.platform.api.service.billing.QuotaType;
 import com.webhook.platform.api.service.billing.RequireQuota;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -16,13 +17,10 @@ import java.util.UUID;
  * parameters by name, so do not rename them.
  */
 @Component
+@RequiredArgsConstructor
 public class McpQuotaGuard {
 
     private final EndpointService endpointService;
-
-    public McpQuotaGuard(EndpointService endpointService) {
-        this.endpointService = endpointService;
-    }
 
     @RequireQuota(QuotaType.ENDPOINTS_PER_PROJECT)
     public EndpointResponse createEndpoint(AuthContext auth, UUID projectId, EndpointRequest request) {

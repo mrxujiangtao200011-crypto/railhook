@@ -11,6 +11,7 @@ import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.rules.RuleEngineService;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -21,22 +22,13 @@ import java.util.UUID;
 /** Shared by ingest and replay; replay's own copy of the matching once drifted from ingest's. */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class EventIntake {
 
     private final SubscriptionMatchingCache subscriptionMatchingCache;
     private final RuleEngineService ruleEngineService;
     private final EntitlementService entitlementService;
     private final ObjectMapper objectMapper;
-
-    public EventIntake(SubscriptionMatchingCache subscriptionMatchingCache,
-            RuleEngineService ruleEngineService,
-            EntitlementService entitlementService,
-            ObjectMapper objectMapper) {
-        this.subscriptionMatchingCache = subscriptionMatchingCache;
-        this.ruleEngineService = ruleEngineService;
-        this.entitlementService = entitlementService;
-        this.objectMapper = objectMapper;
-    }
 
     /** @throws IllegalArgumentException when the Event would exceed the project's fan-out limit */
     public Decision decide(Event event) {

@@ -6,6 +6,8 @@ import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.service.OrderingBufferService;
 import io.micrometer.core.instrument.Counter;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -18,6 +20,7 @@ import java.util.UUID;
 
 /** Per-endpoint FIFO for Outgoing. Incoming enforces no ordering. */
 @Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class OrderingGate {
 
     private final OrderingBufferService orderingBufferService;
@@ -26,20 +29,6 @@ class OrderingGate {
     private final TransactionTemplate transactionTemplate;
     private final Counter gapTimeoutCounter;
     private final long rescheduleDelaySeconds;
-
-    OrderingGate(OrderingBufferService orderingBufferService,
-            DeliveryRepository deliveryRepository,
-            KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
-            TransactionTemplate transactionTemplate,
-            Counter gapTimeoutCounter,
-            long rescheduleDelaySeconds) {
-        this.orderingBufferService = orderingBufferService;
-        this.deliveryRepository = deliveryRepository;
-        this.kafkaTemplate = kafkaTemplate;
-        this.transactionTemplate = transactionTemplate;
-        this.gapTimeoutCounter = gapTimeoutCounter;
-        this.rescheduleDelaySeconds = rescheduleDelaySeconds;
-    }
 
     /** Null if the Delivery may proceed now. Parking ends the Claim and clears its token. */
     Instant holdUntil(Delivery delivery) {

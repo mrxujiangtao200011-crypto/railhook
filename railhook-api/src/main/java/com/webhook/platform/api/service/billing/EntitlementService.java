@@ -9,6 +9,8 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -18,9 +20,16 @@ import java.util.UUID;
 /** With {@code billing.enabled=false} (self-hosted) every check passes. */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class EntitlementService {
 
+    @Getter
+    @Value("${billing.enabled:false}")
     private final boolean billingEnabled;
+    @Value("${entitlement.defaults.rate-limit-per-second:100}")
+    private final int defaultRateLimitPerSecond;
+    @Value("${entitlement.defaults.max-fanout-per-event:100}")
+    private final int defaultMaxFanoutPerEvent;
     private final PlanLookup planLookup;
     private final ProjectRepository projectRepository;
     private final EndpointRepository endpointRepository;
@@ -28,32 +37,6 @@ public class EntitlementService {
     private final MembershipRepository membershipRepository;
     private final TunnelSessionRepository tunnelSessionRepository;
     private final QuotaCounterService quotaCounterService;
-
-    private final int defaultRateLimitPerSecond;
-    private final int defaultMaxFanoutPerEvent;
-
-    public EntitlementService(
-            @Value("${billing.enabled:false}") boolean billingEnabled,
-            @Value("${entitlement.defaults.rate-limit-per-second:100}") int defaultRateLimitPerSecond,
-            @Value("${entitlement.defaults.max-fanout-per-event:100}") int defaultMaxFanoutPerEvent,
-            PlanLookup planLookup,
-            ProjectRepository projectRepository,
-            EndpointRepository endpointRepository,
-            EventRepository eventRepository,
-            MembershipRepository membershipRepository,
-            TunnelSessionRepository tunnelSessionRepository,
-            QuotaCounterService quotaCounterService) {
-        this.billingEnabled = billingEnabled;
-        this.defaultRateLimitPerSecond = defaultRateLimitPerSecond;
-        this.defaultMaxFanoutPerEvent = defaultMaxFanoutPerEvent;
-        this.planLookup = planLookup;
-        this.projectRepository = projectRepository;
-        this.endpointRepository = endpointRepository;
-        this.eventRepository = eventRepository;
-        this.membershipRepository = membershipRepository;
-        this.tunnelSessionRepository = tunnelSessionRepository;
-        this.quotaCounterService = quotaCounterService;
-    }
 
     public void checkEventQuota() {
         if (!billingEnabled) return;
@@ -166,9 +149,5 @@ public class EntitlementService {
 
     public void evictPlanCache(UUID organizationId) {
         planLookup.evict(organizationId);
-    }
-
-    public boolean isBillingEnabled() {
-        return billingEnabled;
     }
 }

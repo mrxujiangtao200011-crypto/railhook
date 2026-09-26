@@ -1,5 +1,6 @@
 package com.webhook.platform.api.tenancy;
 
+import lombok.RequiredArgsConstructor;
 import org.hibernate.cfg.AvailableSettings;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -16,13 +17,10 @@ import java.util.Map;
  * MultiTenantConnectionProvider: every organization shares one schema and pool.
  */
 @Configuration
+@RequiredArgsConstructor
 public class TenancyConfig {
 
     private final OrganizationTenantResolver resolver;
-
-    public TenancyConfig(OrganizationTenantResolver resolver) {
-        this.resolver = resolver;
-    }
 
     /**
      * Ends the startup window in which an unset tenant resolves to the system tenant; after this,

@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,13 +37,10 @@ import lombok.extern.slf4j.Slf4j;
 @Tag(name = "Deliveries", description = "Delivery status and replay operations")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class DeliveryController {
 
     private final DeliveryService deliveryService;
-
-    public DeliveryController(DeliveryService deliveryService) {
-        this.deliveryService = deliveryService;
-    }
 
     @Operation(summary = "Get delivery", description = "Returns delivery details by ID")
     @GetMapping("/{id}")

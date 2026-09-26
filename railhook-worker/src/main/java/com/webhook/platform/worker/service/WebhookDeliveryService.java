@@ -6,6 +6,7 @@ import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
 import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -17,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class WebhookDeliveryService {
 
     private final AttemptRunner attemptRunner;
@@ -26,19 +28,6 @@ public class WebhookDeliveryService {
     private final TransactionTemplate transactionTemplate;
 
     private final AtomicInteger inFlightCount = new AtomicInteger(0);
-
-    public WebhookDeliveryService(
-            AttemptRunner attemptRunner,
-            OutgoingAttemptStoreFactory storeFactory,
-            DeliveryAttemptMetrics metrics,
-            DeliveryRepository deliveryRepository,
-            TransactionTemplate transactionTemplate) {
-        this.attemptRunner = attemptRunner;
-        this.storeFactory = storeFactory;
-        this.metrics = metrics;
-        this.deliveryRepository = deliveryRepository;
-        this.transactionTemplate = transactionTemplate;
-    }
 
     // Only reports. The Kafka containers stop in the lifecycle phase, before any @PreDestroy,
     // and the executor pools drain what is in flight after this.

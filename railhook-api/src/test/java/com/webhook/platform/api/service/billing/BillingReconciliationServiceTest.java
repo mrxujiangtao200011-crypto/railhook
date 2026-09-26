@@ -4,6 +4,8 @@ import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import lombok.AccessLevel;
+import lombok.Setter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -214,10 +216,10 @@ class BillingReconciliationServiceTest {
 
     static class TestManagedProvider implements BillingProvider {
         private BillingProvider.ExternalSubscriptionState externalState;
+        @Setter(AccessLevel.PACKAGE)
         private String throwForSubId;
 
         void setExternalState(ExternalSubscriptionState state) { this.externalState = state; }
-        void setThrowForSubId(String id) { this.throwForSubId = id; }
 
         @Override public String getProviderCode() { return "stripe"; }
         @Override public String getDisplayName() { return "Stripe"; }

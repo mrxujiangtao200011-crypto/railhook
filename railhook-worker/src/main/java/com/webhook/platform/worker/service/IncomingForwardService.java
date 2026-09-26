@@ -11,6 +11,7 @@ import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.worker.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.worker.domain.repository.IncomingEventRepository;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -23,6 +24,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class IncomingForwardService {
 
     private final IncomingEventRepository eventRepository;
@@ -32,23 +34,6 @@ public class IncomingForwardService {
     private final AttemptRunner attemptRunner;
     private final IncomingAttemptStoreFactory storeFactory;
     private final ForwardAttemptMetrics metrics;
-
-    public IncomingForwardService(
-            IncomingEventRepository eventRepository,
-            IncomingDestinationRepository destinationRepository,
-            IncomingForwardAttemptRepository attemptRepository,
-            TransactionTemplate transactionTemplate,
-            AttemptRunner attemptRunner,
-            IncomingAttemptStoreFactory storeFactory,
-            ForwardAttemptMetrics metrics) {
-        this.eventRepository = eventRepository;
-        this.destinationRepository = destinationRepository;
-        this.attemptRepository = attemptRepository;
-        this.transactionTemplate = transactionTemplate;
-        this.attemptRunner = attemptRunner;
-        this.storeFactory = storeFactory;
-        this.metrics = metrics;
-    }
 
     // Never throws: a throw means "do not ack", and under asyncAcks that stalled the partition.
     // The retry ladder and the stuck sweep own the row, not Kafka redelivery.

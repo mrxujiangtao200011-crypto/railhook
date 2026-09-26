@@ -1,6 +1,9 @@
 package com.webhook.platform.api.service.signin;
 
+import lombok.RequiredArgsConstructor;
+
 // Only this code reaches the login page; the dashboard maps it to a sentence.
+@RequiredArgsConstructor
 public enum SignInFailure {
     // The callback's state does not match this browser: forged, replayed or expired.
     STATE("google_state"),
@@ -11,10 +14,6 @@ public enum SignInFailure {
     ACCOUNT_DISABLED("google_account_disabled");
 
     private final String code;
-
-    SignInFailure(String code) {
-        this.code = code;
-    }
 
     public String code() {
         return code;

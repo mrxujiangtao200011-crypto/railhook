@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -31,13 +32,10 @@ import java.util.UUID;
 @Tag(name = "Incoming Sources", description = "Incoming webhook source configuration")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class IncomingSourceController {
 
     private final IncomingSourceService sourceService;
-
-    public IncomingSourceController(IncomingSourceService sourceService) {
-        this.sourceService = sourceService;
-    }
 
     @Operation(summary = "Create incoming source", description = "Creates a new incoming webhook source for the project")
     @ApiResponse(responseCode = "201", description = "Source created")

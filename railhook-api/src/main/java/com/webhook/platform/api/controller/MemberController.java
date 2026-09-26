@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,13 +30,10 @@ import java.util.UUID;
 @Tag(name = "Organizations", description = "Organization member management")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class MemberController {
 
     private final MembershipService membershipService;
-
-    public MemberController(MembershipService membershipService) {
-        this.membershipService = membershipService;
-    }
 
     @Operation(summary = "List members", description = "Returns all members of the organization")
     @RequireOrgAccess

@@ -2,6 +2,10 @@ package com.webhook.platform.api.service.billing;
 
 import java.util.UUID;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
@@ -715,36 +719,31 @@ class BillingServiceTest {
                 paymentRepository, entitlementService, lifecycleService);
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static class TestBillingProvider implements BillingProvider {
         private final String code;
+        @Getter
         private final String displayName;
         private final Set<BillingCapability> caps;
 
+        @Setter(AccessLevel.PACKAGE)
         String createCustomerResult;
         boolean createCustomerCalled;
         CreatePaymentResult paymentResult;
         CreatePaymentRequest lastPaymentRequest;
         String cancelledSubscriptionId;
+        @Setter(AccessLevel.PACKAGE)
         String portalUrl;
+        @Setter(AccessLevel.PACKAGE)
         List<ExternalInvoice> externalInvoices = List.of();
+        @Setter(AccessLevel.PACKAGE)
         BillingWebhookEvent webhookEvent;
         String currency = "USD";
         Long ownPriceCents;
 
-        TestBillingProvider(String code, String displayName, Set<BillingCapability> caps) {
-            this.code = code;
-            this.displayName = displayName;
-            this.caps = caps;
-        }
-
-        void setCreateCustomerResult(String id) { this.createCustomerResult = id; }
         void setCreatePaymentResult(CreatePaymentResult r) { this.paymentResult = r; }
-        void setPortalUrl(String url) { this.portalUrl = url; }
-        void setExternalInvoices(List<ExternalInvoice> inv) { this.externalInvoices = inv; }
-        void setWebhookEvent(BillingWebhookEvent e) { this.webhookEvent = e; }
 
         @Override public String getProviderCode() { return code; }
-        @Override public String getDisplayName() { return displayName; }
         @Override public Set<BillingCapability> capabilities() { return caps; }
         @Override public String getDefaultCurrency() { return currency; }
 

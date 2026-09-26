@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -36,15 +37,11 @@ import com.webhook.platform.api.dto.MtlsConfigRequest;
 @Tag(name = "Endpoints", description = "Webhook endpoint configuration")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class EndpointController {
 
     private final EndpointService endpointService;
     private final EndpointVerificationService verificationService;
-
-    public EndpointController(EndpointService endpointService, EndpointVerificationService verificationService) {
-        this.endpointService = endpointService;
-        this.verificationService = verificationService;
-    }
 
     @Operation(summary = "Create endpoint", description = "Creates a new webhook endpoint for the project")
     @ApiResponse(responseCode = "201", description = "Endpoint created")

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.security;
 
+import lombok.Getter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
@@ -10,6 +11,7 @@ import java.util.UUID;
  * Carries no membership role or API-key scope, so tenant handlers taking an AuthContext refuse
  * it. Its one authority is admitted only on /api/v1/portal/**.
  */
+@Getter
 public class PortalSessionAuthenticationToken extends AbstractAuthenticationToken {
 
     public static final String AUTHORITY = "PORTAL_SESSION";
@@ -39,22 +41,6 @@ public class PortalSessionAuthenticationToken extends AbstractAuthenticationToke
 
     @Override
     public Object getPrincipal() {
-        return consumerId;
-    }
-
-    public UUID getSessionId() {
-        return sessionId;
-    }
-
-    public UUID getOrganizationId() {
-        return organizationId;
-    }
-
-    public UUID getProjectId() {
-        return projectId;
-    }
-
-    public UUID getConsumerId() {
         return consumerId;
     }
 

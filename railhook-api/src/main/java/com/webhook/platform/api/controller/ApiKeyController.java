@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,13 +30,10 @@ import java.util.UUID;
 @Tag(name = "API Keys", description = "API key management for event ingestion")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;
-
-    public ApiKeyController(ApiKeyService apiKeyService) {
-        this.apiKeyService = apiKeyService;
-    }
 
     @Operation(summary = "Create API key", description = "Generates a new API key for event ingestion. The key is shown only once.")
     @ApiResponse(responseCode = "201", description = "API key created")

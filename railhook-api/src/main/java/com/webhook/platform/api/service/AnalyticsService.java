@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -20,23 +21,13 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AnalyticsService {
 
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository attemptRepository;
     private final EventRepository eventRepository;
     private final EndpointRepository endpointRepository;
-
-    public AnalyticsService(
-            DeliveryRepository deliveryRepository,
-            DeliveryAttemptRepository attemptRepository,
-            EventRepository eventRepository,
-            EndpointRepository endpointRepository) {
-        this.deliveryRepository = deliveryRepository;
-        this.attemptRepository = attemptRepository;
-        this.eventRepository = eventRepository;
-        this.endpointRepository = endpointRepository;
-    }
 
     public AnalyticsResponse getAnalytics(UUID projectId, String period) {
         Instant now = Instant.now();
