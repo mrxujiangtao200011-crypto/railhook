@@ -81,8 +81,7 @@ public class MtlsWebClientFactory {
             try {
                 return new CachedClient(createMtlsWebClient(endpoint), endpointUpdatedAt);
             } catch (Exception e) {
-                log.error("Failed to create mTLS WebClient for endpoint {}: {}", id, e.getMessage());
-                throw new RuntimeException("Failed to create mTLS client", e);
+                throw new RuntimeException("Failed to create mTLS client for endpoint " + id, e);
             }
         }).webClient();
     }

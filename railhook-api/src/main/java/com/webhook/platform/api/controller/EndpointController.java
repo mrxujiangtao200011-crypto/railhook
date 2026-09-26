@@ -58,13 +58,8 @@ public class EndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        try {
-            EndpointResponse response = endpointService.createEndpoint(projectId, request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (Exception e) {
-            log.error("Failed to create endpoint for project {}: {}", projectId, e.getMessage(), e);
-            throw e;
-        }
+        EndpointResponse response = endpointService.createEndpoint(projectId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @Operation(summary = "Get endpoint", description = "Returns endpoint details by ID")

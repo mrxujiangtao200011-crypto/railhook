@@ -325,11 +325,8 @@ public class IncomingEventService {
     }
 
     private IncomingEventResponse mapToResponse(IncomingEvent event) {
-        String sourceName = null;
-        try {
-            sourceName = sourceRepository.findById(event.getIncomingSourceId())
-                    .map(IncomingSource::getName).orElse(null);
-        } catch (Exception ignored) {}
+        String sourceName = sourceRepository.findById(event.getIncomingSourceId())
+                .map(IncomingSource::getName).orElse(null);
         IncomingEventResponse resp = mapToResponse(event, Map.of());
         resp.setSourceName(sourceName);
         return resp;
