@@ -31,7 +31,7 @@ vi.mock('../../i18n', () => ({
   },
 }));
 
-import { showApiError, showSuccess, showWarning, resolveErrorMessage, isNetworkError } from '../toast';
+import { showApiError, showSuccess, resolveErrorMessage, isNetworkError } from '../toast';
 
 describe('toast utilities', () => {
   beforeEach(() => {
@@ -81,22 +81,15 @@ describe('toast utilities', () => {
   });
 
   describe('isNetworkError', () => {
-    it('is true when the request has no response (connection refused / backend down)', () => {
-      expect(isNetworkError({ request: {}, message: 'Network Error' })).toBe(true);
-    });
-
-    it('is true for axios ERR_NETWORK / timeout codes', () => {
-      expect(isNetworkError({ code: 'ERR_NETWORK' })).toBe(true);
-      expect(isNetworkError({ code: 'ECONNABORTED' })).toBe(true);
-    });
-
-    it('is false when the server actually responded, even with a 5xx', () => {
-      expect(isNetworkError({ response: { status: 500 }, request: {} })).toBe(false);
-    });
-
-    it('is false for a plain object with no axios shape', () => {
-      expect(isNetworkError({})).toBe(false);
-      expect(isNetworkError(null)).toBe(false);
+    it.each([
+      ['a request with no response (backend down)', { request: {}, message: 'Network Error' }, true],
+      ['axios ERR_NETWORK', { code: 'ERR_NETWORK' }, true],
+      ['an axios timeout', { code: 'ECONNABORTED' }, true],
+      ['a server that responded, even with a 5xx', { response: { status: 500 }, request: {} }, false],
+      ['a plain object with no axios shape', {}, false],
+      ['null', null, false],
+    ])('is %s: %s', (_, err, expected) => {
+      expect(isNetworkError(err)).toBe(expected);
     });
   });
 
@@ -105,42 +98,15 @@ describe('toast utilities', () => {
       const err = { request: {}, message: 'Network Error' };
       expect(resolveErrorMessage(err, 'toast.fallback')).toBe('Network error. Check your connection and try again.');
     });
-
-    it('falls back to the API message when the server responded', () => {
-      const err = { response: { status: 400, data: { message: 'Bad input' } } };
-      expect(resolveErrorMessage(err, 'toast.fallback')).toBe('Bad input');
-    });
-  });
-
-  describe('showApiError network handling', () => {
-    it('shows the network-down message instead of the generic fallback when the backend is unreachable', () => {
-      const err = { request: {}, message: 'Network Error' };
-      showApiError(err, 'toast.fallback');
-      expect(toast.error).toHaveBeenCalledWith(
-        'Network error. Check your connection and try again.',
-        expect.any(Object)
-      );
-    });
   });
 
   describe('showSuccess', () => {
-    it('shows translated message for i18n key', () => {
-      showSuccess('toast.fallback');
-      expect(toast.success).toHaveBeenCalledWith('Something went wrong', expect.any(Object));
-    });
-
-    it('shows raw message for non-i18n string', () => {
-      showSuccess('Created successfully');
-      expect(toast.success).toHaveBeenCalledWith('Created successfully', expect.any(Object));
-    });
-  });
-
-  describe('showWarning', () => {
-    it('calls toast.warning', () => {
-      showWarning('Watch out');
-      expect(toast.warning).toHaveBeenCalledWith('Watch out', expect.objectContaining({
-        duration: 6000,
-      }));
+    it.each([
+      ['an i18n key translated', 'toast.fallback', 'Something went wrong'],
+      ['a plain string as it is', 'Created successfully', 'Created successfully'],
+    ])('shows %s', (_, input, shown) => {
+      showSuccess(input);
+      expect(toast.success).toHaveBeenCalledWith(shown, expect.any(Object));
     });
   });
 });

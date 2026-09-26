@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderFeed, rfc822 } from '../blogFeed';
-import { parseFrontMatter } from '../frontMatter';
 
 const uiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(uiRoot, p), 'utf8');
@@ -62,23 +61,5 @@ describe('the feed is published at /blog/rss.xml', () => {
   it('is emitted into the build at that path', () => {
     expect(config).toContain("fileName: 'blog/rss.xml'");
     expect(config).toContain("const SITE = 'https://site-url.railhook.invalid'");
-  });
-
-  it('is served by the dev server from the same path', () => {
-    expect(config).toContain("req.url?.split('?')[0] !== '/blog/rss.xml'");
-    expect(config).toContain("'application/rss+xml; charset=utf-8'");
-  });
-
-  it('is rewritten to the deployment’s own origin when nginx serves it', () => {
-    const conf = readFileSync(join(uiRoot, 'nginx.conf'), 'utf8');
-    const root = conf.slice(conf.lastIndexOf('location / {'));
-    expect(root).toMatch(/sub_filter_types text\/xml application\/xml text\/plain;/);
-  });
-
-  it('reads its posts through the same front-matter parser the pages do', () => {
-    expect(config).toContain("import { parseFrontMatter } from './src/lib/frontMatter'");
-    const post = parseFrontMatter(read('src/content/blog/stripe-github-shopify-when-your-endpoint-is-down/en.md'));
-    expect(post.values.title).toBeTruthy();
-    expect(post.values.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

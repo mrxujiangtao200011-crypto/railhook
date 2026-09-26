@@ -17,9 +17,11 @@ describe('classifyError, for an attempt that never left the worker', () => {
     expect(result.fixKey).toBe('errorClass.transformFailed.fix');
   });
 
-  it('recognises a template failure too, which says neither "script" nor a line', () => {
-    expect(classifyError(attempt('TRANSFORM_FAILED: Payload transformation failed: bad JSON')).category)
-      .toBe('TRANSFORM_FAILED');
+  it.each([
+    ['a template failure, which says neither "script" nor a line', 'TRANSFORM_FAILED: Payload transformation failed: bad JSON'],
+    ['a script whose own message says TIMEOUT', 'TRANSFORM_FAILED: Script transformation failed (TIMEOUT): the script was still running'],
+  ])('recognises %s as a transform failure', (_, message) => {
+    expect(classifyError(attempt(message)).category).toBe('TRANSFORM_FAILED');
   });
 
   it('names a cancellation as information, not as a failure', () => {
@@ -30,11 +32,6 @@ describe('classifyError, for an attempt that never left the worker', () => {
   });
 
   /** No status code: the same shape timeout rules match on, so ordering is the test. */
-  it('is not mistaken for a timeout when the word appears in the script\'s own message', () => {
-    expect(classifyError(attempt('TRANSFORM_FAILED: Script transformation failed (TIMEOUT): the script was still running')).category)
-      .toBe('TRANSFORM_FAILED');
-  });
-
   it('leaves everything else classified as it was', () => {
     expect(classifyError(attempt('connection refused')).category).toBe('CONNECTION_REFUSED');
     expect(classifyError(attempt(undefined, 429)).category).toBe('RATE_LIMITED');
