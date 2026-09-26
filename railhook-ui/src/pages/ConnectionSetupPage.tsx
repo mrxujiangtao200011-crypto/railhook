@@ -101,10 +101,8 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
   const [retryDelays, setRetryDelays] = useState('60,300,900,3600,21600,86400');
   const [finishing, setFinishing] = useState(false);
 
-  const suggestions = useMemo(() => {
-    const fromCatalog = catalog.map((entry) => entry.name).filter(Boolean);
-    return (fromCatalog.length > 0 ? fromCatalog : SUGGESTED_EVENT_TYPES).slice(0, 6);
-  }, [catalog]);
+  const fromCatalog = catalog.map((entry) => entry.name).filter(Boolean);
+  const suggestions = (fromCatalog.length > 0 ? fromCatalog : SUGGESTED_EVENT_TYPES).slice(0, 6);
 
   const chosenTypes = eventTypes.map((type) => type.trim()).filter(Boolean);
   const ticks = useMemo(() => ladderTicks(retryDelays, maxAttempts), [retryDelays, maxAttempts]);

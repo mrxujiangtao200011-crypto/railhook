@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -41,10 +40,7 @@ const LEVEL_STYLE = {
 export default function PasswordStrengthIndicator({ password, className }: PasswordStrengthIndicatorProps) {
   const { t } = useTranslation();
 
-  const results = useMemo(
-    () => RULES.map((r) => ({ ...r, passed: r.test(password) })),
-    [password],
-  );
+  const results = RULES.map((r) => ({ ...r, passed: r.test(password) }));
 
   const strength = results.filter((r) => r.passed).length;
   const level = strength <= 1 ? 'weak' : strength <= 3 ? 'fair' : strength <= 4 ? 'good' : 'strong';

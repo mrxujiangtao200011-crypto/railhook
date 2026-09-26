@@ -25,6 +25,12 @@ import { rulesApi, type RuleRequest } from './rules.api';
 import { consumersApi } from './consumers.api';
 import { portalApi, type PortalDeliveryFilters } from './portal.api';
 import { mcpAppsApi } from './mcpApps.api';
+import { apiKeysApi, type ApiKeyRequest, type ApiKeyRotateRequest } from './apiKeys.api';
+import { tunnelsApi } from './tunnels.api';
+import { debugLinksApi } from './debugLinks.api';
+import { piiRulesApi, type PiiMaskingRuleRequest } from './piiRules.api';
+import { replayApi, type ReplayRequest, type ReplaySessionResponse } from './replay.api';
+import { testEndpointsApi } from './testEndpoints.api';
 import type { ConsumerRequest, PortalEndpointRequest, PortalSessionRequest, EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest } from '../types/api.types';
 
 export const queryKeys = {
@@ -70,6 +76,7 @@ export const queryKeys = {
         list: (orgId: string) => ['members', orgId] as const,
     },
     apiKeys: {
+        all: (projectId: string) => ['api-keys', projectId] as const,
         paged: (projectId: string, page: number, size: number) => ['api-keys', projectId, page, size] as const,
     },
     mcpGrants: {
@@ -91,6 +98,18 @@ export const queryKeys = {
     incomingDlq: {
         list: (projectId: string, page: number, size: number, filters?: IncomingDlqFilters) => ['incoming-dlq', projectId, page, size, filters ?? {}] as const,
         stats: (projectId: string) => ['incoming-dlq', projectId, 'stats'] as const,
+    },
+    tunnels: {
+        all: ['tunnels'] as const,
+        list: ['tunnels', 'list'] as const,
+        status: ['tunnels', 'status'] as const,
+    },
+    sharedDebugLink: (token: string) => ['shared-debug-link', token] as const,
+    piiRules: {
+        list: (projectId: string) => ['pii-rules', projectId] as const,
+    },
+    replay: {
+        sessions: (projectId: string) => ['replay', projectId] as const,
     },
     testEndpoints: {
         list: (projectId: string) => ['test-endpoints', projectId] as const,
@@ -1247,5 +1266,198 @@ export function useRetryPortalDelivery() {
     return useMutation({
         mutationFn: (deliveryId: string) => portalApi.retryDelivery(deliveryId),
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['portal', 'deliveries'] }); },
+    });
+}
+
+export function useApiKeysPaged(projectId: string | undefined, page: number, size: number) {
+    return useQuery({
+        queryKey: queryKeys.apiKeys.paged(projectId!, page, size),
+        queryFn: () => apiKeysApi.listPaged(projectId!, page, size),
+        enabled: !!projectId,
+        placeholderData: keepPreviousData,
+        staleTime: 0,
+    });
+}
+
+export function useCreateApiKey(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: ApiKeyRequest) => apiKeysApi.create(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.apiKeys.all(projectId) }); },
+    });
+}
+
+export function useRotateApiKey(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: ApiKeyRotateRequest }) => apiKeysApi.rotate(projectId, id, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.apiKeys.all(projectId) }); },
+    });
+}
+
+export function useRevokeApiKey(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => apiKeysApi.revoke(projectId, id),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.apiKeys.all(projectId) }); },
+    });
+}
+
+export function useTunnels() {
+    return useQuery({
+        queryKey: queryKeys.tunnels.list,
+        queryFn: () => tunnelsApi.list(),
+        staleTime: 0,
+    });
+}
+
+export function useTunnelStatus() {
+    return useQuery({
+        queryKey: queryKeys.tunnels.status,
+        queryFn: () => tunnelsApi.status(),
+        staleTime: 0,
+    });
+}
+
+export function useCloseTunnel() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (sessionId: string) => tunnelsApi.close(sessionId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.tunnels.all }); },
+    });
+}
+
+/** Every fetch counts as a view on the server, so it happens once per visit. */
+export function useSharedDebugLink(token: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.sharedDebugLink(token!),
+        queryFn: () => debugLinksApi.viewPublic(token!),
+        enabled: !!token,
+        staleTime: Infinity,
+        retry: false,
+    });
+}
+
+export function usePiiRules(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.piiRules.list(projectId!),
+        queryFn: () => piiRulesApi.list(projectId!),
+        enabled: !!projectId,
+    });
+}
+
+export function useSeedPiiRules(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: () => piiRulesApi.seedDefaults(projectId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.piiRules.list(projectId) }); },
+    });
+}
+
+export function useCreatePiiRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: PiiMaskingRuleRequest) => piiRulesApi.create(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.piiRules.list(projectId) }); },
+    });
+}
+
+export function useUpdatePiiRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: PiiMaskingRuleRequest }) => piiRulesApi.update(projectId, id, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.piiRules.list(projectId) }); },
+    });
+}
+
+export function useDeletePiiRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => piiRulesApi.delete(projectId, id),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.piiRules.list(projectId) }); },
+    });
+}
+
+const REPLAY_IN_FLIGHT = new Set(['RUNNING', 'PENDING', 'ESTIMATING', 'CANCELLING']);
+
+export function isReplayInFlight(sessions: ReplaySessionResponse[] | undefined) {
+    return !!sessions?.some((s) => REPLAY_IN_FLIGHT.has(s.status));
+}
+
+export function useReplaySessions(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.replay.sessions(projectId!),
+        queryFn: () => replayApi.list(projectId!, 0, 50).then((page) => page.content),
+        enabled: !!projectId,
+        staleTime: 0,
+        refetchInterval: (query) => (isReplayInFlight(query.state.data) ? 2000 : false),
+    });
+}
+
+export function useEstimateReplay(projectId: string) {
+    return useMutation({
+        mutationFn: (request: ReplayRequest) => replayApi.estimate(projectId, request),
+    });
+}
+
+export function useCreateReplay(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (request: ReplayRequest) => replayApi.create(projectId, request),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.replay.sessions(projectId) }); },
+    });
+}
+
+export function useCancelReplay(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (sessionId: string) => replayApi.cancel(projectId, sessionId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.replay.sessions(projectId) }); },
+    });
+}
+
+export function useTestEndpoints(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.testEndpoints.list(projectId!),
+        queryFn: () => testEndpointsApi.list(projectId!),
+        enabled: !!projectId,
+        staleTime: 0,
+    });
+}
+
+export function useCapturedRequests(projectId: string | undefined, endpointId: string | null) {
+    return useQuery({
+        queryKey: queryKeys.testEndpoints.requests(projectId!, endpointId!),
+        queryFn: () => testEndpointsApi.getRequests(projectId!, endpointId!).then((page) => page.content),
+        enabled: !!projectId && !!endpointId,
+        staleTime: 0,
+    });
+}
+
+export function useCreateTestEndpoint(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: () => testEndpointsApi.create(projectId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.testEndpoints.list(projectId), exact: true }); },
+    });
+}
+
+export function useDeleteTestEndpoint(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => testEndpointsApi.delete(projectId, id),
+        // Exact: a prefix match would refetch the deleted endpoint's requests into a 404.
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.testEndpoints.list(projectId), exact: true }); },
+    });
+}
+
+export function useClearCapturedRequests(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (endpointId: string) => testEndpointsApi.clearRequests(projectId, endpointId),
+        onSuccess: (_, endpointId) => {
+            qc.invalidateQueries({ queryKey: queryKeys.testEndpoints.list(projectId), exact: true });
+            qc.invalidateQueries({ queryKey: queryKeys.testEndpoints.requests(projectId, endpointId) });
+        },
     });
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -24,10 +24,8 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
 
   const currentProject = projects.find((p) => p.id === currentProjectId);
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
-  }, [projects, query]);
+  const q = query.trim().toLowerCase();
+  const matches = q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
 
   useEffect(() => {
     if (!open) return;
@@ -48,11 +46,12 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
     };
   }, [open]);
 
-  useEffect(() => {
-    if (!open) setQuery('');
-  }, [open]);
-
   if (projects.length === 0) return null;
+
+  const toggleOpen = () => {
+    setQuery('');
+    setOpen((o) => !o);
+  };
 
   const handleSwitch = (newProjectId: string) => {
     setOpen(false);
@@ -132,7 +131,7 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
       <div ref={ref} className="relative">
         <button
           ref={triggerRef}
-          onClick={() => setOpen((o) => !o)}
+          onClick={toggleOpen}
           aria-haspopup="listbox"
           aria-expanded={open}
           title={label}
@@ -150,7 +149,7 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
     <div ref={ref} className="relative">
       <button
         ref={triggerRef}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleOpen}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={t('nav.currentProject', { name: label })}

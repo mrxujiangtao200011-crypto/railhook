@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRight, Eraser, Inbox, TestTube } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,9 @@ import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import JsonEditor from '../components/JsonEditor';
 import { Workbench, WorkbenchPanel, OutputBlock, ResultPlaceholder } from '../components/Workbench';
-import { testEndpointsApi, type TestEndpointResponse, type CapturedRequestResponse } from '../api/testEndpoints.api';
+import {
+  useTestEndpoints, useCapturedRequests, useCreateTestEndpoint, useDeleteTestEndpoint, useClearCapturedRequests,
+} from '../api/queries';
 import { Button, buttonVariants } from '../components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -24,55 +26,30 @@ export default function TestEndpointsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageTestEndpoints } = usePermissions();
 
-  const [endpoints, setEndpoints] = useState<TestEndpointResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<unknown>(null);
-  const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<string | null>(null);
-  const [requests, setRequests] = useState<CapturedRequestResponse[]>([]);
-  const [loadingRequests, setLoadingRequests] = useState(false);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
-  const [clearing, setClearing] = useState(false);
 
-  const loadEndpoints = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      setLoading(true);
-      setEndpoints(await testEndpointsApi.list(projectId));
-      setLoadError(null);
-    } catch (err: any) {
-      setLoadError(err);
-      showApiError(err, 'testEndpoints.toast.loadFailed');
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
-
-  // Only the latest load may write, or a slower earlier answer lands on the newly selected endpoint.
-  const latestRequestsLoad = useRef(0);
-  const loadRequests = useCallback(async (endpointId: string) => {
-    if (!projectId) return;
-    const load = ++latestRequestsLoad.current;
-    try {
-      setLoadingRequests(true);
-      const data = await testEndpointsApi.getRequests(projectId, endpointId);
-      if (load === latestRequestsLoad.current) setRequests(data.content);
-    } catch (err: any) {
-      if (load === latestRequestsLoad.current) showApiError(err, 'testEndpoints.toast.loadRequestsFailed');
-    } finally {
-      if (load === latestRequestsLoad.current) setLoadingRequests(false);
-    }
-  }, [projectId]);
+  const endpointsQuery = useTestEndpoints(projectId);
+  const requestsQuery = useCapturedRequests(projectId, selectedEndpoint);
+  const createEndpoint = useCreateTestEndpoint(projectId!);
+  const deleteEndpoint = useDeleteTestEndpoint(projectId!);
+  const clearRequests = useClearCapturedRequests(projectId!);
+  const endpoints = endpointsQuery.data ?? [];
+  const requests = requestsQuery.data ?? [];
+  const loadError = endpointsQuery.error;
+  const loadingRequests = requestsQuery.isFetching;
+  const creating = createEndpoint.isPending;
+  const deleting = deleteEndpoint.isPending;
+  const clearing = clearRequests.isPending;
 
   useEffect(() => {
-    if (projectId) loadEndpoints();
-  }, [projectId, loadEndpoints]);
+    if (loadError) showApiError(loadError, 'testEndpoints.toast.loadFailed');
+  }, [loadError]);
 
   useEffect(() => {
-    if (selectedEndpoint && projectId) loadRequests(selectedEndpoint);
-  }, [selectedEndpoint, projectId, loadRequests]);
+    if (requestsQuery.error) showApiError(requestsQuery.error, 'testEndpoints.toast.loadRequestsFailed');
+  }, [requestsQuery.error]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -82,34 +59,24 @@ export default function TestEndpointsPage() {
   const handleCreate = async () => {
     if (!projectId) return;
     try {
-      setCreating(true);
-      const endpoint = await testEndpointsApi.create(projectId);
-      setEndpoints([endpoint, ...endpoints]);
+      const endpoint = await createEndpoint.mutateAsync();
       setSelectedEndpoint(endpoint.id);
       showSuccess(t('testEndpoints.toast.created'));
       copyToClipboard(endpoint.url);
     } catch (err: any) {
       showApiError(err, 'testEndpoints.toast.createFailed');
-    } finally {
-      setCreating(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deleteId || !projectId) return;
     try {
-      setDeleting(true);
-      await testEndpointsApi.delete(projectId, deleteId);
-      setEndpoints(endpoints.filter((e) => e.id !== deleteId));
-      if (selectedEndpoint === deleteId) {
-        setSelectedEndpoint(null);
-        setRequests([]);
-      }
+      await deleteEndpoint.mutateAsync(deleteId);
+      if (selectedEndpoint === deleteId) setSelectedEndpoint(null);
       showSuccess(t('testEndpoints.toast.deleted'));
     } catch (err: any) {
       showApiError(err, 'testEndpoints.toast.deleteFailed');
     } finally {
-      setDeleting(false);
       setDeleteId(null);
     }
   };
@@ -117,15 +84,10 @@ export default function TestEndpointsPage() {
   const handleClearRequests = async () => {
     if (!selectedEndpoint || !projectId) return;
     try {
-      setClearing(true);
-      await testEndpointsApi.clearRequests(projectId, selectedEndpoint);
-      setRequests([]);
-      setEndpoints(endpoints.map((e) => (e.id === selectedEndpoint ? { ...e, requestCount: 0 } : e)));
+      await clearRequests.mutateAsync(selectedEndpoint);
       showSuccess(t('testEndpoints.toast.cleared'));
     } catch (err: any) {
       showApiError(err, 'testEndpoints.toast.clearFailed');
-    } finally {
-      setClearing(false);
     }
   };
 
@@ -142,7 +104,7 @@ export default function TestEndpointsPage() {
     try { return JSON.parse(headers); } catch { return {}; }
   };
 
-  if (loading) {
+  if (endpointsQuery.isLoading && !endpointsQuery.data) {
     return (
       <PageSkeleton>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -169,8 +131,8 @@ export default function TestEndpointsPage() {
         <ErrorState
           error={loadError}
           fallbackKey="testEndpoints.toast.loadFailed"
-          onRetry={loadEndpoints}
-          retrying={loading}
+          onRetry={() => endpointsQuery.refetch()}
+          retrying={endpointsQuery.isFetching}
         />
       </div>
     );
@@ -263,7 +225,7 @@ export default function TestEndpointsPage() {
                       {t('testEndpoints.clearRequests')}
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => loadRequests(selectedEndpoint)} disabled={loadingRequests}>
+                  <Button variant="ghost" size="sm" onClick={() => requestsQuery.refetch()} disabled={loadingRequests}>
                     <RefreshCw className={cn('h-3.5 w-3.5', loadingRequests && 'animate-spin')} />
                     {t('testEndpoints.refresh')}
                   </Button>
@@ -271,7 +233,7 @@ export default function TestEndpointsPage() {
               }
               bodyClassName="space-y-2"
             >
-              {loadingRequests ? (
+              {loadingRequests && !requestsQuery.isSuccess ? (
                 <SkeletonRows count={3} height="h-12" />
               ) : requests.length === 0 ? (
                 <EmptyState

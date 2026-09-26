@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Shield, Clock, Eye } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '../lib/date';
-import { debugLinksApi, SharedDebugLinkPublicResponse } from '../api/debugLinks.api';
+import { useSharedDebugLink } from '../api/queries';
 import { ErrorState } from '../components/EmptyState';
 import PageSkeleton from '../components/PageSkeleton';
 import { formatJson } from '../lib/json';
@@ -20,36 +19,9 @@ function Fact({ label, value, mono }: { label: string; value: string; mono?: boo
 export default function SharedDebugPage() {
   const { t } = useTranslation();
   const { token } = useParams<{ token: string }>();
-  const [data, setData] = useState<SharedDebugLinkPublicResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, isPending, refetch } = useSharedDebugLink(token);
 
-  const loadData = useCallback(async () => {
-    if (!token) return;
-    try {
-      setLoading(true);
-      // A retry that succeeds must not go on showing the failure before it.
-      setError(null);
-      const response = await debugLinksApi.viewPublic(token);
-      setData(response);
-    } catch (err: any) {
-      const status = err?.response?.status;
-      if (status === 404) {
-        setError(t('sharedDebug.expired'));
-      } else {
-        setError(t('sharedDebug.error'));
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [token, t]);
-
-  useEffect(() => {
-    if (token) loadData();
-  }, [token, loadData]);
-
-
-  if (loading) {
+  if (isPending) {
     return (
       <div className="min-h-screen bg-background">
         <PageSkeleton maxWidth="max-w-4xl" />
@@ -58,13 +30,14 @@ export default function SharedDebugPage() {
   }
 
   if (error || !data) {
+    const expired = (error as { response?: { status?: number } } | null)?.response?.status === 404;
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <div className="w-full max-w-md">
           <ErrorState
             title={t('sharedDebug.unavailable')}
-            description={error ?? t('sharedDebug.error')}
-            onRetry={loadData}
+            description={t(expired ? 'sharedDebug.expired' : 'sharedDebug.error')}
+            onRetry={() => refetch()}
           />
         </div>
       </div>

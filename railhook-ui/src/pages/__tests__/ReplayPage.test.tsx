@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ReplaySessionResponse } from '../../api/replay.api';
@@ -109,7 +109,6 @@ describe('ReplayPage', () => {
   it('renders an empty history without breaking', async () => {
     renderReplay();
 
-    await waitFor(() => expect(replayApi.list).toHaveBeenCalled());
-    expect(document.body.textContent?.trim()).not.toBe('');
+    expect(await screen.findByText('No replay sessions')).toBeInTheDocument();
   });
 });
