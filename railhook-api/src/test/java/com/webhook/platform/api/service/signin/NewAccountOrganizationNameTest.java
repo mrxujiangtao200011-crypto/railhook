@@ -1,6 +1,8 @@
 package com.webhook.platform.api.service.signin;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,24 +13,15 @@ class NewAccountOrganizationNameTest {
         return new VerifiedIdentity("google", "sub-1", email, "Full Name", givenName, hostedDomain);
     }
 
-    @Test
-    void namesTheCompanyAfterTheWorkspaceDomain() {
-        assertThat(NewAccountOrganizationName.of(identity("ada@acme.com", "Ada", "acme.com")))
-                .isEqualTo("Acme");
-        assertThat(NewAccountOrganizationName.of(identity("ada@northwind-traders.co.uk", "Ada", "northwind-traders.co.uk")))
-                .isEqualTo("Northwind-traders");
-    }
-
-    @Test
-    void namesAPersonalAccountAfterThePerson() {
-        assertThat(NewAccountOrganizationName.of(identity("ada@gmail.com", "Ada", null)))
-                .isEqualTo("Ada's workspace");
-    }
-
-    @Test
-    void fallsBackToTheAddressWhenGoogleGivesNoName() {
-        assertThat(NewAccountOrganizationName.of(identity("ada.lovelace@gmail.com", null, "")))
-                .isEqualTo("ada.lovelace's workspace");
+    @ParameterizedTest
+    @CsvSource(nullValues = "NULL", value = {
+            "ada@acme.com, Ada, acme.com, Acme",
+            "ada@northwind-traders.co.uk, Ada, northwind-traders.co.uk, Northwind-traders",
+            "ada@gmail.com, Ada, NULL, Ada's workspace",
+            "ada.lovelace@gmail.com, NULL, '', ada.lovelace's workspace"})
+    void namesTheCompanyAfterTheDomainAndAPersonalAccountAfterThePerson(
+            String email, String givenName, String hostedDomain, String expected) {
+        assertThat(NewAccountOrganizationName.of(identity(email, givenName, hostedDomain))).isEqualTo(expected);
     }
 
     @Test

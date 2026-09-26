@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Delays between attempts and how many attempts there are, for both directions. No defaults
@@ -12,6 +15,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * malformed ladder used to hand customers an undocumented policy, so {@link #parse} throws.
  * Per-direction defaults are in {@link RetryLadderDefaults}.
  */
+@EqualsAndHashCode
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public final class RetryLadder {
 
     /** Longer is likelier a typo, and this keeps the arithmetic clear of overflow. */
@@ -23,11 +28,6 @@ public final class RetryLadder {
 
     private final List<Long> delaysSeconds;
     private final int maxAttempts;
-
-    private RetryLadder(List<Long> delaysSeconds, int maxAttempts) {
-        this.delaysSeconds = delaysSeconds;
-        this.maxAttempts = maxAttempts;
-    }
 
     public static RetryLadder parse(String delaysCsv, int maxAttempts) {
         List<Long> delays = parseDelays(delaysCsv, "retryDelays");
@@ -146,22 +146,6 @@ public final class RetryLadder {
                     worstCase, worstCase / 3600.0,
                     capName, hardCapSeconds, hardCapSeconds / 3600.0));
         }
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof RetryLadder other)) {
-            return false;
-        }
-        return maxAttempts == other.maxAttempts && delaysSeconds.equals(other.delaysSeconds);
-    }
-
-    @Override
-    public int hashCode() {
-        return 31 * delaysSeconds.hashCode() + maxAttempts;
     }
 
     @Override

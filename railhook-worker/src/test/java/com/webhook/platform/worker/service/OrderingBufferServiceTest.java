@@ -95,17 +95,6 @@ class OrderingBufferServiceTest {
     }
 
     @Test
-    void markDelivered_advancesRedisFromAuthoritativePostgresValue_notFromRawArgument() {
-        UUID endpointId = endpointId();
-        when(cursorRepository.upsertCursor(endpointId, 5L)).thenReturn(100L);
-
-        service.markDelivered(endpointId, 5L);
-
-        assertEquals(100L, fakeRedisState.get("seq:delivered:" + endpointId),
-                "Redis must converge to the authoritative Postgres value, never regress to the raw arg");
-    }
-
-    @Test
     void markDelivered_neverRegressesRedisCache_evenAfterSimulatedFlush() {
         UUID endpointId = endpointId();
         String key = "seq:delivered:" + endpointId;

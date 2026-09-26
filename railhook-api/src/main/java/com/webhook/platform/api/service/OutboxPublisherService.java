@@ -164,7 +164,7 @@ public class OutboxPublisherService {
             return;
         }
 
-        log.info("Publishing {} pending outbox messages", claimed.size());
+        log.debug("Publishing {} pending outbox messages", claimed.size());
         publishBatchAsync(claimed, false);
     }
 
@@ -347,7 +347,7 @@ public class OutboxPublisherService {
                                     }
                                 }
                                 if (isRetry) {
-                                    log.info("Successfully retried outbox message: {}",
+                                    log.debug("Successfully retried outbox message: {}",
                                             message.getId());
                                 }
                             }

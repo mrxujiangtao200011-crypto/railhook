@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import lombok.RequiredArgsConstructor;
 import org.redisson.api.RRateLimiter;
 import org.redisson.api.RateLimiterConfig;
 import org.redisson.api.RateType;
@@ -13,6 +14,7 @@ import java.time.Duration;
  * trySetRate never updates an existing key, so the stored rate is compared and rewritten. A lost
  * limiter ("RateLimiter is not initialized") is re-created and retried once.
  */
+@RequiredArgsConstructor
 public final class ConvergingRateLimiter {
 
     private static final Duration INTERVAL = Duration.ofSeconds(1);
@@ -24,11 +26,6 @@ public final class ConvergingRateLimiter {
             .maximumSize(10_000)
             .expireAfterWrite(Duration.ofMinutes(1))
             .build();
-
-    public ConvergingRateLimiter(RedissonClient redissonClient, Duration keepAlive) {
-        this.redissonClient = redissonClient;
-        this.keepAlive = keepAlive;
-    }
 
     public boolean tryAcquire(String key, long ratePerSecond) {
         RRateLimiter limiter = redissonClient.getRateLimiter(key);

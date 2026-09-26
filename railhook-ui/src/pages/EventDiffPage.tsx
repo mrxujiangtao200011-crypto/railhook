@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { GitCompare, Search, ChevronLeft, ChevronRight, AlertTriangle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +7,8 @@ import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import { eventDiffApi, type EventDiffResponse } from '../api/eventDiff.api';
-import { eventsApi, type EventResponse } from '../api/events.api';
+import type { EventResponse } from '../api/events.api';
+import { useEvents } from '../api/queries';
 import EventDiffView from '../components/EventDiffView';
 import {
   Workbench, WorkbenchPanel, RunControl, ResultFrame, ResultMetric, ResultPlaceholder,
@@ -171,12 +172,7 @@ export default function EventDiffPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [allEvents, setAllEvents] = useState<EventResponse[]>([]);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [eventsPage, setEventsPage] = useState(0);
-  const [loadingEvents, setLoadingEvents] = useState(true);
-  const [eventsError, setEventsError] = useState<unknown>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [leftId, setLeftId] = useState(searchParams.get('left') || '');
@@ -186,22 +182,17 @@ export default function EventDiffPage() {
   const [diffing, setDiffing] = useState(false);
   const [sanitize, setSanitize] = useState(true);
 
-  const loadEvents = useCallback(async (page: number) => {
-    if (!projectId) return;
-    try {
-      setLoadingEvents(true);
-      const data = await eventsApi.listByProject(projectId, { page, size: 20, sort: 'createdAt,desc' });
-      setAllEvents(data.content);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
-      setEventsError(undefined);
-    } catch (err: any) {
-      setEventsError(err);
-      showApiError(err, 'eventDiff.toast.loadEventsFailed');
-    } finally {
-      setLoadingEvents(false);
-    }
-  }, [projectId]);
+  const events = useEvents(projectId, eventsPage);
+  const allEvents = events.data?.content ?? [];
+  const totalElements = events.data?.totalElements ?? 0;
+  const totalPages = events.data?.totalPages ?? 0;
+  const loadingEvents = events.isFetching && (events.isPlaceholderData || !events.isSuccess);
+  const eventsError = events.error ?? undefined;
+  const { refetch: refetchEvents } = events;
+
+  useEffect(() => {
+    if (eventsError) showApiError(eventsError, 'eventDiff.toast.loadEventsFailed');
+  }, [eventsError]);
 
   const runDiff = useCallback(async (left: string, right: string, mask: boolean) => {
     if (!projectId || !left || !right) return;
@@ -217,10 +208,6 @@ export default function EventDiffPage() {
     }
   }, [projectId, setSearchParams]);
 
-  useEffect(() => {
-    if (projectId) loadEvents(eventsPage);
-  }, [projectId, eventsPage, loadEvents]);
-
   // A link that already names both events compares itself once, on arrival.
   const deepLinked = useRef(false);
   useEffect(() => {
@@ -231,21 +218,17 @@ export default function EventDiffPage() {
     }
   }, [projectId, leftId, rightId, sanitize, runDiff]);
 
-  const filteredEvents = useMemo(() => {
-    if (!searchQuery.trim()) return allEvents;
-    const q = searchQuery.toLowerCase();
-    return allEvents.filter((ev) => ev.eventType.toLowerCase().includes(q) || ev.id.toLowerCase().includes(q));
-  }, [allEvents, searchQuery]);
+  const q = searchQuery.toLowerCase();
+  const filteredEvents = q.trim()
+    ? allEvents.filter((ev) => ev.eventType.toLowerCase().includes(q) || ev.id.toLowerCase().includes(q))
+    : allEvents;
 
-  const summary = useMemo(() => {
-    if (!diffResult) return null;
-    return {
-      added: diffResult.diffs.filter((d) => d.type === 'ADDED').length,
-      removed: diffResult.diffs.filter((d) => d.type === 'REMOVED').length,
-      changed: diffResult.diffs.filter((d) => d.type === 'CHANGED').length,
-      total: diffResult.diffs.length,
-    };
-  }, [diffResult]);
+  const summary = diffResult && {
+    added: diffResult.diffs.filter((d) => d.type === 'ADDED').length,
+    removed: diffResult.diffs.filter((d) => d.type === 'REMOVED').length,
+    changed: diffResult.diffs.filter((d) => d.type === 'CHANGED').length,
+    total: diffResult.diffs.length,
+  };
 
   if (loadingEvents && allEvents.length === 0) {
     return <PageSkeleton><div className="h-64 animate-pulse bg-muted" /></PageSkeleton>;
@@ -273,7 +256,7 @@ export default function EventDiffPage() {
           onSearchChange={setSearchQuery}
           loading={loadingEvents}
           error={eventsError}
-          onRetry={() => loadEvents(eventsPage)}
+          onRetry={() => refetchEvents()}
           totalElements={totalElements}
         />
         <EventPicker
@@ -288,7 +271,7 @@ export default function EventDiffPage() {
           onSearchChange={setSearchQuery}
           loading={loadingEvents}
           error={eventsError}
-          onRetry={() => loadEvents(eventsPage)}
+          onRetry={() => refetchEvents()}
           totalElements={totalElements}
         />
 

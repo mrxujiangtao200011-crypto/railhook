@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.consumer;
 
 import com.webhook.platform.worker.service.BoundedAsyncExecutor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.support.Acknowledgment;
 
@@ -10,13 +11,10 @@ import org.springframework.kafka.support.Acknowledgment;
  * obligation goes back to the ladder and the record is acked.
  */
 @Slf4j
+@RequiredArgsConstructor
 public class BackpressureDispatch {
 
     private final BoundedAsyncExecutor asyncExecutor;
-
-    public BackpressureDispatch(BoundedAsyncExecutor asyncExecutor) {
-        this.asyncExecutor = asyncExecutor;
-    }
 
     /**
      * {@code handBack} must stamp the row's next retry time: the schedulers ignore rows without

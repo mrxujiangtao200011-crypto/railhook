@@ -3,12 +3,15 @@ package com.webhook.platform.api.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.AuditLogAspect;
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ErrorResponseWriter;
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.PlatformAdminAccessService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,6 +32,7 @@ import java.util.regex.Pattern;
  * <p>Not a {@code @Component}: Spring Boot would also register it as a servlet filter.
  */
 @Slf4j
+@RequiredArgsConstructor
 public class PlatformAdminAccessFilter extends OncePerRequestFilter {
 
     static final String ADMIN_PREFIX = "/api/v1/admin/";
@@ -38,20 +42,11 @@ public class PlatformAdminAccessFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final PlatformAdminAccessService access;
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
     private final AuthRateLimiterService rateLimiter;
     private final AuditLogAspect audit;
     private final TrustedProxyResolver proxyResolver;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    public PlatformAdminAccessFilter(PlatformAdminAccessService access, JwtUtil jwtUtil,
-            AuthRateLimiterService rateLimiter, AuditLogAspect audit, TrustedProxyResolver proxyResolver) {
-        this.access = access;
-        this.jwtUtil = jwtUtil;
-        this.rateLimiter = rateLimiter;
-        this.audit = audit;
-        this.proxyResolver = proxyResolver;
-    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -71,7 +66,7 @@ public class PlatformAdminAccessFilter extends OncePerRequestFilter {
                 case GRANTED -> SecurityContextHolder.getContext()
                         .setAuthentication(new PlatformAdminUserAuthenticationToken(jwt, decision.email()));
                 case REAUTHENTICATE -> {
-                    writeError(response, HttpServletResponse.SC_FORBIDDEN, "reauthentication_required",
+                    ErrorResponseWriter.write(response, ErrorCode.REAUTHENTICATION_REQUIRED,
                             "Sign in again to use the platform admin panel: the last sign-in was more than "
                                     + PlatformAdminAccessService.MAX_SIGN_IN_AGE.toHours() + " hours ago.");
                     return;
@@ -94,7 +89,7 @@ public class PlatformAdminAccessFilter extends OncePerRequestFilter {
                 : "token:" + clientIp;
         if (!rateLimiter.allowPlatformAdmin(caller)) {
             log.warn("Platform admin rate limit exceeded for {}", caller);
-            writeError(response, 429, "rate_limited", "Too many platform admin requests. Try again in a minute.");
+            ErrorResponseWriter.write(response, ErrorCode.RATE_LIMITED, "Too many platform admin requests. Try again in a minute.");
             return;
         }
 
@@ -148,8 +143,8 @@ public class PlatformAdminAccessFilter extends OncePerRequestFilter {
             return null;
         }
         try {
-            String raw = jwtUtil.parseToken(header.substring(BEARER_PREFIX.length()))
-                    .get(JwtUtil.CLAIM_SESSION_ID, String.class);
+            String raw = jwtTokenService.parseToken(header.substring(BEARER_PREFIX.length()))
+                    .get(JwtTokenService.CLAIM_SESSION_ID, String.class);
             return raw == null ? null : UUID.fromString(raw);
         } catch (Exception e) {
             return null;
@@ -165,13 +160,5 @@ public class PlatformAdminAccessFilter extends OncePerRequestFilter {
         String uri = request.getRequestURI();
         String context = request.getContextPath();
         return context != null && !context.isEmpty() && uri.startsWith(context) ? uri.substring(context.length()) : uri;
-    }
-
-    private static void writeError(HttpServletResponse response, int status, String error, String message)
-            throws IOException {
-        response.setStatus(status);
-        response.setContentType("application/json");
-        response.getWriter().write("{\"error\":\"" + error + "\",\"message\":\"" + message + "\",\"status\":"
-                + status + "}");
     }
 }

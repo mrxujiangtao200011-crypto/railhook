@@ -4,9 +4,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
-import i18n from '../../i18n';
 import en from '../../i18n/locales/en.json';
-import uk from '../../i18n/locales/uk.json';
 import { renderPage } from '../../test/renderPage';
 import SignatureVerifierPage from '../SignatureVerifierPage';
 
@@ -34,10 +32,9 @@ beforeEach(() => {
   xhrSpy = vi.spyOn(XMLHttpRequest.prototype, 'open');
 });
 
-afterEach(async () => {
+afterEach(() => {
   fetchSpy.mockRestore();
   xhrSpy.mockRestore();
-  await i18n.changeLanguage('en');
 });
 
 describe('SignatureVerifierPage', () => {
@@ -49,20 +46,6 @@ describe('SignatureVerifierPage', () => {
     const data = JSON.parse(node?.textContent ?? '{}');
     expect(data['@type']).toBe('WebApplication');
     expect(data.offers).toMatchObject({ price: '0' });
-  });
-
-  it('says up front that the secret never leaves the browser', () => {
-    renderVerifier();
-    expect(screen.getByText(en.webhookSignature.private)).toBeInTheDocument();
-  });
-
-  it('confirms a GitHub signature that matches', async () => {
-    renderVerifier();
-    await userEvent.click(screen.getByRole('radio', { name: en.webhookSignature.providers.github }));
-    paste(en.webhookSignature.payload, BODY);
-    paste(en.webhookSignature.secret, SECRET);
-    paste('X-Hub-Signature-256', GITHUB_SIGNATURE);
-    expect(await screen.findByText(en.webhookSignature.result.valid)).toBeInTheDocument();
   });
 
   it('shows the signature it expected when the body does not match', async () => {
@@ -104,28 +87,15 @@ describe('SignatureVerifierPage', () => {
     expect(screen.getByRole('status').textContent).toMatch(/outside the 5-minute window/);
   });
 
-  it('sends nothing anywhere while it checks', async () => {
+  it('confirms a GitHub signature that matches, sending nothing anywhere while it checks', async () => {
     renderVerifier();
     await userEvent.click(screen.getByRole('radio', { name: en.webhookSignature.providers.github }));
     paste(en.webhookSignature.payload, BODY);
     paste(en.webhookSignature.secret, SECRET);
     paste('X-Hub-Signature-256', GITHUB_SIGNATURE);
-    await screen.findByText(en.webhookSignature.result.valid);
+    expect(await screen.findByText(en.webhookSignature.result.valid)).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(xhrSpy).not.toHaveBeenCalled();
-  });
-
-  it('points to Railhook doing this on every incoming webhook', () => {
-    renderVerifier();
-    const cta = screen.getByRole('heading', { name: en.webhookSignature.cta.title }).closest('section') as HTMLElement;
-    expect(within(cta).getByRole('link', { name: en.webhookSignature.cta.button })).toHaveAttribute('href', '/register');
-    expect(within(cta).getByRole('link', { name: en.webhookSignature.cta.docs })).toHaveAttribute('href', '/docs/incoming/verification/');
-  });
-
-  it('switches language', async () => {
-    await i18n.changeLanguage('uk');
-    renderVerifier();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(uk.webhookSignature.title);
   });
 
   it('has no detectable accessibility violations', async () => {

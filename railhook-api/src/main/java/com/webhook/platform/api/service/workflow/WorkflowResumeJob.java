@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.repository.WorkflowExecutionRepository;
 import com.webhook.platform.api.domain.repository.WorkflowRepository;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,26 +22,15 @@ import java.util.List;
 /** Resumes delayed executions so no thread sleeps; the batch cap keeps a burst off the pool. */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class WorkflowResumeJob {
 
     private final WorkflowExecutionRepository executionRepository;
     private final WorkflowRepository workflowRepository;
     private final WorkflowEngine engine;
     private final ObjectMapper objectMapper;
+    @Value("${workflow.execution.resume-batch-size:50}")
     private final int batchSize;
-
-    public WorkflowResumeJob(
-            WorkflowExecutionRepository executionRepository,
-            WorkflowRepository workflowRepository,
-            WorkflowEngine engine,
-            ObjectMapper objectMapper,
-            @Value("${workflow.execution.resume-batch-size:50}") int batchSize) {
-        this.executionRepository = executionRepository;
-        this.workflowRepository = workflowRepository;
-        this.engine = engine;
-        this.objectMapper = objectMapper;
-        this.batchSize = batchSize;
-    }
 
     @SystemTenant("suspended executions belong to every organization; each is resumed inside its own")
     @Scheduled(fixedDelayString = "${workflow.execution.resume-interval-ms:5000}")

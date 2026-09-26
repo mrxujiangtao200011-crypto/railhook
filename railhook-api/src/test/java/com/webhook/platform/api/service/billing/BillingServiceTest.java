@@ -2,6 +2,10 @@ package com.webhook.platform.api.service.billing;
 
 import java.util.UUID;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
@@ -473,8 +477,9 @@ class BillingServiceTest {
         verify(lifecycleService).activate(SUB_ID, start, end);
     }
 
-    @Test
-    void processWebhook_refunded_updatesPayment() {
+    @ParameterizedTest
+    @CsvSource({"2900, REFUNDED", "1000, PARTIALLY_REFUNDED"})
+    void processWebhook_refund_updatesPaymentAndSaysHowMuchOnTheStatus(long refundedCents, PaymentStatus expected) {
         BillingPayment payment = BillingPayment.builder()
                 .id(UUID.randomUUID()).amountCents(2900)
                 .status(PaymentStatus.SUCCEEDED)
@@ -486,34 +491,13 @@ class BillingServiceTest {
 
         stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
                 "payment.refunded", null, null, "pi_ref", null,
-                2900L, "USD", null, null, null, null, null, null, null, Map.of()));
+                refundedCents, "USD", null, null, null, null, null, null, null, Map.of()));
 
         service.processWebhook("stripe", "{}", Map.of());
 
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
-        assertThat(payment.getRefundedCents()).isEqualTo(2900L);
+        assertThat(payment.getStatus()).isEqualTo(expected);
+        assertThat(payment.getRefundedCents()).isEqualTo(refundedCents);
         verify(paymentRepository).save(payment);
-    }
-
-    @Test
-    void processWebhook_partiallyRefunded_saysSoOnTheStatus() {
-        BillingPayment payment = BillingPayment.builder()
-                .id(UUID.randomUUID()).amountCents(2900)
-                .status(PaymentStatus.SUCCEEDED)
-                .externalPaymentId("pi_part").build();
-        when(subscriptionRepository.findByExternalSubscriptionId(any())).thenReturn(Optional.empty());
-        when(subscriptionRepository.findFirstByExternalCustomerIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
-        when(paymentRepository.findFirstByProviderCodeAndExternalPaymentIdAndStatusInOrderByCreatedAtDesc(eq("stripe"), eq("pi_part"), any()))
-                .thenReturn(Optional.of(payment));
-
-        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
-                "payment.refunded", null, null, "pi_part", null,
-                1000L, "USD", null, null, null, null, null, null, null, Map.of()));
-
-        service.processWebhook("stripe", "{}", Map.of());
-
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
-        assertThat(payment.getRefundedCents()).isEqualTo(1000L);
     }
 
     @Test
@@ -715,36 +699,31 @@ class BillingServiceTest {
                 paymentRepository, entitlementService, lifecycleService);
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     static class TestBillingProvider implements BillingProvider {
         private final String code;
+        @Getter
         private final String displayName;
         private final Set<BillingCapability> caps;
 
+        @Setter(AccessLevel.PACKAGE)
         String createCustomerResult;
         boolean createCustomerCalled;
         CreatePaymentResult paymentResult;
         CreatePaymentRequest lastPaymentRequest;
         String cancelledSubscriptionId;
+        @Setter(AccessLevel.PACKAGE)
         String portalUrl;
+        @Setter(AccessLevel.PACKAGE)
         List<ExternalInvoice> externalInvoices = List.of();
+        @Setter(AccessLevel.PACKAGE)
         BillingWebhookEvent webhookEvent;
         String currency = "USD";
         Long ownPriceCents;
 
-        TestBillingProvider(String code, String displayName, Set<BillingCapability> caps) {
-            this.code = code;
-            this.displayName = displayName;
-            this.caps = caps;
-        }
-
-        void setCreateCustomerResult(String id) { this.createCustomerResult = id; }
         void setCreatePaymentResult(CreatePaymentResult r) { this.paymentResult = r; }
-        void setPortalUrl(String url) { this.portalUrl = url; }
-        void setExternalInvoices(List<ExternalInvoice> inv) { this.externalInvoices = inv; }
-        void setWebhookEvent(BillingWebhookEvent e) { this.webhookEvent = e; }
 
         @Override public String getProviderCode() { return code; }
-        @Override public String getDisplayName() { return displayName; }
         @Override public Set<BillingCapability> capabilities() { return caps; }
         @Override public String getDefaultCurrency() { return currency; }
 

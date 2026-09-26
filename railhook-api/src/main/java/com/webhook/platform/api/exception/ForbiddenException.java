@@ -1,16 +1,16 @@
 package com.webhook.platform.api.exception;
 
-public class ForbiddenException extends RuntimeException {
+public class ForbiddenException extends DomainException {
 
     public ForbiddenException(String message) {
-        super(message);
+        super(ErrorCode.FORBIDDEN, message);
     }
 
     public ForbiddenException(String message, Throwable cause) {
-        super(message, cause);
+        super(ErrorCode.FORBIDDEN, message, cause);
     }
 
-    public String getCode() {
-        return "forbidden";
+    protected ForbiddenException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
     }
 }

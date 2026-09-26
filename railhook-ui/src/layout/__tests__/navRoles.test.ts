@@ -6,8 +6,8 @@ const ROLES: Role[] = ['VIEWER', 'DEVELOPER', 'OWNER'];
 
 /** Sidebar and router both read requiredRoleFor; separate lists once showed a link that denied access. */
 describe('route roles', () => {
-  it('lets any authenticated member reach their own profile', () => {
-    expect(requiredRoleFor('/admin/settings')).toBeUndefined();
+  it.each(['/admin/settings', '/admin/dashboard', '/admin/nothing-here'])('demands no role for %s: the profile, and paths no nav entry claims', (path) => {
+    expect(requiredRoleFor(path)).toBeUndefined();
   });
 
   it('keeps the organization-level pages owner-only', () => {
@@ -16,25 +16,10 @@ describe('route roles', () => {
     expect(requiredRoleFor('/admin/billing')).toBe('OWNER');
   });
 
-  it('demands nothing of a path no nav entry claims', () => {
-    expect(requiredRoleFor('/admin/dashboard')).toBeUndefined();
-    expect(requiredRoleFor('/admin/nothing-here')).toBeUndefined();
-  });
-
-  it('offers a settings tab exactly where the guard would let the member through', () => {
-    for (const role of ROLES) {
-      for (const tab of SETTINGS_SECTION.tabs) {
-        const offered = !tab.requiredRole || hasMinRole(role, tab.requiredRole);
-        const required = requiredRoleFor(tab.path());
-        const admitted = !required || hasMinRole(role, required);
-        expect(`${role} ${tab.nameKey} offered=${offered}`)
-          .toBe(`${role} ${tab.nameKey} offered=${admitted}`);
-      }
-    }
-  });
-
-  it('offers a project tab exactly where the guard would let the member through', () => {
-    const entries = PROJECT_SECTIONS.flatMap((section) => [section, ...section.tabs]);
+  it.each([
+    ['settings', SETTINGS_SECTION.tabs],
+    ['project', PROJECT_SECTIONS.flatMap((section) => [section, ...section.tabs])],
+  ] as const)('offers a %s tab exactly where the guard would let the member through', (_, entries) => {
     for (const role of ROLES) {
       for (const entry of entries) {
         const offered = !entry.requiredRole || hasMinRole(role, entry.requiredRole);

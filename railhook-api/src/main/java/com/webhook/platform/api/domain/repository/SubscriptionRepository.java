@@ -24,8 +24,4 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
             + "WHERE s.transformationId IN :transformationIds GROUP BY s.transformationId")
     List<Object[]> countByTransformationIds(@Param("transformationIds") Collection<UUID> transformationIds);
     boolean existsByEndpointIdAndEventType(UUID endpointId, String eventType);
-
-    @Query("SELECT s FROM Subscription s WHERE s.projectId = :projectId AND s.enabled = true " +
-           "AND s.eventType LIKE '%*%'")
-    List<Subscription> findWildcardSubscriptions(@Param("projectId") UUID projectId);
 }

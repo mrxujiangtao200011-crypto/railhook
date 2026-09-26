@@ -26,11 +26,12 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.mcp.oauth.McpOAuthAuthenticationToken;
 import com.webhook.platform.api.mcp.oauth.McpOAuthSettings;
-import com.webhook.platform.api.mcp.oauth.OAuthProtocolException;
+import com.webhook.platform.api.exception.OAuthProtocolException;
 import com.webhook.platform.api.mcp.oauth.OAuthSecrets;
 import com.webhook.platform.api.mcp.oauth.RedirectUris;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +60,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class McpOAuthService {
 
     private static final String RESOURCE_TYPE = "McpGrant";
@@ -78,28 +80,6 @@ public class McpOAuthService {
     private final AuditLogAspect auditLog;
     private final ObjectMapper objectMapper;
     private final Clock clock;
-
-    public McpOAuthService(McpOAuthSettings settings,
-                           OAuthClientRepository clientRepository,
-                           OAuthAuthorizationRequestRepository requestRepository,
-                           OAuthGrantRepository grantRepository,
-                           ProjectRepository projectRepository,
-                           MembershipRepository membershipRepository,
-                           UserRepository userRepository,
-                           AuditLogAspect auditLog,
-                           ObjectMapper objectMapper,
-                           Clock clock) {
-        this.settings = settings;
-        this.clientRepository = clientRepository;
-        this.requestRepository = requestRepository;
-        this.grantRepository = grantRepository;
-        this.projectRepository = projectRepository;
-        this.membershipRepository = membershipRepository;
-        this.userRepository = userRepository;
-        this.auditLog = auditLog;
-        this.objectMapper = objectMapper;
-        this.clock = clock;
-    }
 
     /** Unknown metadata is ignored (RFC 7591 §2); unsupported grant types are narrowed, not refused. */
     @SystemTenant("an app registers before any person or organization is involved -- oauth_clients is not tenant-scoped")

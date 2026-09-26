@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.repository.UserSessionRepository;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.RegisterRequest;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
-    @Autowired private JwtUtil jwtUtil;
+    @Autowired private JwtTokenService jwtTokenService;
     @Autowired private UserSessionRepository userSessionRepository;
 
     @Test
@@ -37,11 +37,11 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
     void registrationOpensASessionTheListCanSee() throws Exception {
         AuthResponse tokens = register("session-lifecycle-list@example.com");
 
-        UUID sessionId = jwtUtil.getSessionIdFromToken(tokens.getAccessToken());
+        UUID sessionId = jwtTokenService.getSessionIdFromToken(tokens.getAccessToken());
         assertThat(sessionId)
                 .as("the access token has to name its session, or revoking one could not reach it")
                 .isNotNull();
-        assertThat(jwtUtil.getSessionIdFromToken(tokens.getRefreshToken())).isEqualTo(sessionId);
+        assertThat(jwtTokenService.getSessionIdFromToken(tokens.getRefreshToken())).isEqualTo(sessionId);
 
         mockMvc.perform(get("/api/v1/auth/sessions")
                         .header("Authorization", "Bearer " + tokens.getAccessToken())
@@ -58,7 +58,7 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
     void listCarriesNoCredential() throws Exception {
         AuthResponse tokens = register("session-lifecycle-no-secrets@example.com");
         String storedJti = userSessionRepository
-                .findByRefreshTokenJti(jwtUtil.getJtiFromToken(tokens.getRefreshToken()))
+                .findByRefreshTokenJti(jwtTokenService.getJtiFromToken(tokens.getRefreshToken()))
                 .orElseThrow()
                 .getRefreshTokenJti();
 
@@ -76,8 +76,8 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("a refresh rotates the session onto the new token rather than opening a second")
     void refreshRotatesInPlace() throws Exception {
         AuthResponse tokens = register("session-lifecycle-rotate@example.com");
-        UUID sessionId = jwtUtil.getSessionIdFromToken(tokens.getRefreshToken());
-        String firstJti = jwtUtil.getJtiFromToken(tokens.getRefreshToken());
+        UUID sessionId = jwtTokenService.getSessionIdFromToken(tokens.getRefreshToken());
+        String firstJti = jwtTokenService.getJtiFromToken(tokens.getRefreshToken());
 
         MvcResult refreshed = mockMvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refresh_token", tokens.getRefreshToken())))
@@ -85,13 +85,13 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
                 .andReturn();
         String newRefreshToken = refreshCookie(refreshed);
 
-        assertThat(jwtUtil.getSessionIdFromToken(newRefreshToken))
+        assertThat(jwtTokenService.getSessionIdFromToken(newRefreshToken))
                 .as("still the same session — refreshing is not signing in again")
                 .isEqualTo(sessionId);
 
         var row = userSessionRepository.findById(sessionId).orElseThrow();
         assertThat(row.getRefreshTokenJti())
-                .isEqualTo(jwtUtil.getJtiFromToken(newRefreshToken))
+                .isEqualTo(jwtTokenService.getJtiFromToken(newRefreshToken))
                 .isNotEqualTo(firstJti);
         assertThat(userSessionRepository
                 .findByUserIdAndRevokedAtIsNullAndExpiresAtAfterOrderByLastSeenAtDesc(
@@ -119,7 +119,7 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("revoking a session ends it, and the revoked token cannot be refreshed")
     void revokedSessionCannotRefresh() throws Exception {
         AuthResponse tokens = register("session-lifecycle-revoke@example.com");
-        UUID sessionId = jwtUtil.getSessionIdFromToken(tokens.getAccessToken());
+        UUID sessionId = jwtTokenService.getSessionIdFromToken(tokens.getAccessToken());
 
         mockMvc.perform(delete("/api/v1/auth/sessions/" + sessionId)
                         .header("Authorization", "Bearer " + tokens.getAccessToken()))
@@ -137,7 +137,7 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
     void cannotRevokeSomebodyElsesSession() throws Exception {
         AuthResponse victim = register("session-lifecycle-victim@example.com");
         AuthResponse attacker = register("session-lifecycle-attacker@example.com");
-        UUID victimSessionId = jwtUtil.getSessionIdFromToken(victim.getAccessToken());
+        UUID victimSessionId = jwtTokenService.getSessionIdFromToken(victim.getAccessToken());
 
         // user_sessions has no @TenantId: the (id, userId) lookup is the whole ownership check.
         mockMvc.perform(delete("/api/v1/auth/sessions/" + victimSessionId)
@@ -151,7 +151,7 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("sign out everywhere revokes every session the account has")
     void signOutEverywhere() throws Exception {
         AuthResponse first = register("session-lifecycle-everywhere@example.com");
-        UUID userId = jwtUtil.getUserIdFromToken(first.getAccessToken());
+        UUID userId = jwtTokenService.getUserIdFromToken(first.getAccessToken());
 
         mockMvc.perform(post("/api/v1/auth/sessions/revoke-all")
                         .header("Authorization", "Bearer " + first.getAccessToken()))

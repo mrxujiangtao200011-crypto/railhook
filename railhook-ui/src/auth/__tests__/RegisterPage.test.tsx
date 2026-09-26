@@ -71,8 +71,10 @@ describe('RegisterPage', () => {
 
   it('has the token in place before it asks who the new user is', async () => {
     vi.spyOn(authApi, 'register').mockResolvedValue({ accessToken: 'the-token' } as never);
+    // An expect() inside the mock would be swallowed by RegisterPage as a failed registration.
+    let tokenWhenAsked: string | null | undefined;
     const whoAmI = vi.spyOn(authApi, 'getCurrentUser').mockImplementation(async () => {
-      expect(http.getToken()).toBe('the-token');
+      tokenWhenAsked = http.getToken();
       return USER;
     });
 
@@ -80,27 +82,11 @@ describe('RegisterPage', () => {
     await fillAndSubmit();
 
     await waitFor(() => expect(whoAmI).toHaveBeenCalled());
+    expect(tokenWhenAsked).toBe('the-token');
+    await waitFor(() => expect(login).toHaveBeenCalled());
   });
 
-  it('shows the rejected field, not the generic summary that says nothing', async () => {
-    vi.spyOn(authApi, 'register').mockRejectedValue({
-      response: {
-        data: {
-          message: 'Invalid request parameters',
-          fieldErrors: { email: 'Email is already registered' },
-        },
-      },
-    });
-
-    renderRegister();
-    await fillAndSubmit();
-
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Email is already registered');
-    expect(alert).not.toHaveTextContent('Invalid request parameters');
-  });
-
-  it('joins several rejected fields rather than picking one', async () => {
+  it('shows every rejected field, not the generic summary that says nothing', async () => {
     vi.spyOn(authApi, 'register').mockRejectedValue({
       response: {
         data: {
@@ -116,6 +102,7 @@ describe('RegisterPage', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Email is invalid');
     expect(alert).toHaveTextContent('Password is too common');
+    expect(alert).not.toHaveTextContent('Invalid request parameters');
   });
 
   it('falls back to the summary when there are no field errors', async () => {
@@ -129,7 +116,7 @@ describe('RegisterPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Registration is disabled on this instance');
   });
 
-  it('does not sign anyone in when registration failed', async () => {
+  it('does not sign anyone in when registration failed, and lets the person try again', async () => {
     vi.spyOn(authApi, 'register').mockRejectedValue(new Error('Network Error'));
 
     renderRegister();
@@ -138,6 +125,7 @@ describe('RegisterPage', () => {
     await screen.findByRole('alert');
     expect(login).not.toHaveBeenCalled();
     expect(http.getToken()).toBeNull();
+    expect(screen.getByRole('button', { name: /create|register|sign up/i })).toBeEnabled();
   });
 
   it('links the terms and the privacy policy it asks people to agree to', () => {
@@ -156,7 +144,6 @@ describe('RegisterPage', () => {
     const missing = screen.getByRole('status');
     expect(missing).toHaveTextContent(/special character/i);
     expect(missing).not.toHaveTextContent(/uppercase|lowercase|number|8 characters/i);
-    expect(missing.className).toMatch(/text-halt/);
   });
 
   it('drops the hint once the password meets every rule', async () => {
@@ -167,14 +154,31 @@ describe('RegisterPage', () => {
     expect(screen.queryByRole('status')).toBeNull();
   });
 
-  it('lets the person try again after a failure', async () => {
-    vi.spyOn(authApi, 'register').mockRejectedValue(new Error('Network Error'));
-
+  // A real account registered as wheelet1228@gmail.con and never got a verification mail.
+  it('refuses a mistyped .con, offers gmail.com, and takes it in one click', async () => {
+    const register = vi.spyOn(authApi, 'register');
+    const user = userEvent.setup();
     renderRegister();
-    await fillAndSubmit();
 
-    await screen.findByRole('alert');
-    expect(screen.getByRole('button', { name: /create|register|sign up/i })).toBeEnabled();
+    // Pasted, not typed: per-key re-renders outran the test timeout under a full run.
+    const fill = async (field: HTMLElement, value: string) => {
+      await user.click(field);
+      await user.paste(value);
+    };
+    await fill(screen.getByLabelText(/name/i, { selector: '#fullName' }), 'Wheelet');
+    await fill(screen.getByLabelText(/organization|company|workspace/i), 'Wheelet Org');
+    await fill(screen.getByLabelText(/^password/i), 'A str0ng! passphrase');
+    await fill(screen.getByLabelText(/email/i), 'wheelet1228@gmail.con');
+
+    const submit = screen.getByRole('button', { name: /create|register|sign up/i });
+    expect(submit).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'wheelet1228@gmail.com' }));
+
+    expect(screen.getByLabelText(/email/i)).toHaveValue('wheelet1228@gmail.com');
+    expect(screen.queryByText(/did you mean/i)).not.toBeInTheDocument();
+    expect(submit).toBeEnabled();
+    expect(register).not.toHaveBeenCalled();
   });
 
   const INVITE = `/register?redirect=${encodeURIComponent('/accept-invite?token=t&orgId=o2')}`;

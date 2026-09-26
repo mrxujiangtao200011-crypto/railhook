@@ -228,12 +228,13 @@ export function SuspensionDialog({
   const reinstate = useReinstateOrganization();
   const mutation = mode === 'suspend' ? suspend : reinstate;
 
-  useEffect(() => {
-    if (!open) {
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
       setTyped('');
       setReason('');
     }
-  }, [open]);
+    onOpenChange(next);
+  };
 
   const ready = typed === organization.name && reason.trim().length > 0;
   const suspending = mode === 'suspend';
@@ -244,14 +245,14 @@ export function SuspensionDialog({
       await mutation.mutateAsync({ id: organization.id, reason: reason.trim() });
       showSuccess(t(suspending ? 'platformAdmin.suspendDialog.suspended' : 'platformAdmin.suspendDialog.reinstated',
         { name: organization.name }));
-      onOpenChange(false);
+      handleOpenChange(false);
     } catch (err) {
       showApiError(err, 'platformAdmin.suspendDialog.failed');
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className={cn(suspending && 'text-halt')}>
@@ -289,7 +290,7 @@ export function SuspensionDialog({
             </p>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               {t('common.cancel')}
             </Button>
             <Button type="submit" variant={suspending ? 'destructive' : 'default'} disabled={!ready || mutation.isPending}>

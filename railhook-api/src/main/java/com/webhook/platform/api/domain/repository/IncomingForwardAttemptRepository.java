@@ -3,7 +3,6 @@ package com.webhook.platform.api.domain.repository;
 import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -20,15 +19,6 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
 
     Page<IncomingForwardAttempt> findByIncomingEventId(UUID incomingEventId, Pageable pageable);
 
-    List<IncomingForwardAttempt> findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
-            UUID incomingEventId, UUID destinationId);
-
-    @Query("SELECT a FROM IncomingForwardAttempt a WHERE a.status = :status AND a.nextRetryAt <= :now " +
-            "ORDER BY a.nextRetryAt ASC")
-    List<IncomingForwardAttempt> findPendingRetries(
-            @Param("status") ForwardAttemptStatus status,
-            @Param("now") Instant now,
-            PageRequest pageRequest);
 
     @Query(value = "SELECT a FROM IncomingForwardAttempt a "
             + "JOIN IncomingEvent e ON a.incomingEventId = e.id "

@@ -11,9 +11,11 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.TreeMap;
+import lombok.RequiredArgsConstructor;
 
 // Non-form requests sign only the URL, so its bodySHA256 must be checked or the body could be
 // swapped. The URL comes from ingress-base-url, not Host headers, which break behind a proxy.
+@RequiredArgsConstructor
 public class TwilioVerifier implements WebhookVerificationStrategy {
 
     private static final String SIGNATURE_HEADER = "X-Twilio-Signature";
@@ -21,10 +23,6 @@ public class TwilioVerifier implements WebhookVerificationStrategy {
     private static final String FORM_CONTENT_TYPE = "application/x-www-form-urlencoded";
 
     private final String ingressBaseUrl;
-
-    public TwilioVerifier(String ingressBaseUrl) {
-        this.ingressBaseUrl = ingressBaseUrl;
-    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

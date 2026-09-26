@@ -17,11 +17,11 @@ import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.testcontainers.containers.Container;
+import com.webhook.platform.common.security.SecretEncryption;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -53,7 +53,7 @@ class BackupRestoreRoundTripIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("a dump taken mid-flight restores with its secrets readable and its work recoverable")
     void roundTrip() throws Exception {
         String secret = "whsec_" + UUID.randomUUID();
-        CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(secret);
+        SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(secret);
 
         Plan plan = planRepository.findByName("self_hosted")
                 .orElseGet(() -> planRepository.findAll().stream().findFirst().orElseThrow());

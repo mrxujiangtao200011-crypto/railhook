@@ -18,7 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.api.exception.DomainException;
 
 import java.time.Instant;
 import java.util.List;
@@ -152,7 +152,7 @@ class AccountErasureServiceTest {
                     orgId, MembershipRole.OWNER, MembershipStatus.DISABLED)).thenReturn(1L);
 
             assertThatThrownBy(() -> service.eraseAccount(userId))
-                    .isInstanceOf(ResponseStatusException.class)
+                    .isInstanceOf(DomainException.class)
                     .hasMessageContaining("owner");
 
             verify(userRepository, never()).save(any());

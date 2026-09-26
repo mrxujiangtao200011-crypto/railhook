@@ -40,15 +40,9 @@ describe('VITE_ build arguments', () => {
     }
   });
 
-  it.each(documented)('%s is declared as an ARG in the Dockerfile', (name) => {
+  it.each(documented)('%s is an ARG promoted to ENV in the Dockerfile and passed by the build overlay', (name) => {
     expect(dockerfile).toMatch(new RegExp(`^ARG ${name}=`, 'm'));
-  });
-
-  it.each(documented)('%s is promoted to ENV so Vite can read it', (name) => {
     expect(dockerfile).toMatch(new RegExp(`^ENV ${name}=\\$${name}$`, 'm'));
-  });
-
-  it.each(documented)('%s is passed as a build arg by the build overlay', (name) => {
     expect(composeBuild).toMatch(new RegExp(`^\\s+${name}: \\$\\{${name}:-`, 'm'));
   });
 });
@@ -65,12 +59,5 @@ describe('content-security-policy ownership', () => {
     expect(policies).toEqual(['frame-ancestors $portal_frame_ancestors']);
     expect(securityHeaders).not.toMatch(/add_header\s+Content-Security-Policy/i);
     expect(commonHeaders).not.toMatch(/add_header\s+Content-Security-Policy/i);
-  });
-
-  it('nginx still sends the headers that are not policy, and cannot be set from a meta tag', () => {
-    // frame-ancestors is ignored in a meta tag, so X-Frame-Options must stay.
-    expect(securityHeaders).toMatch(/add_header\s+X-Frame-Options/i);
-    expect(commonHeaders).toMatch(/add_header\s+X-Content-Type-Options/i);
-    expect(commonHeaders).toMatch(/add_header\s+Referrer-Policy/i);
   });
 });

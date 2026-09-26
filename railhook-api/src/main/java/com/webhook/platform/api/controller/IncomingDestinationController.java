@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -31,13 +32,10 @@ import java.util.UUID;
 @Tag(name = "Incoming Destinations", description = "Incoming webhook forwarding destinations")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class IncomingDestinationController {
 
     private final IncomingDestinationService destinationService;
-
-    public IncomingDestinationController(IncomingDestinationService destinationService) {
-        this.destinationService = destinationService;
-    }
 
     @Operation(summary = "Create destination", description = "Creates a new forwarding destination for the incoming source")
     @ApiResponse(responseCode = "201", description = "Destination created")

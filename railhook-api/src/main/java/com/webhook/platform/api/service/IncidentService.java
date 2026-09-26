@@ -87,7 +87,7 @@ public class IncidentService {
                 .build();
         timelineRepository.save(entry);
 
-        log.info("Created incident '{}' for project {}", incident.getTitle(), projectId);
+        log.debug("Created incident '{}' for project {}", incident.getTitle(), projectId);
         return getIncident(projectId, incident.getId());
     }
 

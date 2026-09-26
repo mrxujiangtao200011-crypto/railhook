@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.Project;
@@ -17,7 +18,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -103,7 +103,7 @@ class TunnelServiceTest {
     }
 
     @Test
-    void shouldCloseSessionByToken() {
+    void closingASessionByTokenMarksItClosedAndDisconnectsItEverywhere() {
         TunnelSession session = TunnelSession.builder()
                 .id(UUID.randomUUID())
                 .tunnelToken("test-token")
@@ -120,6 +120,7 @@ class TunnelServiceTest {
         verify(tunnelSessionRepository).save(captor.capture());
         assertEquals(TunnelStatus.CLOSED, captor.getValue().getStatus());
         assertNotNull(captor.getValue().getClosedAt());
+        verify(redisTunnelCoordinator).disconnect("tun-abc123");
     }
 
     // Deleting a tunnel only marked its row CLOSED, and the socket kept forwarding unmetered.
@@ -137,18 +138,6 @@ class TunnelServiceTest {
     }
 
     @Test
-    void closingASessionByTokenDisconnectsItsTunnelEverywhere() {
-        TunnelSession session = TunnelSession.builder()
-                .id(UUID.randomUUID()).tunnelToken("tok").publicSlug("tun-bytoken").status(TunnelStatus.ACTIVE).build();
-        when(tunnelSessionRepository.findByTunnelToken("tok")).thenReturn(Optional.of(session));
-        when(tunnelSessionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        tunnelService.closeSession("tok");
-
-        verify(redisTunnelCoordinator).disconnect("tun-bytoken");
-    }
-
-    @Test
     void shouldThrowWhenSlugNotActive() {
         TunnelSession session = TunnelSession.builder()
                 .id(UUID.randomUUID())
@@ -158,7 +147,7 @@ class TunnelServiceTest {
 
         when(tunnelSessionRepository.findByPublicSlug("tun-closed")).thenReturn(Optional.of(session));
 
-        assertThrows(ResponseStatusException.class, () -> tunnelService.getActiveBySlug("tun-closed"));
+        assertThrows(DomainException.class, () -> tunnelService.getActiveBySlug("tun-closed"));
     }
 
     // A slug cut out of base64 came up short when enough '-' and '_' were stripped, and creation threw.

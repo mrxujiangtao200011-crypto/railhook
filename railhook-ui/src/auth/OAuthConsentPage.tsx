@@ -46,7 +46,7 @@ export default function OAuthConsentPage() {
     enabled: isAuthenticated,
   });
 
-  const [projectId, setProjectId] = useState('');
+  const [chosenProjectId, setProjectId] = useState('');
   const [scope, setScope] = useState<McpGrantScope>('READ_ONLY');
   const [switchingOrg, setSwitchingOrg] = useState(false);
   const [deciding, setDeciding] = useState<'approve' | 'deny' | null>(null);
@@ -60,11 +60,7 @@ export default function OAuthConsentPage() {
     }
   }, [request]);
 
-  useEffect(() => {
-    if (!projects.some((p) => p.id === projectId)) {
-      setProjectId(projects[0]?.id ?? '');
-    }
-  }, [projects, projectId]);
+  const projectId = (projects.find((p) => p.id === chosenProjectId) ?? projects[0])?.id ?? '';
 
   if (errorCode || !requestId) {
     return (

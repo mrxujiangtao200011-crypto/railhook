@@ -1,10 +1,9 @@
 package com.webhook.platform.api.exception;
 
-import com.webhook.platform.common.security.UrlValidator;
+import com.webhook.platform.common.exception.InvalidUrlException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -42,12 +41,12 @@ public class GlobalExceptionHandler {
         log.warn("Validation failed: {}", summary);
         
         ErrorResponse error = ErrorResponse.builder()
-                .error("validation_error")
+                .error(ErrorCode.VALIDATION_ERROR.getValue())
                 .message("Invalid request parameters")
-                .status(HttpStatus.BAD_REQUEST.value())
+                .status(ErrorCode.VALIDATION_ERROR.getStatus().value())
                 .fieldErrors(fieldErrors)
                 .build();
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getStatus()).body(error);
     }
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -55,7 +54,7 @@ public class GlobalExceptionHandler {
             ResponseStatusException ex) {
         log.warn("Response status exception: {} {}", ex.getStatusCode(), ex.getReason());
         ErrorResponse error = new ErrorResponse(
-                ex.getStatusCode().is4xxClientError() ? "client_error" : "server_error",
+                (ex.getStatusCode().is4xxClientError() ? ErrorCode.CLIENT_ERROR : ErrorCode.SERVER_ERROR).getValue(),
                 ex.getReason() != null ? ex.getReason() : ex.getMessage(),
                 ex.getStatusCode().value()
         );
@@ -65,49 +64,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
             IllegalArgumentException ex, WebRequest request) {
-        log.error("Bad request: {}", ex.getMessage());
-        ErrorResponse error = new ErrorResponse(
-                "invalid_request",
-                ex.getMessage(),
-                HttpStatus.BAD_REQUEST.value()
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        log.warn("Bad request: {}", ex.getMessage());
+        return respond(ErrorCode.INVALID_REQUEST, ex.getMessage());
     }
 
-    @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<ErrorResponse> handleUnauthorizedException(
-            UnauthorizedException ex, WebRequest request) {
-        log.warn("Unauthorized: {}", ex.getMessage());
-        ErrorResponse error = new ErrorResponse(
-                "unauthorized",
-                ex.getMessage(),
-                HttpStatus.UNAUTHORIZED.value()
-        );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-    }
-
-    @ExceptionHandler(ForbiddenException.class)
-    public ResponseEntity<ErrorResponse> handleForbiddenException(
-            ForbiddenException ex, WebRequest request) {
-        log.warn("Forbidden: {}", ex.getMessage());
-        ErrorResponse error = new ErrorResponse(
-                ex.getCode(),
-                ex.getMessage(),
-                HttpStatus.FORBIDDEN.value()
-        );
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
-    }
-
-    @ExceptionHandler(NotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNotFoundException(
-            NotFoundException ex, WebRequest request) {
-        log.warn("Not found: {}", ex.getMessage());
-        ErrorResponse error = new ErrorResponse(
-                "not_found",
-                ex.getMessage(),
-                HttpStatus.NOT_FOUND.value()
-        );
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    @ExceptionHandler(DomainException.class)
+    public ResponseEntity<ErrorResponse> handleDomainException(DomainException ex, WebRequest request) {
+        ErrorCode code = ex.getErrorCode();
+        log.warn("{} {}: {}", code.getStatus().value(), code.getValue(), ex.getMessage());
+        return respond(code, ex.getMessage());
     }
 
     @ExceptionHandler(QuotaExceededException.class)
@@ -120,24 +85,12 @@ public class GlobalExceptionHandler {
         details.put("limit", String.valueOf(ex.getLimit()));
         details.put("plan", ex.getPlanName());
         ErrorResponse error = ErrorResponse.builder()
-                .error("quota_exceeded")
+                .error(ErrorCode.QUOTA_EXCEEDED.getValue())
                 .message(ex.getMessage())
-                .status(HttpStatus.PAYMENT_REQUIRED.value())
+                .status(ErrorCode.QUOTA_EXCEEDED.getStatus().value())
                 .fieldErrors(details)
                 .build();
-        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(error);
-    }
-
-    @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<ErrorResponse> handleConflictException(
-            ConflictException ex, WebRequest request) {
-        log.warn("Conflict: {}", ex.getMessage());
-        ErrorResponse error = new ErrorResponse(
-                "conflict",
-                ex.getMessage(),
-                HttpStatus.CONFLICT.value()
-        );
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        return ResponseEntity.status(ErrorCode.QUOTA_EXCEEDED.getStatus()).body(error);
     }
 
     /**
@@ -148,24 +101,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
             DataIntegrityViolationException ex, WebRequest request) {
         log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
-        ErrorResponse error = new ErrorResponse(
-                "conflict",
-                "The request conflicts with the current state of the resource",
-                HttpStatus.CONFLICT.value()
-        );
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        return respond(ErrorCode.CONFLICT, "The request conflicts with the current state of the resource");
     }
 
     @ExceptionHandler(PropertyReferenceException.class)
     public ResponseEntity<ErrorResponse> handlePropertyReference(
             PropertyReferenceException ex, WebRequest request) {
         log.debug("Unknown property reference: {}", ex.getPropertyName());
-        ErrorResponse error = new ErrorResponse(
-                "invalid_parameter",
-                "Cannot sort by '" + ex.getPropertyName() + "'",
-                HttpStatus.BAD_REQUEST.value()
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        return respond(ErrorCode.INVALID_PARAMETER, "Cannot sort by '" + ex.getPropertyName() + "'");
     }
 
     /** Actuator lives on the management port, so /actuator/health on this port lands here. */
@@ -173,12 +116,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleNoResourceFound(
             NoResourceFoundException ex, WebRequest request) {
         log.debug("No handler for {}", ex.getResourcePath());
-        ErrorResponse error = new ErrorResponse(
-                "not_found",
-                "The requested resource was not found",
-                HttpStatus.NOT_FOUND.value()
-        );
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        return respond(ErrorCode.NOT_FOUND, "The requested resource was not found");
     }
 
     /** Requests Spring rejects before a controller must not fall to the 500 catch-all, or clients retry them. */
@@ -186,18 +124,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMethodNotSupported(
             HttpRequestMethodNotSupportedException ex, WebRequest request) {
         log.debug("Method {} not supported for this path", ex.getMethod());
-        ErrorResponse error = new ErrorResponse(
-                "method_not_allowed",
-                "The " + ex.getMethod() + " method is not supported for this endpoint",
-                HttpStatus.METHOD_NOT_ALLOWED.value()
-        );
-        ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.getStatus());
         // RFC 9110 requires Allow on a 405.
         Set<HttpMethod> allowed = ex.getSupportedHttpMethods();
         if (allowed != null && !allowed.isEmpty()) {
             response.allow(allowed.toArray(new HttpMethod[0]));
         }
-        return response.body(error);
+        return response.body(ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED,
+                "The " + ex.getMethod() + " method is not supported for this endpoint"));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -205,81 +139,43 @@ public class GlobalExceptionHandler {
             HttpMessageNotReadableException ex, WebRequest request) {
         // Not ex.getMessage(): Jackson quotes part of the payload, which can hold credentials.
         log.debug("Unreadable request body: {}", ex.getMostSpecificCause().getClass().getSimpleName());
-        ErrorResponse error = new ErrorResponse(
-                "malformed_request",
-                "The request body is missing or is not valid JSON",
-                HttpStatus.BAD_REQUEST.value()
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        return respond(ErrorCode.MALFORMED_REQUEST, "The request body is missing or is not valid JSON");
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(
             HttpMediaTypeNotSupportedException ex, WebRequest request) {
         log.debug("Unsupported content type: {}", ex.getContentType());
-        ErrorResponse error = new ErrorResponse(
-                "unsupported_media_type",
-                "This endpoint accepts application/json",
-                HttpStatus.UNSUPPORTED_MEDIA_TYPE.value()
-        );
-        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(error);
+        return respond(ErrorCode.UNSUPPORTED_MEDIA_TYPE, "This endpoint accepts application/json");
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParameter(
             MissingServletRequestParameterException ex, WebRequest request) {
-        ErrorResponse error = new ErrorResponse(
-                "missing_parameter",
-                "Required parameter '" + ex.getParameterName() + "' is missing",
-                HttpStatus.BAD_REQUEST.value()
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        return respond(ErrorCode.MISSING_PARAMETER, "Required parameter '" + ex.getParameterName() + "' is missing");
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(
             MethodArgumentTypeMismatchException ex, WebRequest request) {
-        ErrorResponse error = new ErrorResponse(
-                "invalid_parameter",
-                "Parameter '" + ex.getName() + "' is not in the expected format",
-                HttpStatus.BAD_REQUEST.value()
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        return respond(ErrorCode.INVALID_PARAMETER, "Parameter '" + ex.getName() + "' is not in the expected format");
     }
 
-    @ExceptionHandler(UrlValidator.InvalidUrlException.class)
+    @ExceptionHandler(InvalidUrlException.class)
     public ResponseEntity<ErrorResponse> handleInvalidUrlException(
-            UrlValidator.InvalidUrlException ex, WebRequest request) {
+            InvalidUrlException ex, WebRequest request) {
         log.warn("Rejected webhook URL: {}", ex.getMessage());
-        ErrorResponse error = new ErrorResponse(
-                "invalid_url",
-                ex.getMessage(),
-                HttpStatus.BAD_REQUEST.value()
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-    }
-
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ErrorResponse> handleRuntimeException(
-            RuntimeException ex, WebRequest request) {
-        log.error("Internal server error: {}", ex.getMessage(), ex);
-        ErrorResponse error = new ErrorResponse(
-                "internal_error",
-                "An unexpected error occurred",
-                HttpStatus.INTERNAL_SERVER_ERROR.value()
-        );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        return respond(ErrorCode.INVALID_URL, ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(
             Exception ex, WebRequest request) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);
-        ErrorResponse error = new ErrorResponse(
-                "internal_error",
-                "An unexpected error occurred",
-                HttpStatus.INTERNAL_SERVER_ERROR.value()
-        );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        return respond(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred");
+    }
+
+    private static ResponseEntity<ErrorResponse> respond(ErrorCode code, String message) {
+        return ResponseEntity.status(code.getStatus()).body(ErrorResponse.of(code, message));
     }
 }

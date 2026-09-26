@@ -10,7 +10,7 @@ import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import com.webhook.platform.common.transform.JavaScriptTransformEngine;
-import com.webhook.platform.common.transform.ScriptTransformException;
+import com.webhook.platform.common.exception.ScriptTransformException;
 import com.webhook.platform.common.transform.TransformOutcome;
 import com.webhook.platform.common.transform.TransformRequest;
 import com.webhook.platform.common.transform.TransformationKind;
@@ -19,6 +19,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import com.webhook.platform.worker.exception.PayloadTransformException;
 
 import java.util.Iterator;
 import java.util.Map;

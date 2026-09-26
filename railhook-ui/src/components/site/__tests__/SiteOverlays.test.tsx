@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -40,18 +40,19 @@ describe('cookie notice', () => {
     expect(screen.queryByText(en.site.cookie.title)).not.toBeInTheDocument();
   });
 
-  it('is not shown again once answered', async () => {
-    localStorage.setItem(NOTICE_KEY, 'seen');
-    renderAt();
-    await new Promise((resolve) => setTimeout(resolve, 1100));
-    expect(screen.queryByText(en.site.cookie.title)).not.toBeInTheDocument();
-  });
-
-  it('is not shown where the deployment runs no analytics', async () => {
-    window.__RAILHOOK__ = { contactDomain: 'railhook.io' };
-    renderAt();
-    await new Promise((resolve) => setTimeout(resolve, 1100));
-    expect(screen.queryByText(en.site.cookie.title)).not.toBeInTheDocument();
+  it.each([
+    ['once answered', () => localStorage.setItem(NOTICE_KEY, 'seen')],
+    ['where the deployment runs no analytics', () => { window.__RAILHOOK__ = { contactDomain: 'railhook.io' }; }],
+  ])('is not shown %s', (_, arrange) => {
+    arrange();
+    vi.useFakeTimers();
+    try {
+      renderAt();
+      act(() => vi.advanceTimersByTime(2000));
+      expect(screen.queryByText(en.site.cookie.title)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

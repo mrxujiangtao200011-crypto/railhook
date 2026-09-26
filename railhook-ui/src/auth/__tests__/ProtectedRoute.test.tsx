@@ -56,14 +56,11 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('the guarded page')).toBeInTheDocument();
   });
 
-  it('refuses a Viewer a page that requires a Developer', () => {
-    renderGuarded(authState({ role: 'VIEWER' }), 'DEVELOPER');
-
-    expect(screen.queryByText('the guarded page')).not.toBeInTheDocument();
-  });
-
-  it('refuses a Developer a page that requires the Owner', () => {
-    renderGuarded(authState({ role: 'DEVELOPER' }), 'OWNER');
+  it.each([
+    ['VIEWER', 'DEVELOPER'],
+    ['DEVELOPER', 'OWNER'],
+  ] as const)('refuses a %s a page that requires a %s', (role, required) => {
+    renderGuarded(authState({ role }), required);
 
     expect(screen.queryByText('the guarded page')).not.toBeInTheDocument();
   });
@@ -85,16 +82,15 @@ describe('ProtectedRoute', () => {
   });
 
   describe('hasMinRole', () => {
-    it('orders the three roles', () => {
-      expect(hasMinRole('OWNER', 'VIEWER')).toBe(true);
-      expect(hasMinRole('DEVELOPER', 'VIEWER')).toBe(true);
-      expect(hasMinRole('VIEWER', 'DEVELOPER')).toBe(false);
-      expect(hasMinRole('DEVELOPER', 'OWNER')).toBe(false);
-    });
-
-    it('counts a role as meeting itself', () => {
-      expect(hasMinRole('VIEWER', 'VIEWER')).toBe(true);
-      expect(hasMinRole('OWNER', 'OWNER')).toBe(true);
+    it.each([
+      ['OWNER', 'VIEWER', true],
+      ['DEVELOPER', 'VIEWER', true],
+      ['VIEWER', 'VIEWER', true],
+      ['OWNER', 'OWNER', true],
+      ['VIEWER', 'DEVELOPER', false],
+      ['DEVELOPER', 'OWNER', false],
+    ] as const)('%s meets %s: %s', (role, required, expected) => {
+      expect(hasMinRole(role, required)).toBe(expected);
     });
   });
 });

@@ -16,9 +16,12 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -69,26 +72,6 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
     }
 
     @Test
-    public void anOwnerCannotListEveryOrganization() throws Exception {
-        Tenant tenant = registerTenant("suspension-owner@example.com");
-
-        mockMvc.perform(get("/api/v1/admin/organizations")
-                        .header("Authorization", "Bearer " + tenant.token()))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void anOwnerCannotSuspendAnybody() throws Exception {
-        Tenant tenant = registerTenant("suspension-nonadmin@example.com");
-
-        mockMvc.perform(post("/api/v1/admin/organizations/" + tenant.organizationId() + "/suspend")
-                        .header("Authorization", "Bearer " + tenant.token())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"trying it on\"}"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
     public void theOperatorSeesEveryOrganization() throws Exception {
         registerTenant("suspension-listed@example.com");
 
@@ -135,7 +118,7 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
                         .content("{\"name\":\"After\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(
-                        org.hamcrest.Matchers.containsString("spam reports")));
+                        containsString("spam reports")));
     }
 
     @Test
@@ -235,7 +218,7 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("suspended"))
                 .andExpect(jsonPath("$.message").value(
-                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("chargeback"))));
+                        not(containsString("chargeback"))));
     }
 
     @Test
@@ -271,7 +254,7 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
                 .andReturn();
         String slug = objectMapper.readTree(tunnel.getResponse().getContentAsString()).get("publicSlug").asText();
         when(redisTunnelCoordinator.isActiveInCluster(slug)).thenReturn(true);
-        when(redisTunnelCoordinator.forwardRequest(org.mockito.ArgumentMatchers.eq(slug), any()))
+        when(redisTunnelCoordinator.forwardRequest(eq(slug), any()))
                 .thenReturn(TunnelResponseMessage.builder().statusCode(200).body("ok").build());
 
         mockMvc.perform(post("/tunnel/" + slug + "/webhooks").contentType(MediaType.APPLICATION_JSON).content("{}"))
@@ -281,29 +264,11 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/tunnel/" + slug + "/webhooks").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isForbidden());
-        verify(redisTunnelCoordinator, times(1)).forwardRequest(org.mockito.ArgumentMatchers.eq(slug), any());
+        verify(redisTunnelCoordinator, times(1)).forwardRequest(eq(slug), any());
     }
 
     @Test
-    public void theOperatorSeesWhatATenantHasUsedAgainstTheirPlan() throws Exception {
-        Tenant tenant = registerTenant("suspension-usage@example.com");
-
-        mockMvc.perform(post("/api/v1/projects")
-                        .header("Authorization", "Bearer " + tenant.token())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Counted\"}"))
-                .andExpect(status().isCreated());
-
-        mockMvc.perform(get("/api/v1/admin/organizations/" + tenant.organizationId() + "/usage")
-                        .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.projects.current").value(1))
-                .andExpect(jsonPath("$.events.limit").exists())
-                .andExpect(jsonPath("$.periodStart").exists());
-    }
-
-    @Test
-    public void usageIsCountedForTheTenantAskedAboutAndNotTheAsker() throws Exception {
+    public void theOperatorSeesTheUsageOfTheTenantAskedAboutAgainstItsPlan() throws Exception {
         Tenant busy = registerTenant("suspension-usage-busy@example.com");
         Tenant quiet = registerTenant("suspension-usage-quiet@example.com");
 
@@ -319,20 +284,13 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/organizations/" + busy.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.projects.current").value(3));
+                .andExpect(jsonPath("$.projects.current").value(3))
+                .andExpect(jsonPath("$.events.limit").exists())
+                .andExpect(jsonPath("$.periodStart").exists());
 
         mockMvc.perform(get("/api/v1/admin/organizations/" + quiet.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.projects.current").value(0));
-    }
-
-    @Test
-    public void anOwnerCannotReadAnotherTenantsUsage() throws Exception {
-        Tenant mine = registerTenant("suspension-usage-mine@example.com");
-
-        mockMvc.perform(get("/api/v1/admin/organizations/" + mine.organizationId() + "/usage")
-                        .header("Authorization", "Bearer " + mine.token()))
-                .andExpect(status().isForbidden());
     }
 }

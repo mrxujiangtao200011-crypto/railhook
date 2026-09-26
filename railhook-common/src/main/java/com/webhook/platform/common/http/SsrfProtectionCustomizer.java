@@ -1,5 +1,6 @@
 package com.webhook.platform.common.http;
 
+import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.security.UrlValidator;
 import io.netty.channel.ChannelOption;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +28,7 @@ public final class SsrfProtectionCustomizer {
     /** {@code metrics(true)} makes Reactor Netty register the pool gauges with Micrometer. */
     public static ConnectionProvider createConnectionProvider(
             int maxConnections, int pendingAcquireTimeoutSeconds, int maxIdleTimeSeconds) {
-        log.info("Creating webhook connection pool: maxConnections={}, pendingAcquireTimeout={}s, maxIdleTime={}s",
+        log.debug("Creating webhook connection pool: maxConnections={}, pendingAcquireTimeout={}s, maxIdleTime={}s",
                 maxConnections, pendingAcquireTimeoutSeconds, maxIdleTimeSeconds);
         return ConnectionProvider.builder("webhook-pool")
                 .maxConnections(maxConnections)
@@ -65,7 +66,7 @@ public final class SsrfProtectionCustomizer {
                         && UrlValidator.isBlockedTarget(isa.getHostString(), addr, allowPrivateIps, allowedHosts)) {
                     log.warn("SSRF protection: DNS rebinding detected, resolved to private IP {}", addr.getHostAddress());
                     conn.dispose();
-                    throw new UrlValidator.InvalidUrlException(
+                    throw new InvalidUrlException(
                             "SSRF protection: connection resolved to private IP " + addr.getHostAddress());
                 }
             }

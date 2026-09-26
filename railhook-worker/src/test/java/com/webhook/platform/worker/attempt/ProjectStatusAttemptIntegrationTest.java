@@ -10,6 +10,8 @@ import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.common.transform.JavaScriptTransformEngine;
+import com.webhook.platform.common.transform.ScriptLimits;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import com.webhook.platform.worker.domain.entity.Event;
@@ -158,17 +160,6 @@ class ProjectStatusAttemptIntegrationTest {
     }
 
     @Test
-    void aDeliveryOfAnActiveProjectIsSent() {
-        UUID org = organization();
-        UUID project = project(org);
-
-        Delivery delivery = runDelivery(pendingDelivery(org, project, endpoint(org, project)));
-
-        assertThat(received.get()).isEqualTo(1);
-        assertThat(delivery.getStatus()).isEqualTo(Delivery.DeliveryStatus.SUCCESS);
-    }
-
-    @Test
     void aDeliveryOfADeletedProjectIsNotSent_andEndsAsADeletedEndpointsDoes() {
         UUID org = organization();
         UUID deletedEndpointsProject = project(org);
@@ -217,17 +208,6 @@ class ProjectStatusAttemptIntegrationTest {
         assertThat(received.get()).isEqualTo(1);
         assertThat(resumed.getStatus()).isEqualTo(Delivery.DeliveryStatus.SUCCESS);
         assertThat(resumed.getAttemptCount()).isEqualTo(1);
-    }
-
-    @Test
-    void aForwardOfAnActiveProjectIsSent() {
-        UUID org = organization();
-        UUID source = source(org, project(org));
-
-        IncomingForwardAttempt forward = runForward(pendingForward(org, source));
-
-        assertThat(received.get()).isEqualTo(1);
-        assertThat(forward.getStatus()).isEqualTo(ForwardAttemptStatus.SUCCESS);
     }
 
     @Test
@@ -428,9 +408,7 @@ class ProjectStatusAttemptIntegrationTest {
         }
     }
 
-    // Built lazily so a test that never runs a script never starts GraalJS.
-    private static com.webhook.platform.common.transform.JavaScriptTransformEngine scriptEngine() {
-        return new com.webhook.platform.common.transform.JavaScriptTransformEngine(
-                new ObjectMapper(), com.webhook.platform.common.transform.ScriptLimits.defaults());
+    private static JavaScriptTransformEngine scriptEngine() {
+        return new JavaScriptTransformEngine(new ObjectMapper(), ScriptLimits.defaults());
     }
 }

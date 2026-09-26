@@ -1,6 +1,7 @@
 package com.webhook.platform.api.domain.repository;
 
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -18,13 +19,10 @@ import java.util.UUID;
  * taken as an argument, so a caller cannot pass the wrong one.
  */
 @Repository
+@RequiredArgsConstructor
 public class MaterializedViewRepository {
 
     private final JdbcTemplate jdbcTemplate;
-
-    public MaterializedViewRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
 
     public Map<String, Long> getDeliveryStatsByProject(UUID projectId) {
         String sql = "SELECT status, SUM(cnt) as total FROM mv_delivery_stats "

@@ -7,7 +7,6 @@ import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Endpoint.VerificationStatus;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.exception.NotFoundException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -17,13 +16,12 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.beans.factory.annotation.Value;
 import reactor.netty.http.client.HttpClient;
+import com.webhook.platform.common.security.SecureTokens;
+import java.util.UUID;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Map;
-import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.util.List;
@@ -64,20 +62,6 @@ public class EndpointVerificationService {
                 .build();
     }
 
-    public String generateVerificationToken() {
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        return "whc_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    @Transactional
-    public Endpoint initializeVerification(Endpoint endpoint) {
-        String token = generateVerificationToken();
-        endpoint.setVerificationToken(token);
-        endpoint.setVerificationStatus(VerificationStatus.PENDING);
-        return endpointRepository.save(endpoint);
-    }
-
     // Not @Transactional: a slow customer URL held a connection and row lock and drained the pool.
     public VerificationResult verify(UUID projectId, UUID endpointId) {
         Endpoint endpoint = beginVerificationAttempt(projectId, endpointId);
@@ -103,7 +87,7 @@ public class EndpointVerificationService {
                     .block();
 
             if (verifyChallengeResponse(response, token)) {
-                log.info("Endpoint {} verified successfully", endpointId);
+                log.debug("Endpoint {} verified successfully", endpointId);
                 return new VerificationResult(true, "Verification successful",
                         recordVerificationOutcome(endpointId, VerificationStatus.VERIFIED), null);
             }
@@ -114,7 +98,7 @@ public class EndpointVerificationService {
         } catch (WebClientResponseException e) {
             // A raw 503 from an offline tunnel looks like our outage; the fix is on the caller's machine.
             if (isOfflineTunnel(e)) {
-                log.info("Endpoint {} verification failed - tunnel not connected", endpointId);
+                log.debug("Endpoint {} verification failed - tunnel not connected", endpointId);
                 return new VerificationResult(false,
                         "The tunnel is not connected. Start it with `railhook tunnel`, then verify again.",
                         recordVerificationOutcome(endpointId, VerificationStatus.FAILED),
@@ -139,7 +123,7 @@ public class EndpointVerificationService {
             }
 
             if (endpoint.getVerificationToken() == null) {
-                endpoint.setVerificationToken(generateVerificationToken());
+                endpoint.setVerificationToken("whc_" + SecureTokens.generate(32));
             }
             endpoint.setVerificationAttemptedAt(Instant.now());
             return endpointRepository.save(endpoint);

@@ -13,8 +13,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.util.UriComponentsBuilder;
+import com.webhook.platform.common.security.SecureTokens;
 
-import com.webhook.platform.common.util.CryptoUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -66,7 +66,7 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
 
     private String createInvitedMembership(UUID userId, UUID orgId) {
         String inviteToken = "test-invite-" + UUID.randomUUID();
-        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        String tokenHash = SecureTokens.hash(inviteToken);
         Membership membership = Membership.builder()
                 .userId(userId)
                 .organizationId(orgId)
@@ -96,7 +96,7 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
                         .header("Authorization", "Bearer " + attacker.auth().getAccessToken()))
                 .andExpect(status().isForbidden());
 
-        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        String tokenHash = SecureTokens.hash(inviteToken);
         Membership m = membershipRepository.findByInviteTokenHash(tokenHash).orElseThrow();
         assertEquals(MembershipStatus.INVITED, m.getStatus());
     }
@@ -117,7 +117,7 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
                         .header("Authorization", "Bearer " + invitee.auth().getAccessToken()))
                 .andExpect(status().isForbidden());
 
-        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        String tokenHash = SecureTokens.hash(inviteToken);
         Membership m = membershipRepository.findByInviteTokenHash(tokenHash).orElseThrow();
         assertEquals(MembershipStatus.INVITED, m.getStatus());
     }
@@ -155,7 +155,7 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.role").value("DEVELOPER"));
 
-        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        String tokenHash = SecureTokens.hash(inviteToken);
         assertFalse(membershipRepository.findByInviteTokenHash(tokenHash).isPresent(),
                 "Invite token hash should be cleared after acceptance");
     }
@@ -173,7 +173,7 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
         assertNotNull(invited.getInviteUrl(), "the owner has no other way to deliver the invite");
 
         Membership membership = membershipRepository
-                .findByInviteTokenHash(CryptoUtils.hashApiKey(tokenOf(invited.getInviteUrl())))
+                .findByInviteTokenHash(SecureTokens.hash(tokenOf(invited.getInviteUrl())))
                 .orElseThrow(() -> new AssertionError("the returned link does not carry the stored token"));
         assertEquals(invited.getUserId(), membership.getUserId());
 
@@ -205,9 +205,9 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
         String freshToken = tokenOf(reissued.getInviteUrl());
 
         assertNotEquals(staleToken, freshToken, "re-issuing must mint a new token");
-        assertFalse(membershipRepository.findByInviteTokenHash(CryptoUtils.hashApiKey(staleToken)).isPresent(),
+        assertFalse(membershipRepository.findByInviteTokenHash(SecureTokens.hash(staleToken)).isPresent(),
                 "the link that was handed out before must stop working");
-        assertTrue(membershipRepository.findByInviteTokenHash(CryptoUtils.hashApiKey(freshToken)).isPresent(),
+        assertTrue(membershipRepository.findByInviteTokenHash(SecureTokens.hash(freshToken)).isPresent(),
                 "the link handed out now must work");
         assertTrue(reissued.getInviteExpiresAt().isAfter(invited.getInviteExpiresAt()),
                 "re-issuing restarts the expiry");

@@ -4,17 +4,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.transform.JavaScriptTransformEngine;
 import com.webhook.platform.common.transform.ScriptConsoleLine;
-import com.webhook.platform.common.transform.ScriptTransformException;
+import com.webhook.platform.common.exception.ScriptTransformException;
 import com.webhook.platform.common.transform.TransformOutcome;
 import com.webhook.platform.common.transform.TransformRequest;
 import com.webhook.platform.common.transform.TransformationKind;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.util.List;
 import java.util.Map;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /** Same engine as the worker, so a preview cannot disagree with a real delivery. */
 @Component

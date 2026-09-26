@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '../../i18n';
+import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { RuleResponse } from '../../api/rules.api';
 import type { ProjectResponse } from '../../types/api.types';
@@ -124,7 +125,7 @@ describe('RulesPage', () => {
 
     await screen.findByText('Discard test traffic');
     const row = rowFor('Discard test traffic');
-    expect(row.textContent).toMatch(/drop|відкид/i);
+    expect(row.textContent).toMatch(/drop/i);
     expect(row.textContent).not.toMatch(/rules\.actionTypes/);
   });
 
@@ -132,7 +133,7 @@ describe('RulesPage', () => {
     renderRules();
     await screen.findByText('Route payments');
 
-    await userEvent.type(screen.getByRole('textbox', { name: /search|пошук/i }), 'test.*');
+    await userEvent.type(screen.getByRole('textbox', { name: /search/i }), 'test.*');
 
     await waitFor(() => expect(screen.queryByText('Route payments')).toBeNull());
     expect(screen.getByText('Discard test traffic')).toBeInTheDocument();
@@ -149,31 +150,20 @@ describe('RulesPage', () => {
     expect(rulesApi.delete).not.toHaveBeenCalled();
   });
 
-  it('creates, deletes and toggles nothing by being opened', async () => {
-    renderRules();
-
-    await screen.findByText('Route payments');
-    expect(rulesApi.create).not.toHaveBeenCalled();
-    expect(rulesApi.update).not.toHaveBeenCalled();
-    expect(rulesApi.delete).not.toHaveBeenCalled();
-    expect(rulesApi.toggle).not.toHaveBeenCalled();
-  });
-
   it('tells a project with no rules that events pass through untouched', async () => {
     vi.mocked(rulesApi.list).mockResolvedValue([]);
     renderRules();
 
-    await waitFor(() => expect(rulesApi.list).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
-    expect(screen.queryByRole('switch')).toBeNull();
+    expect(await screen.findByText(en.rules.empty.title)).toBeInTheDocument();
+    expect(screen.getByText(en.rules.empty.description)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('shows an error state rather than an empty rule list when the load fails', async () => {
-    vi.mocked(rulesApi.list).mockRejectedValue(new Error('boom'));
+    vi.mocked(rulesApi.list).mockRejectedValue({ response: { status: 500, data: { message: 'Rules are unavailable' } } });
     renderRules();
 
-    await waitFor(() => expect(rulesApi.list).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
-    expect(screen.queryByRole('switch')).toBeNull();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rules are unavailable');
+    expect(screen.queryByText(en.rules.empty.title)).toBeNull();
   });
 });

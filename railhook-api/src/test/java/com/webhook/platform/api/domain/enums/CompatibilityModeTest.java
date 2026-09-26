@@ -1,6 +1,6 @@
 package com.webhook.platform.api.domain.enums;
 
-import com.webhook.platform.common.util.JsonSchemaUtils;
+import com.webhook.platform.common.util.EventSchemas;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,8 +14,8 @@ class CompatibilityModeTest {
              },"required":["id"]}
             """;
 
-    private static JsonSchemaUtils.SchemaDiff against(String newSchema) throws Exception {
-        return JsonSchemaUtils.diff(BASE, newSchema);
+    private static EventSchemas.SchemaDiff against(String newSchema) throws Exception {
+        return EventSchemas.diff(BASE, newSchema);
     }
 
     @Test

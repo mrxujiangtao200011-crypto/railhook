@@ -1,6 +1,7 @@
 package com.webhook.platform.api.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,7 @@ import java.util.regex.Pattern;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class TrustedProxyResolver {
 
     // Header hops are attacker-controlled; only literal IPs reach InetAddress, which would
@@ -24,12 +26,8 @@ public class TrustedProxyResolver {
             "^((25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1?\\d?\\d)$");
     private static final Pattern IPV6_CHARSET = Pattern.compile("^[0-9a-fA-F:.]+$");
 
+    @Value("${webhook.trusted-proxies:}")
     private final List<String> trustedProxies;
-
-    public TrustedProxyResolver(
-            @Value("${webhook.trusted-proxies:}") List<String> trustedProxies) {
-        this.trustedProxies = trustedProxies;
-    }
 
     /**
      * X-Forwarded-For is walked from the right and the first untrusted hop wins: the left-most

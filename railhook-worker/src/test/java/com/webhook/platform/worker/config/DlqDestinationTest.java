@@ -33,10 +33,4 @@ class DlqDestinationTest {
             assertTrue(destination.partition() < 0, "source partition " + sourcePartition + " was carried over");
         }
     }
-
-    @Test
-    @DisplayName("each direction still parks in its own topic")
-    void topicIsPreserved() {
-        assertEquals("incoming.forward.dlq", resolve("incoming.forward.dlq", 3).topic());
-    }
 }

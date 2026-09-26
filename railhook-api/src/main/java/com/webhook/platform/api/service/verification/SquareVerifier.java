@@ -7,20 +7,18 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Base64;
+import lombok.RequiredArgsConstructor;
 
 /**
  * The signed URL must match the Square console exactly, so it comes from webhook.ingress-base-url,
  * not Host and X-Forwarded-Proto, which break behind a proxy.
  */
+@RequiredArgsConstructor
 public class SquareVerifier implements WebhookVerificationStrategy {
 
     private static final String HEADER = "x-square-hmacsha256-signature";
 
     private final String ingressBaseUrl;
-
-    public SquareVerifier(String ingressBaseUrl) {
-        this.ingressBaseUrl = ingressBaseUrl;
-    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

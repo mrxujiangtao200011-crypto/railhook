@@ -13,7 +13,6 @@ import java.util.UUID;
 @Repository
 public interface SchemaChangeRepository extends JpaRepository<SchemaChange, UUID> {
     List<SchemaChange> findByEventTypeIdOrderByCreatedAtDesc(UUID eventTypeId);
-    List<SchemaChange> findByToVersionId(UUID toVersionId);
 
     @Query("SELECT sc FROM SchemaChange sc JOIN FETCH sc.eventType et " +
            "LEFT JOIN FETCH sc.fromVersion LEFT JOIN FETCH sc.toVersion " +

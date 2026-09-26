@@ -10,12 +10,16 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import com.webhook.platform.common.http.SsrfProtectionCustomizer;
+import com.webhook.platform.common.security.UrlValidator;
 import reactor.netty.http.client.HttpClient;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -66,10 +70,10 @@ public class AlertNotificationService {
             log.info("Message: {}", event.getMessage());
             log.info("Value: {} / Threshold: {}", event.getCurrentValue(), event.getThresholdValue());
             if (channel == AlertChannel.SLACK || channel == AlertChannel.WEBHOOK) {
-                log.info("URL: {}", rule.getWebhookUrl());
+                log.info("Host: {}", UrlValidator.hostOf(rule.getWebhookUrl()));
             }
             if (channel == AlertChannel.EMAIL) {
-                log.info("Recipients: {}", rule.getEmailRecipients());
+                log.info("Recipients: {}", maskedRecipients(rule.getEmailRecipients()));
             }
             log.info("=================================================");
             return;
@@ -84,8 +88,26 @@ public class AlertNotificationService {
             }
         } catch (Exception e) {
             log.error("Failed to send {} notification for rule '{}': {}",
-                    channel, rule.getName(), e.getMessage());
+                    channel, rule.getName(), failureOf(e));
         }
+    }
+
+    // A response exception's message carries the full URL, and a Slack webhook URL is its own credential.
+    private static String failureOf(Exception e) {
+        return e instanceof WebClientResponseException response
+                ? "HTTP " + response.getStatusCode().value()
+                : e.getMessage();
+    }
+
+    private static String maskedRecipients(String recipients) {
+        if (recipients == null) {
+            return "(none)";
+        }
+        return Arrays.stream(recipients.split(","))
+                .map(String::trim)
+                .filter(address -> !address.isEmpty())
+                .map(EmailService::maskRecipient)
+                .collect(Collectors.joining(", "));
     }
 
     private void sendSlack(AlertRule rule, AlertEvent event) {
@@ -179,7 +201,7 @@ public class AlertNotificationService {
                 .timeout(Duration.ofSeconds(10))
                 .block();
 
-        log.info("Webhook notification sent to {} for rule '{}'", url, rule.getName());
+        log.info("Webhook notification sent to {} for rule '{}'", UrlValidator.hostOf(url), rule.getName());
     }
 
     private void sendEmail(AlertRule rule, AlertEvent event) {
@@ -230,7 +252,7 @@ public class AlertNotificationService {
             }
         }
 
-        log.info("Email alert sent to {} for rule '{}'", recipients, rule.getName());
+        log.info("Email alert sent to {} for rule '{}'", maskedRecipients(recipients), rule.getName());
     }
 
     private static String escapeHtml(String s) {

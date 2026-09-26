@@ -1,5 +1,7 @@
 package com.webhook.platform.worker.config;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
@@ -22,6 +24,7 @@ import java.util.function.Supplier;
  * at build time; a newer schema, after a rollback, starts at once.
  */
 @Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class MigratedSchemaGate {
 
     static final String BUNDLED_MIGRATIONS = "classpath*:db/expected-migrations/V*__*.sql";
@@ -47,13 +50,6 @@ public class MigratedSchemaGate {
     private final AppliedVersion applied;
     private final Supplier<Instant> clock;
     private final Sleeper sleeper;
-
-    MigratedSchemaGate(String required, AppliedVersion applied, Supplier<Instant> clock, Sleeper sleeper) {
-        this.required = required;
-        this.applied = applied;
-        this.clock = clock;
-        this.sleeper = sleeper;
-    }
 
     void await() {
         Instant started = clock.get();

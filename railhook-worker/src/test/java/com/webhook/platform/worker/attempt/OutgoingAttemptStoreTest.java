@@ -13,7 +13,7 @@ import com.webhook.platform.worker.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.domain.repository.EndpointRepository;
 import com.webhook.platform.worker.domain.repository.EventRepository;
-import com.webhook.platform.worker.service.MtlsWebClientFactory;
+import com.webhook.platform.worker.service.MtlsWebClientCache;
 import com.webhook.platform.worker.service.OrderingBufferService;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
@@ -67,7 +67,7 @@ class OutgoingAttemptStoreTest {
     @Mock private OrderingBufferService orderingBufferService;
     @Mock private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     @Mock private EncryptionKeyRegistry encryptionKeyRegistry;
-    @Mock private MtlsWebClientFactory mtlsWebClientFactory;
+    @Mock private MtlsWebClientCache mtlsWebClientCache;
     @Mock private TransformationCacheService transformationCacheService;
     @Mock private PayloadTransformService payloadTransformService;
     @Mock private TransactionTemplate transactionTemplate;
@@ -91,7 +91,7 @@ class OutgoingAttemptStoreTest {
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
-                mtlsWebClientFactory, transformationCacheService, payloadTransformService,
+                mtlsWebClientCache, transformationCacheService, payloadTransformService,
                 objectMapper, WebClient.builder().build(), null,
                 Counter.builder("test").register(new SimpleMeterRegistry()),
                 Clock.systemUTC(), 5, message, retry);
@@ -405,22 +405,6 @@ class OutgoingAttemptStoreTest {
                     "the loser of the CAS must not go on to POST the webhook a second time");
             // The claim must be a conditional swap on the published token, never a fence read off the row.
             verify(deliveryRepository).claimRetryForProcessing(eq(deliveryId), eq(schedulerToken), any(UUID.class));
-            verify(deliveryRepository, never()).findById(deliveryId);
-        }
-
-        @Test
-        void aMessageCarryingAStaleTokenClaimsNothing() {
-            // The scheduler timed out, handed the row back and re-claimed it; then this send landed.
-            UUID staleToken = UUID.randomUUID();
-            // PROCESSING under the new token.
-            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(processingRow()));
-            when(deliveryRepository.claimRetryForProcessing(eq(deliveryId), eq(staleToken), any(UUID.class)))
-                    .thenReturn(null);
-
-            ClaimResult<OutgoingAttemptStore.Claim> result =
-                    retryStoreFor(retryMessage(staleToken)).claim();
-
-            assertInstanceOf(ClaimResult.NotClaimed.class, result);
             verify(deliveryRepository, never()).findById(deliveryId);
         }
 

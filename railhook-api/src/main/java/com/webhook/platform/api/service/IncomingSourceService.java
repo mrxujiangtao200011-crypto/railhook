@@ -14,38 +14,29 @@ import com.webhook.platform.api.dto.IncomingSourceRequest;
 import com.webhook.platform.api.dto.IncomingSourceResponse;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.webhook.platform.common.security.SecretEncryption;
 
 import java.util.UUID;
+import com.webhook.platform.common.security.SecureTokens;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class IncomingSourceService {
 
     private final IncomingSourceRepository sourceRepository;
     private final ProjectRepository projectRepository;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final WebhookVerifierFactory verifierFactory;
+    @Value("${webhook.ingress-base-url:}")
     private final String ingressBaseUrl;
-
-    public IncomingSourceService(
-            IncomingSourceRepository sourceRepository,
-            ProjectRepository projectRepository,
-            EncryptionKeyRegistry encryptionKeyRegistry,
-            WebhookVerifierFactory verifierFactory,
-            @Value("${webhook.ingress-base-url:}") String ingressBaseUrl) {
-        this.sourceRepository = sourceRepository;
-        this.projectRepository = projectRepository;
-        this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.verifierFactory = verifierFactory;
-        this.ingressBaseUrl = ingressBaseUrl;
-    }
 
     /** A secret with no mode means verify with it. Saving that as NONE accepted forged requests. */
     private VerificationMode defaultVerificationMode(IncomingSourceRequest request) {
@@ -93,9 +84,9 @@ public class IncomingSourceService {
             throw new IllegalArgumentException("Source with slug '" + slug + "' already exists in this project");
         }
 
-        String ingressPathToken = CryptoUtils.generateSecureToken(32);
+        String ingressPathToken = SecureTokens.generate(32);
         while (sourceRepository.existsByIngressPathToken(ingressPathToken)) {
-            ingressPathToken = CryptoUtils.generateSecureToken(32);
+            ingressPathToken = SecureTokens.generate(32);
         }
 
         IncomingSource source = IncomingSource.builder()
@@ -110,7 +101,7 @@ public class IncomingSourceService {
                 .build();
 
         if (request.getHmacSecret() != null && !request.getHmacSecret().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getHmacSecret());
+            SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getHmacSecret());
             source.setHmacSecretEncrypted(encrypted.getCiphertext());
             source.setHmacSecretIv(encrypted.getIv());
             source.setEncryptionKeyVersion(encrypted.getKeyVersion());
@@ -126,7 +117,7 @@ public class IncomingSourceService {
 
         validateVerificationSettings(source);
         source = sourceRepository.saveAndFlush(source);
-        log.info("Created incoming source: id={}, projectId={}, slug={}", source.getId(), projectId, slug);
+        log.debug("Created incoming source: id={}, projectId={}, slug={}", source.getId(), projectId, slug);
         return mapToResponse(source);
     }
 
@@ -171,7 +162,7 @@ public class IncomingSourceService {
         }
 
         if (request.getHmacSecret() != null && !request.getHmacSecret().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getHmacSecret());
+            SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getHmacSecret());
             source.setHmacSecretEncrypted(encrypted.getCiphertext());
             source.setHmacSecretIv(encrypted.getIv());
             source.setEncryptionKeyVersion(encrypted.getKeyVersion());
@@ -189,7 +180,7 @@ public class IncomingSourceService {
 
         validateVerificationSettings(source);
         source = sourceRepository.saveAndFlush(source);
-        log.info("Updated incoming source: id={}", id);
+        log.debug("Updated incoming source: id={}", id);
         return mapToResponse(source);
     }
 
@@ -199,7 +190,7 @@ public class IncomingSourceService {
         IncomingSource source = requireSource(projectId, id);
         source.setStatus(IncomingSourceStatus.DISABLED);
         sourceRepository.save(source);
-        log.info("Disabled incoming source: id={}", id);
+        log.debug("Disabled incoming source: id={}", id);
     }
 
     private IncomingSourceResponse mapToResponse(IncomingSource source) {

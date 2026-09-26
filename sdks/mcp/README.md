@@ -1,5 +1,7 @@
 # @railhook/mcp
 
+[![Wellknown](https://wellknown.network/agents/railhook-mcp/badge.svg)](https://wellknown.network/agents/railhook-mcp)
+
 A stdio bridge to Railhook's [MCP](https://modelcontextprotocol.io) server, for clients that only
 start local processes, such as Claude Desktop.
 

@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.DashboardStatsResponse;
 import com.webhook.platform.api.dto.OnboardingStatusResponse;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DashboardService {
     
     private final ProjectRepository projectRepository;
@@ -31,27 +33,6 @@ public class DashboardService {
     private final IncomingSourceRepository incomingSourceRepository;
     private final IncomingDestinationRepository incomingDestinationRepository;
     private final MaterializedViewRepository materializedViewRepository;
-    
-    public DashboardService(
-            ProjectRepository projectRepository,
-            EventRepository eventRepository,
-            DeliveryRepository deliveryRepository,
-            EndpointRepository endpointRepository,
-            SubscriptionRepository subscriptionRepository,
-            ApiKeyRepository apiKeyRepository,
-            IncomingSourceRepository incomingSourceRepository,
-            IncomingDestinationRepository incomingDestinationRepository,
-            MaterializedViewRepository materializedViewRepository) {
-        this.projectRepository = projectRepository;
-        this.eventRepository = eventRepository;
-        this.deliveryRepository = deliveryRepository;
-        this.endpointRepository = endpointRepository;
-        this.subscriptionRepository = subscriptionRepository;
-        this.apiKeyRepository = apiKeyRepository;
-        this.incomingSourceRepository = incomingSourceRepository;
-        this.incomingDestinationRepository = incomingDestinationRepository;
-        this.materializedViewRepository = materializedViewRepository;
-    }
     
     public OnboardingStatusResponse getOnboardingStatus(UUID projectId) {
         UUID organizationId = TenantContext.require();

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.RegisterRequest;
 import com.webhook.platform.api.security.AllowedInDemo;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.service.demo.DemoDataRemover;
 import com.webhook.platform.api.service.demo.DemoDataSeeder;
 import com.webhook.platform.api.tenancy.TenantContext;
@@ -67,7 +67,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private JwtTokenService jwtTokenService;
 
     @Autowired
     private DemoDataSeeder seeder;
@@ -128,7 +128,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void anExpiredSessionIsNoSessionAtAll() throws Exception {
-        String expired = jwtUtil.generateDemoAccessToken(
+        String expired = jwtTokenService.generateDemoAccessToken(
                 DemoTenant.USER_ID, DemoTenant.ORGANIZATION_ID, Duration.ofSeconds(-5));
 
         mockMvc.perform(get("/api/v1/projects").header("Authorization", "Bearer " + expired))
@@ -154,7 +154,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void theDemoCanBeReadInFull() throws Exception {
+    void theDemoCanBeReadInFullWorkflowRunsIncluded() throws Exception {
         String token = openSession();
         String project = DemoTenant.PROJECT_ID.toString();
 
@@ -176,12 +176,6 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/dashboard/projects/" + project + "/analytics").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.overview.totalDeliveries").value(greaterThan(0)));
-    }
-
-    @Test
-    void theDemoWorkflowsCanBeReadWithTheirRuns() throws Exception {
-        String token = openSession();
-        String project = DemoTenant.PROJECT_ID.toString();
 
         MvcResult listed = mockMvc.perform(get("/api/v1/projects/" + project + "/workflows")
                         .header("Authorization", "Bearer " + token))

@@ -1,6 +1,6 @@
 package com.webhook.platform.common.security;
 
-import com.webhook.platform.common.util.CryptoUtils;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -34,6 +34,7 @@ public class EncryptionKeyRegistry {
     private String salt;
 
     private Map<Integer, String> keyMap;
+    @Getter
     private int activeVersion;
 
     @PostConstruct
@@ -81,10 +82,6 @@ public class EncryptionKeyRegistry {
                 keyMap.size(), activeVersion);
     }
 
-    public int getActiveVersion() {
-        return activeVersion;
-    }
-
     public String getActiveKey() {
         return keyMap.get(activeVersion);
     }
@@ -98,16 +95,12 @@ public class EncryptionKeyRegistry {
         return keyMap.get(version);
     }
 
-    public boolean hasVersion(int version) {
-        return keyMap.containsKey(version);
-    }
-
     public Set<Integer> getVersions() {
         return keyMap.keySet();
     }
 
-    public CryptoUtils.EncryptedData encrypt(String plaintext) {
-        return CryptoUtils.encryptSecret(plaintext, getActiveKey(), salt, activeVersion);
+    public SecretEncryption.EncryptedData encrypt(String plaintext) {
+        return SecretEncryption.encrypt(plaintext, getActiveKey(), salt, activeVersion);
     }
 
     /** A version of 0 or less means the active one. */
@@ -118,14 +111,14 @@ public class EncryptionKeyRegistry {
             throw new RuntimeException("Encryption key version " + version +
                     " not found. Available versions: " + keyMap.keySet());
         }
-        return CryptoUtils.decryptSecret(ciphertext, iv, key, salt);
+        return SecretEncryption.decrypt(ciphertext, iv, key, salt);
     }
 
     public String decryptWithFallback(String ciphertext, String iv, int keyVersion) {
 
         if (keyVersion > 0 && keyMap.containsKey(keyVersion)) {
             try {
-                return CryptoUtils.decryptSecret(ciphertext, iv, keyMap.get(keyVersion), salt);
+                return SecretEncryption.decrypt(ciphertext, iv, keyMap.get(keyVersion), salt);
             } catch (Exception e) {
                 log.warn("Failed to decrypt with key version {}, trying fallback", keyVersion);
             }
@@ -134,16 +127,12 @@ public class EncryptionKeyRegistry {
         for (int version : keyMap.keySet().stream().sorted(Collections.reverseOrder()).toList()) {
             if (version == keyVersion) continue;
             try {
-                return CryptoUtils.decryptSecret(ciphertext, iv, keyMap.get(version), salt);
+                return SecretEncryption.decrypt(ciphertext, iv, keyMap.get(version), salt);
             } catch (Exception ignored) {
             }
         }
 
         throw new RuntimeException("Failed to decrypt with any available key version. " +
                 "Available versions: " + keyMap.keySet());
-    }
-
-    public boolean needsReEncryption(int keyVersion) {
-        return keyVersion != activeVersion;
     }
 }

@@ -6,6 +6,8 @@ import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.service.OrderingBufferService;
 import io.micrometer.core.instrument.Counter;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -18,6 +20,7 @@ import java.util.UUID;
 
 /** Per-endpoint FIFO for Outgoing. Incoming enforces no ordering. */
 @Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class OrderingGate {
 
     private final OrderingBufferService orderingBufferService;
@@ -26,20 +29,6 @@ class OrderingGate {
     private final TransactionTemplate transactionTemplate;
     private final Counter gapTimeoutCounter;
     private final long rescheduleDelaySeconds;
-
-    OrderingGate(OrderingBufferService orderingBufferService,
-            DeliveryRepository deliveryRepository,
-            KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
-            TransactionTemplate transactionTemplate,
-            Counter gapTimeoutCounter,
-            long rescheduleDelaySeconds) {
-        this.orderingBufferService = orderingBufferService;
-        this.deliveryRepository = deliveryRepository;
-        this.kafkaTemplate = kafkaTemplate;
-        this.transactionTemplate = transactionTemplate;
-        this.gapTimeoutCounter = gapTimeoutCounter;
-        this.rescheduleDelaySeconds = rescheduleDelaySeconds;
-    }
 
     /** Null if the Delivery may proceed now. Parking ends the Claim and clears its token. */
     Instant holdUntil(Delivery delivery) {
@@ -61,7 +50,7 @@ class OrderingGate {
                 : null;
 
         if (oldestPendingInRange == null) {
-            log.info("No outstanding deliveries in gap [{}, {}] for endpoint {}, proceeding with seq={}",
+            log.debug("No outstanding deliveries in gap [{}, {}] for endpoint {}, proceeding with seq={}",
                     rangeStart, rangeEnd, endpointId, sequenceNumber);
             return null;
         }
@@ -97,7 +86,7 @@ class OrderingGate {
         if (delivery.getOrderingFirstBufferedAt() == null) {
             delivery.setOrderingFirstBufferedAt(Instant.now());
         }
-        log.info("Buffering delivery {} (seq={}) waiting for range [{}, {}]",
+        log.debug("Buffering delivery {} (seq={}) waiting for range [{}, {}]",
                 delivery.getId(), sequenceNumber, rangeStart, rangeEnd);
         orderingBufferService.bufferDelivery(endpointId, delivery.getId(), sequenceNumber);
 
@@ -160,7 +149,7 @@ class OrderingGate {
                             .sequenceNumber(buffered.getSequenceNumber())
                             .orderingEnabled(buffered.getOrderingEnabled())
                             .build());
-            log.info("Triggered buffered delivery {} (seq={}) for endpoint {}",
+            log.debug("Triggered buffered delivery {} (seq={}) for endpoint {}",
                     buffered.getId(), buffered.getSequenceNumber(), endpointId);
         }
     }

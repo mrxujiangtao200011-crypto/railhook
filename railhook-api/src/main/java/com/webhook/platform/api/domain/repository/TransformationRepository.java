@@ -12,7 +12,6 @@ import java.util.UUID;
 public interface TransformationRepository extends JpaRepository<Transformation, UUID> {
     Optional<Transformation> findByIdAndProjectId(UUID id, UUID projectId);
     List<Transformation> findByProjectIdOrderByNameAsc(UUID projectId);
-    List<Transformation> findByProjectIdAndEnabledTrueOrderByNameAsc(UUID projectId);
     boolean existsByProjectIdAndName(UUID projectId, String name);
     boolean existsByProjectIdAndNameAndIdNot(UUID projectId, String name, UUID id);
 }

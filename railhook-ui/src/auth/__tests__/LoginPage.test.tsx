@@ -132,7 +132,7 @@ describe('LoginPage', () => {
     expect(alert).not.toHaveTextContent(/permission/i);
   });
 
-  it('still says something when the server said nothing useful', async () => {
+  it('still says something when the server said nothing useful, and lets the user try again', async () => {
     vi.spyOn(authApi, 'login').mockRejectedValue(new Error('Network Error'));
 
     renderLogin();
@@ -140,41 +140,17 @@ describe('LoginPage', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent?.trim()).not.toBe('');
-  });
-
-  it('lets the user try again after a failure rather than staying disabled', async () => {
-    vi.spyOn(authApi, 'login').mockRejectedValue(new Error('Network Error'));
-
-    renderLogin();
-    await signIn();
-
-    await screen.findByRole('alert');
     expect(screen.getByRole('button', { name: /sign in|log in/i })).toBeEnabled();
   });
 
   it('returns the user to the page that sent them to sign in', async () => {
     vi.spyOn(authApi, 'login').mockResolvedValue({ accessToken: 'the-token' } as never);
     vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue(USER);
-    login = vi.fn<AuthState['login']>();
 
-    render(
-      <AuthContext.Provider
-        value={{
-          user: null, token: null, login, logout: () => {}, updateUser: () => {},
-          isAuthenticated: false,
-        }}
-      >
-        <MemoryRouter initialEntries={[{ pathname: '/login', state: { from: '/admin/endpoints' } }]}>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/admin/endpoints" element={<p>the endpoints screen</p>} />
-          </Routes>
-        </MemoryRouter>
-      </AuthContext.Provider>,
-    );
+    renderAtEntry({ pathname: '/login', state: { from: '/admin/projects/p1/endpoints' } });
     await signIn();
 
-    expect(await screen.findByText('the endpoints screen')).toBeInTheDocument();
+    expect(await screen.findByText("their project's endpoints")).toBeInTheDocument();
   });
 
   it('continues to the invite a signed-out visitor was sent here from (?redirect=)', async () => {

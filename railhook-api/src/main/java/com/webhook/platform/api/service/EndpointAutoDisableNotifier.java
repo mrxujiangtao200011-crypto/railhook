@@ -5,6 +5,8 @@ import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.security.UrlValidator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,23 +18,14 @@ import java.util.UUID;
 /** Separate from the sweep, which spans organizations, because each notice is written in its own tenant. */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class EndpointAutoDisableNotifier {
 
     private final AlertService alertService;
     private final EmailService emailService;
     private final MembershipRepository membershipRepository;
+    @Value("${app.base-url:http://localhost:5173}")
     private final String baseUrl;
-
-    public EndpointAutoDisableNotifier(
-            AlertService alertService,
-            EmailService emailService,
-            MembershipRepository membershipRepository,
-            @Value("${app.base-url:http://localhost:5173}") String baseUrl) {
-        this.alertService = alertService;
-        this.emailService = emailService;
-        this.membershipRepository = membershipRepository;
-        this.baseUrl = baseUrl;
-    }
 
     public void endpointDisabled(Endpoint endpoint) {
         String title = "Endpoint disabled after continuous failure";
@@ -74,7 +67,7 @@ public class EndpointAutoDisableNotifier {
         }
         List<String> owners = membershipRepository.findOwnerEmails(organizationId);
         if (owners.isEmpty()) {
-            log.warn("Organization {} has no verified owner to tell about {}", organizationId, url);
+            log.warn("Organization {} has no verified owner to tell about {}", organizationId, UrlValidator.hostOf(url));
             return;
         }
         String html = body(url, failingSince, failures, link);

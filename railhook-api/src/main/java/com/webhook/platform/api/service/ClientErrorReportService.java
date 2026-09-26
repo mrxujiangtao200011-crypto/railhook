@@ -2,6 +2,8 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.dto.ClientErrorReportRequest;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ClientErrorReportService {
 
     private static final int MAX_MESSAGE = 500;
@@ -29,20 +32,15 @@ public class ClientErrorReportService {
 
     private static final Duration WINDOW = Duration.ofMinutes(1);
 
+    @Value("${client-errors.enabled:true}")
     private final boolean enabled;
+    @Value("${client-errors.per-user-per-minute:20}")
     private final int reportsPerUserPerMinute;
     // Bounded and expiring: a plain map kept one entry per user for the life of the process.
     private final Cache<UUID, Window> windows = Caffeine.newBuilder()
             .maximumSize(50_000)
             .expireAfterWrite(WINDOW.multipliedBy(2))
             .build();
-
-    public ClientErrorReportService(
-            @Value("${client-errors.enabled:true}") boolean enabled,
-            @Value("${client-errors.per-user-per-minute:20}") int reportsPerUserPerMinute) {
-        this.enabled = enabled;
-        this.reportsPerUserPerMinute = reportsPerUserPerMinute;
-    }
 
     /** Never throws; the endpoint answers 202 whether or not the report was kept. */
     public void record(ClientErrorReportRequest report, UUID userId) {
@@ -64,12 +62,6 @@ public class ClientErrorReportService {
                 message,
                 suffix(" | stack: ", clean(report.getStack(), MAX_STACK)),
                 suffix(" | component: ", clean(report.getComponentStack(), MAX_COMPONENT_STACK)));
-    }
-
-    // For tests.
-    long trackedWindows() {
-        windows.cleanUp();
-        return windows.estimatedSize();
     }
 
     private boolean admit(UUID userId) {
@@ -119,13 +111,10 @@ public class ClientErrorReportService {
         return value.isBlank() ? "" : label + value;
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     private static final class Window {
         private final Instant startedAt;
         private final AtomicInteger count = new AtomicInteger();
-
-        private Window(Instant startedAt) {
-            this.startedAt = startedAt;
-        }
 
         private boolean startedBefore(Instant cutoff) {
             return startedAt.isBefore(cutoff);

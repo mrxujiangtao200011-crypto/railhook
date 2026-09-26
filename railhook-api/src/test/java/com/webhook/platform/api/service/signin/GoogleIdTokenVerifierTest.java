@@ -3,6 +3,7 @@ package com.webhook.platform.api.service.signin;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
+import com.webhook.platform.api.exception.SignInRejectedException;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;

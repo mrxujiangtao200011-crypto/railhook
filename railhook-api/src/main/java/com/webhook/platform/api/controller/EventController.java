@@ -5,6 +5,7 @@ import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.dto.RateLimitInfo;
 import com.webhook.platform.api.dto.RateLimitResult;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.EventIngestService;
@@ -20,6 +21,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,21 +32,13 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/events")
 @Slf4j
 @Tag(name = "Events", description = "Event ingestion API")
+@RequiredArgsConstructor
 public class EventController {
 
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private final EventIngestService eventIngestService;
     private final RedisRateLimiterService rateLimiterService;
     private final EntitlementService entitlementService;
-
-    public EventController(
-            EventIngestService eventIngestService,
-            RedisRateLimiterService rateLimiterService,
-            EntitlementService entitlementService) {
-        this.eventIngestService = eventIngestService;
-        this.rateLimiterService = rateLimiterService;
-        this.entitlementService = entitlementService;
-    }
 
     @Operation(
             summary = "Ingest event",
@@ -79,11 +73,8 @@ public class EventController {
         
         if (!rateLimitResult.isAcquired()) {
             log.warn("Rate limit exceeded for project: {}", apiKeyAuth.getProjectId());
-            ErrorResponse errorBody = new ErrorResponse(
-                    "rate_limit_exceeded",
-                    "Too many requests. Please retry after " + rateLimitResult.getRetryAfterSeconds() + " seconds.",
-                    HttpStatus.TOO_MANY_REQUESTS.value()
-            );
+            ErrorResponse errorBody = ErrorResponse.of(ErrorCode.RATE_LIMIT_EXCEEDED,
+                    "Too many requests. Please retry after " + rateLimitResult.getRetryAfterSeconds() + " seconds.");
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .header("X-RateLimit-Limit", String.valueOf(info.getLimit()))
                     .header("X-RateLimit-Remaining", "0")
@@ -92,7 +83,7 @@ public class EventController {
                     .body(errorBody);
         }
         
-        log.info("Ingesting event type: {} for project: {}", request.getType(), apiKeyAuth.getProjectId());
+        log.debug("Ingesting event type: {} for project: {}", request.getType(), apiKeyAuth.getProjectId());
 
         EventIngestResponse response = eventIngestService.ingestEvent(
                 apiKeyAuth.getProjectId(),

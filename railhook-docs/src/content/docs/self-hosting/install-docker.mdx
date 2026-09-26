@@ -45,8 +45,10 @@ Both methods run the same `docker-compose.yml`. The installer also generates sec
     | `--behind-proxy` | With `--domain`: your own reverse proxy terminates TLS, and the dashboard listens on `127.0.0.1` for it |
     | `--email <address>` | Where Let's Encrypt sends expiry warnings |
     | `--no-start` | Write the files, start nothing |
-    | `--yes` | Do not ask before reusing a non-empty directory |
+    | `--admin-email <address>` | Platform admins, comma-separated. Also works with `--refresh` |
+    | `--yes` | Install into a non-empty directory. Without it the installer refuses |
     | `--check` | Run the system and configuration checks only |
+    | `--refresh` | Rewrite the `./railhook` helper and the Caddyfile of an existing installation |
     | `--uninstall` | Stop the stack and remove the containers. Data volumes are kept |
     | `--purge` | Uninstall and delete the data volumes too |
 
@@ -61,6 +63,7 @@ Both methods run the same `docker-compose.yml`. The installer also generates sec
     | `./railhook start` / `stop` / `restart` | Starts, stops or restarts the stack |
     | `./railhook upgrade [version]` | Backs up, then upgrades. See [Upgrade and backup](/docs/self-hosting/upgrade-backup/) |
     | `./railhook backup` | Writes a database dump into the directory |
+    | `./railhook settings < file` | Merges `NAME=value` lines into `.env`. Secrets and image tags are refused |
     | `./railhook doctor` | Re-runs every check against the files on disk |
 
     Any other argument goes to Docker Compose, so `./railhook ps` or `./railhook up -d` work.

@@ -40,7 +40,7 @@ export default function ProductSection() {
     [t('landing.product.in.unknown'), no(t('landing.product.in.invalid')), '—', no(t('landing.product.in.rejected'))],
     ['Twilio', verified, 'sms.internal/twilio', ok('200')],
     ['SendGrid', verified, 'mail.internal/events', ok('202')],
-    ['Stripe', verified, 'billing.internal/stripe', ok('200')],
+    ['Slack', verified, 'ops.internal/slack', ok('200')],
   ];
 
   return (

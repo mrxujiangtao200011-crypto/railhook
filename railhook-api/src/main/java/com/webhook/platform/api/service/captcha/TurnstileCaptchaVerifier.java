@@ -2,6 +2,7 @@ package com.webhook.platform.api.service.captcha;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -10,23 +11,16 @@ import java.time.Duration;
 
 /** Serves Turnstile and hCaptcha. Fails closed: an unreachable provider refuses registration. */
 @Slf4j
+@RequiredArgsConstructor
 public class TurnstileCaptchaVerifier implements CaptchaVerifier {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
 
     private final WebClient webClient;
+    /** Parses the body itself: WebClient's reactive codecs are configured apart from the servlet ones. */
     private final ObjectMapper objectMapper;
     private final String verifyUrl;
     private final String secretKey;
-
-    /** Parses the body itself: WebClient's reactive codecs are configured apart from the servlet ones. */
-    public TurnstileCaptchaVerifier(WebClient webClient, ObjectMapper objectMapper,
-            String verifyUrl, String secretKey) {
-        this.webClient = webClient;
-        this.objectMapper = objectMapper;
-        this.verifyUrl = verifyUrl;
-        this.secretKey = secretKey;
-    }
 
     @Override
     public boolean verify(String token, String clientIp) {

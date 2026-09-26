@@ -10,8 +10,9 @@ import com.webhook.platform.api.domain.enums.SchemaStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.exception.NotFoundException;
-import com.webhook.platform.common.util.JsonSchemaUtils;
+import com.webhook.platform.common.util.EventSchemas;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class SchemaRegistryService {
 
     private final EventTypeCatalogRepository catalogRepository;
@@ -31,21 +33,6 @@ public class SchemaRegistryService {
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
-
-    public SchemaRegistryService(
-            EventTypeCatalogRepository catalogRepository,
-            EventSchemaVersionRepository versionRepository,
-            SchemaChangeRepository changeRepository,
-            ProjectRepository projectRepository,
-            ObjectMapper objectMapper,
-            MeterRegistry meterRegistry) {
-        this.catalogRepository = catalogRepository;
-        this.versionRepository = versionRepository;
-        this.changeRepository = changeRepository;
-        this.projectRepository = projectRepository;
-        this.objectMapper = objectMapper;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Auditable(action = AuditAction.CREATE, resourceType = "EventType")
     @Transactional
@@ -63,7 +50,7 @@ public class SchemaRegistryService {
                 .build();
 
         entity = catalogRepository.saveAndFlush(entity);
-        log.info("Created event type '{}' in project {}", request.getName(), projectId);
+        log.debug("Created event type '{}' in project {}", request.getName(), projectId);
         return mapCatalogResponse(entity);
     }
 
@@ -96,7 +83,7 @@ public class SchemaRegistryService {
     public void deleteEventType(UUID projectId, UUID eventTypeId) {
         EventTypeCatalog entity = requireEventType(projectId, eventTypeId);
         catalogRepository.delete(entity);
-        log.info("Deleted event type '{}'", entity.getName());
+        log.debug("Deleted event type '{}'", entity.getName());
     }
 
     @Auditable(action = AuditAction.CREATE, resourceType = "SchemaVersion")
@@ -113,14 +100,14 @@ public class SchemaRegistryService {
 
         String fp;
         try {
-            fp = JsonSchemaUtils.fingerprint(request.getSchemaJson());
+            fp = EventSchemas.fingerprint(request.getSchemaJson());
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Failed to compute schema fingerprint: " + e.getMessage());
         }
 
         Optional<EventSchemaVersion> existing = versionRepository.findByEventTypeIdAndFingerprint(eventTypeId, fp);
         if (existing.isPresent()) {
-            log.info("Schema with fingerprint {} already exists as version {}", fp, existing.get().getVersion());
+            log.debug("Schema with fingerprint {} already exists as version {}", fp, existing.get().getVersion());
             return mapVersionResponse(existing.get());
         }
 
@@ -149,7 +136,7 @@ public class SchemaRegistryService {
                 .build();
 
         version = versionRepository.saveAndFlush(version);
-        log.info("Created schema version {} for event type '{}'", nextVersion, eventType.getName());
+        log.debug("Created schema version {} for event type '{}'", nextVersion, eventType.getName());
 
         if (nextVersion > 1) {
             computeAndSaveDiff(eventTypeId, nextVersion - 1, version);
@@ -235,7 +222,7 @@ public class SchemaRegistryService {
 
         List<String> violations;
         try {
-            violations = mode.violations(JsonSchemaUtils.diff(previous.getSchemaJson(), schemaJson));
+            violations = mode.violations(EventSchemas.diff(previous.getSchemaJson(), schemaJson));
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Could not compare this schema with version "
                     + previous.getVersion() + ": " + e.getMessage());
@@ -256,13 +243,13 @@ public class SchemaRegistryService {
             if (prevOpt.isEmpty()) return;
 
             EventSchemaVersion prev = prevOpt.get();
-            JsonSchemaUtils.SchemaDiff schemaDiff = JsonSchemaUtils.diff(prev.getSchemaJson(), newVersion.getSchemaJson());
+            EventSchemas.SchemaDiff schemaDiff = EventSchemas.diff(prev.getSchemaJson(), newVersion.getSchemaJson());
 
             SchemaChange change = SchemaChange.builder()
                     .eventTypeId(eventTypeId)
                     .fromVersionId(prev.getId())
                     .toVersionId(newVersion.getId())
-                    .changeSummary(JsonSchemaUtils.diffToJson(schemaDiff))
+                    .changeSummary(EventSchemas.diffToJson(schemaDiff))
                     .breaking(schemaDiff.breaking())
                     .build();
             changeRepository.save(change);

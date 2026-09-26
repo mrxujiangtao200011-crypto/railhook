@@ -6,6 +6,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.LocatorAdapter;
+import com.webhook.platform.api.exception.SignInRejectedException;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -22,9 +23,11 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 
 // Every check blocks a real takeover. RS256 only, so a token cannot ask to be checked as HMAC
 // against the public key.
+@RequiredArgsConstructor
 public class GoogleIdTokenVerifier {
 
     @FunctionalInterface
@@ -44,12 +47,6 @@ public class GoogleIdTokenVerifier {
 
     private volatile Map<String, PublicKey> keys = Map.of();
     private volatile Instant fetchedAt = Instant.EPOCH;
-
-    public GoogleIdTokenVerifier(KeySetSource keySetSource, String clientId, Clock clock) {
-        this.keySetSource = keySetSource;
-        this.clientId = clientId;
-        this.clock = clock;
-    }
 
     public VerifiedIdentity verify(String idToken, String expectedNonce) {
         try {

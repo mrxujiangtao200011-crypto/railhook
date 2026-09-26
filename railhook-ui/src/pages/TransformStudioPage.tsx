@@ -329,16 +329,13 @@ export default function TransformStudioPage() {
     }
   }, [mode, preview, dryRunResult]);
 
-  const verdict: { kind: StatusKind; label: string } = useMemo(() => {
-    if (!hasRun) return { kind: 'idle', label: t('transform.verdictNotRun') };
-    if (errors.length > 0) return { kind: 'halt', label: t('transform.verdictErrors') };
-    if (cancelled) return { kind: 'idle', label: t('transform.verdictCancelled') };
-    if (mode === 'dryRun') return { kind: 'ok', label: t('transform.verdictSimulated') };
-    if (outputPayload && isUnchanged(inputPayload, outputPayload)) {
-      return { kind: 'idle', label: t('transform.verdictUnchanged') };
-    }
-    return { kind: 'ok', label: t('transform.verdictChanged') };
-  }, [hasRun, errors.length, cancelled, mode, outputPayload, inputPayload, t]);
+  const verdict: { kind: StatusKind; label: string } =
+    !hasRun ? { kind: 'idle', label: t('transform.verdictNotRun') }
+    : errors.length > 0 ? { kind: 'halt', label: t('transform.verdictErrors') }
+    : cancelled ? { kind: 'idle', label: t('transform.verdictCancelled') }
+    : mode === 'dryRun' ? { kind: 'ok', label: t('transform.verdictSimulated') }
+    : outputPayload && isUnchanged(inputPayload, outputPayload) ? { kind: 'idle', label: t('transform.verdictUnchanged') }
+    : { kind: 'ok', label: t('transform.verdictChanged') };
 
   const isScript = kind === 'JAVASCRIPT';
 

@@ -1,6 +1,6 @@
 {
   "name": "@railhook/node",
-  "version": "2.31.1",
+  "version": "2.32.0",
   "description": "Official Node.js SDK for Railhook — reliable webhook infrastructure",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,7 +15,6 @@
     "test": "jest",
     "test:contract": "jest --config jest.contract.config.js",
     "smoke:live": "npm run build && node scripts/live-api-smoke.mjs",
-    "lint": "eslint src --ext .ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

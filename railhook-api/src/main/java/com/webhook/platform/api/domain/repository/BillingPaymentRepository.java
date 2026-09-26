@@ -15,8 +15,6 @@ public interface BillingPaymentRepository extends JpaRepository<BillingPayment, 
 
     List<BillingPayment> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
-    List<BillingPayment> findByInvoiceIdOrderByCreatedAtDesc(UUID invoiceId);
-
     // One provider reference can name several rows (declined, then paid), so a refund asks for
     // the one that took money.
     Optional<BillingPayment> findFirstByProviderCodeAndExternalPaymentIdAndStatusInOrderByCreatedAtDesc(

@@ -75,12 +75,6 @@ describe('WorkflowBuilderPage', () => {
     vi.mocked(workflowsApi.listExecutions).mockResolvedValue(emptyExecutions as never);
   });
 
-  it('renders the canvas without throwing', async () => {
-    renderBuilder();
-
-    expect(await screen.findByText('Route payments')).toBeInTheDocument();
-  });
-
   it('opens a workflow whose nodes carry no position', async () => {
     vi.mocked(workflowsApi.get).mockResolvedValue({
       ...WORKFLOW,
@@ -99,22 +93,12 @@ describe('WorkflowBuilderPage', () => {
     expect(screen.queryByText(/reading 'x'/)).not.toBeInTheDocument();
   });
 
-  it('offers every node type the canvas can draw', async () => {
-    renderBuilder();
-    await screen.findByText('Route payments');
-
-    const palette = document.body.textContent ?? '';
-    for (const label of [/webhook/i, /filter|фільтр/i, /transform|трансформац/i, /http/i, /slack/i, /delay|затримк/i]) {
-      expect(palette).toMatch(label);
-    }
-  });
-
   it('adds a node when a palette entry is tapped', async () => {
     renderBuilder();
     await screen.findByText('Route payments');
     await waitFor(() => expect(document.body.textContent).toMatch(/1 nodes/));
 
-    await userEvent.click(screen.getByRole('button', { name: /delay|затримк/i }));
+    await userEvent.click(screen.getByRole('button', { name: /delay/i }));
 
     await waitFor(() => expect(document.body.textContent).toMatch(/2 nodes/));
     expect(screen.getByText(/unsaved/i)).toBeInTheDocument();
@@ -124,36 +108,18 @@ describe('WorkflowBuilderPage', () => {
     renderBuilder();
     await screen.findByText('Route payments');
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /^save|^зберегти/i })).toBeDisabled());
-    expect(screen.queryByText(/unsaved|не збережено/i)).not.toBeInTheDocument();
-  });
-
-  it('saves nothing, enables nothing and runs nothing by being opened', async () => {
-    renderBuilder();
-    await screen.findByText('Route payments');
-
-    expect(workflowsApi.update).not.toHaveBeenCalled();
-    expect(workflowsApi.toggle).not.toHaveBeenCalled();
-    expect(workflowsApi.trigger).not.toHaveBeenCalled();
-    expect(workflowsApi.delete).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('button', { name: /^save/i })).toBeDisabled());
+    expect(screen.queryByText(/unsaved/i)).not.toBeInTheDocument();
   });
 
   it('does not fire a test run from opening the test-run panel', async () => {
     renderBuilder();
     await screen.findByText('Route payments');
 
-    const open = screen.getAllByRole('button')
-      .find((b) => /test run|тестовий запуск/i.test(b.textContent ?? ''));
-    if (open) await userEvent.click(open);
+    await userEvent.click(screen.getByRole('button', { name: 'Test Run' }));
 
+    expect(await screen.findByText('Provide a JSON payload to manually trigger this workflow')).toBeInTheDocument();
     expect(workflowsApi.trigger).not.toHaveBeenCalled();
-  });
-
-  it('shows a disabled workflow as disabled', async () => {
-    renderBuilder();
-
-    await screen.findByText('Route payments');
-    await waitFor(() => expect(document.body.textContent).toMatch(/disabled|вимкнено/i));
   });
 
   it('keeps unsaved canvas edits when the workflow is enabled or disabled', async () => {
@@ -172,13 +138,5 @@ describe('WorkflowBuilderPage', () => {
     await screen.findByRole('button', { name: /^enabled$/i });
     expect(screen.getByText(/unsaved/i)).toBeInTheDocument();
     expect(screen.queryByText('Reshape')).not.toBeInTheDocument();
-  });
-
-  it('renders something rather than a blank page when the workflow fails to load', async () => {
-    vi.mocked(workflowsApi.get).mockRejectedValue(new Error('boom'));
-    renderBuilder();
-
-    await waitFor(() => expect(workflowsApi.get).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
   });
 });

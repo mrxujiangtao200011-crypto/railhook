@@ -9,18 +9,13 @@ describe('NotFoundPage', () => {
     return renderPage(<NotFoundPage />, { path: '*', initialEntry: entry, auth });
   }
 
-  it('sends a signed-in user back to the dashboard', () => {
-    renderAt('/admin/nope', { isAuthenticated: true });
+  it.each([
+    ['a signed-in user back to the dashboard', '/admin/nope', true, '/admin/dashboard'],
+    ['a signed-out visitor back to the front page', '/nope', false, '/'],
+  ])('sends %s', (_, entry, isAuthenticated, href) => {
+    renderAt(entry, { isAuthenticated });
 
-    const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/admin/dashboard');
-  });
-
-  it('sends a signed-out visitor back to the front page', () => {
-    renderAt('/nope', { isAuthenticated: false });
-
-    const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link')).toHaveAttribute('href', href);
   });
 
   it('names the path that missed', () => {

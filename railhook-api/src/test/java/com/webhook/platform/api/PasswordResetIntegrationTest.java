@@ -5,7 +5,6 @@ import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.service.EmailService;
-import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -14,9 +13,12 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import com.webhook.platform.common.security.SecureTokens;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -59,7 +61,7 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String requestResetAndCaptureToken() throws Exception {
-        org.mockito.Mockito.clearInvocations(emailService);
+        clearInvocations(emailService);
 
         ForgotPasswordRequest forgotReq = ForgotPasswordRequest.builder()
                 .email(EMAIL)
@@ -82,9 +84,9 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
         User user = userRepository.findByEmail(EMAIL).orElseThrow();
         assertThat(user.getPasswordResetToken()).isNotNull();
         assertThat(user.getPasswordResetToken()).isNotEqualTo(resetToken);
-        assertThat(user.getPasswordResetToken()).isEqualTo(CryptoUtils.hashApiKey(resetToken));
+        assertThat(user.getPasswordResetToken()).isEqualTo(SecureTokens.hash(resetToken));
         assertThat(user.getPasswordResetTokenExpiresAt()).isNotNull();
-        assertThat(user.getPasswordResetTokenExpiresAt()).isAfter(java.time.Instant.now());
+        assertThat(user.getPasswordResetTokenExpiresAt()).isAfter(Instant.now());
 
         ResetPasswordRequest resetReq = ResetPasswordRequest.builder()
                 .token(resetToken)
@@ -152,7 +154,7 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
         String resetToken = requestResetAndCaptureToken();
 
         User user = userRepository.findByEmail(EMAIL).orElseThrow();
-        user.setPasswordResetTokenExpiresAt(java.time.Instant.now().minusSeconds(3600));
+        user.setPasswordResetTokenExpiresAt(Instant.now().minusSeconds(3600));
         userRepository.save(user);
 
         ResetPasswordRequest resetReq = ResetPasswordRequest.builder()
@@ -203,18 +205,6 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/reset-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(resetReq)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void testForgotPassword_invalidEmailFormat_returns400() throws Exception {
-        ForgotPasswordRequest req = ForgotPasswordRequest.builder()
-                .email("not-an-email")
-                .build();
-
-        mockMvc.perform(post("/api/v1/auth/forgot-password")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
     }
 }

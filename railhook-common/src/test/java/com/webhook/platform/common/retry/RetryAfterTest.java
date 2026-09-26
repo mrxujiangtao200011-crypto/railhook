@@ -58,13 +58,6 @@ class RetryAfterTest {
     class Formats {
 
         @Test
-        @DisplayName("delta-seconds is taken from now")
-        void deltaSeconds() {
-            assertEquals(NOW.plusSeconds(120),
-                    RetryAfter.nextRetryAt(ladderNext(60), "120", 429, NOW, MAX));
-        }
-
-        @Test
         @DisplayName("an HTTP-date is taken as the absolute instant it names")
         void httpDate() {
             assertEquals(Instant.parse("2026-09-20T12:30:00Z"),

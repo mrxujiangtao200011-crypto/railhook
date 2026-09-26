@@ -1,22 +1,19 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.common.retry.RetryLadder;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /** A ladder longer than the worker's escalation cap was sent to the DLQ before its later tiers ran. */
 @Component
+@RequiredArgsConstructor
 public class RetryLadderEscalationCap {
 
+    @Value("${delivery.escalation.hard-cap-hours:96}")
     private final long deliveryHardCapHours;
+    @Value("${forward.escalation.hard-cap-hours:24}")
     private final long forwardHardCapHours;
-
-    public RetryLadderEscalationCap(
-            @Value("${delivery.escalation.hard-cap-hours:96}") long deliveryHardCapHours,
-            @Value("${forward.escalation.hard-cap-hours:24}") long forwardHardCapHours) {
-        this.deliveryHardCapHours = deliveryHardCapHours;
-        this.forwardHardCapHours = forwardHardCapHours;
-    }
 
     public void requireOutgoingFits(String retryDelays, int maxAttempts) {
         requireFits(retryDelays, maxAttempts, deliveryHardCapHours, "Delivery");

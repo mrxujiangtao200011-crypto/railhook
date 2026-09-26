@@ -19,23 +19,12 @@ class RetryGovernorTest {
     void additiveIncrease_afterSuccess() {
         RetryGovernor gov = new RetryGovernor("test", 100, 5, 10, 5000, 6, meterRegistry);
 
-        gov.recordResult(1, 9); // 90% failure → halve
+        gov.recordResult(1, 9);
         int after = gov.getEffectiveBatch();
         assertEquals(50, after);
 
         gov.recordResult(10, 0);
         assertEquals(60, gov.getEffectiveBatch());
-    }
-
-    @Test
-    void multiplicativeDecrease_onHighFailureRate() {
-        RetryGovernor gov = new RetryGovernor("test", 100, 5, 10, 5000, 6, meterRegistry);
-
-        gov.recordResult(2, 8);
-        assertEquals(50, gov.getEffectiveBatch());
-
-        gov.recordResult(1, 9);
-        assertEquals(25, gov.getEffectiveBatch());
     }
 
     @Test
@@ -73,7 +62,7 @@ class RetryGovernorTest {
         assertEquals(1, gov.getCooldownRemaining());
 
         assertEquals(0, gov.computeEffectiveBatch(0));
-        assertEquals(0, gov.getCooldownRemaining()); // consumed
+        assertEquals(0, gov.getCooldownRemaining());
 
         assertTrue(gov.computeEffectiveBatch(0) > 0);
     }

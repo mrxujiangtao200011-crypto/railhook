@@ -3,15 +3,13 @@ package com.webhook.platform.api.dto.validation;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
+import lombok.RequiredArgsConstructor;
 
 /** Reads the caller's plan, so it only works once the request is scoped to an organization. */
+@RequiredArgsConstructor
 public class WithinPlanRateLimitValidator implements ConstraintValidator<WithinPlanRateLimit, Integer> {
 
     private final EntitlementService entitlementService;
-
-    public WithinPlanRateLimitValidator(EntitlementService entitlementService) {
-        this.entitlementService = entitlementService;
-    }
 
     @Override
     public boolean isValid(Integer value, ConstraintValidatorContext context) {

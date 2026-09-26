@@ -10,12 +10,12 @@ import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
-import com.webhook.platform.common.util.PayloadCompressionUtil;
+import com.webhook.platform.common.util.PayloadCompression;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Set;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -113,7 +113,7 @@ public class EventIngestService {
             if (idempotencyKey != null) {
                 var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
                 if (existingEvent.isPresent()) {
-                    log.info("Idempotency race resolved, returning existing event: {}", existingEvent.get().getId());
+                    log.debug("Idempotency race resolved, returning existing event: {}", existingEvent.get().getId());
                     duplicateEventsCounter.increment();
                     return buildResponse(existingEvent.get(), 0);
                 }
@@ -179,7 +179,7 @@ public class EventIngestService {
             var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
             if (existingEvent.isPresent()) {
                 Event event = existingEvent.get();
-                log.info("Duplicate event detected, returning existing event: {}", event.getId());
+                log.debug("Duplicate event detected, returning existing event: {}", event.getId());
                 duplicateEventsCounter.increment();
                 return buildResponse(event, 0);
             }
@@ -196,7 +196,7 @@ public class EventIngestService {
         if (project != null) {
             organizationToCharge.set(project.getOrganizationId());
         }
-        log.info("Created event: {} for project: {}", event.getId(), projectId);
+        log.debug("Created event: {} for project: {}", event.getId(), projectId);
 
         // Replay decides through the same EventIntake, so a replayed Event goes where this one went.
         EventIntake.Decision decision;
@@ -213,7 +213,7 @@ public class EventIngestService {
         }
 
         if (decision.dropped()) {
-            log.info("Rule DROP action — skipping deliveries for event {}", event.getId());
+            log.debug("Rule DROP action — skipping deliveries for event {}", event.getId());
             rulesDroppedCounter.increment();
             return buildResponse(event, 0, schemaWarnings);
         }
@@ -235,7 +235,7 @@ public class EventIngestService {
         int deliveriesCreated = savedDeliveries.size();
         deliveriesCreatedCounter.increment(deliveriesCreated);
 
-        log.info("Created {} deliveries for event: {} (rules matched: {})",
+        log.debug("Created {} deliveries for event: {} (rules matched: {})",
                 deliveriesCreated, event.getId(), decision.rulesMatched());
 
         int depth = WorkflowTriggerService.getCurrentDepth() + 1;
@@ -261,8 +261,8 @@ public class EventIngestService {
                                 + maxPayloadSizeBytes + " bytes)");
             }
 
-            PayloadCompressionUtil.CompressionResult compression = 
-                    PayloadCompressionUtil.compress(payload, compressionThresholdBytes);
+            PayloadCompression.CompressionResult compression = 
+                    PayloadCompression.compress(payload, compressionThresholdBytes);
             
             return Event.builder()
                     .projectId(projectId)

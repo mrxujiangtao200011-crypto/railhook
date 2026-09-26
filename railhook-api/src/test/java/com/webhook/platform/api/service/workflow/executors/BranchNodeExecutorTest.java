@@ -6,6 +6,8 @@ import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
 import com.webhook.platform.api.service.workflow.StepResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,8 +34,9 @@ class BranchNodeExecutorTest {
         assertThat(result.output().get("_branchResult").asBoolean()).isTrue();
     }
 
-    @Test
-    void matchingCondition_routesToTrueHandle() throws Exception {
+    @ParameterizedTest
+    @CsvSource({"200, true", "10, false"})
+    void conditionPicksTheHandle(int amount, boolean matches) throws Exception {
         JsonNode config = json("""
                 {
                   "conditions": {
@@ -45,31 +48,11 @@ class BranchNodeExecutorTest {
                   }
                 }
                 """);
-        StepResult result = executor.execute(config, json("{\"amount\":200}"));
+        StepResult result = executor.execute(config, json("{\"amount\":" + amount + "}"));
 
         assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(result.output().get("_branchHandle").asText()).isEqualTo("true");
-        assertThat(result.output().get("_branchResult").asBoolean()).isTrue();
-    }
-
-    @Test
-    void nonMatchingCondition_routesToFalseHandle() throws Exception {
-        JsonNode config = json("""
-                {
-                  "conditions": {
-                    "type": "predicate",
-                    "field": "amount",
-                    "operator": "GT",
-                    "value": 100,
-                    "valueType": "NUMBER"
-                  }
-                }
-                """);
-        StepResult result = executor.execute(config, json("{\"amount\":10}"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(result.output().get("_branchHandle").asText()).isEqualTo("false");
-        assertThat(result.output().get("_branchResult").asBoolean()).isFalse();
+        assertThat(result.output().get("_branchHandle").asText()).isEqualTo(String.valueOf(matches));
+        assertThat(result.output().get("_branchResult").asBoolean()).isEqualTo(matches);
     }
 
     @Test

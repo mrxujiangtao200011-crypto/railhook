@@ -37,16 +37,7 @@ describe('SettingsPage — erasing your account', () => {
     return renderPage(<SettingsPage />, { path: '/settings', initialEntry: '/settings' });
   }
 
-  it('does not erase anything on the first click', async () => {
-    const user = userEvent.setup();
-    render();
-
-    await user.click((await screen.findAllByRole('button', { name: /erase my account/i }))[0]);
-
-    expect(authApi.eraseOwnAccount).not.toHaveBeenCalled();
-  });
-
-  it('keeps the confirmation disabled until the account is typed back', async () => {
+  it('erases nothing on the first click, and keeps the confirmation disabled until the account is typed back', async () => {
     const user = userEvent.setup();
     render();
 
@@ -55,6 +46,7 @@ describe('SettingsPage — erasing your account', () => {
     const dialog = await screen.findByRole('dialog');
     const confirm = await within(dialog).findByRole('button', { name: /erase my account/i });
     expect(confirm).toBeDisabled();
+    expect(authApi.eraseOwnAccount).not.toHaveBeenCalled();
   });
 
   it('erases once the account is confirmed by name', async () => {
@@ -96,7 +88,7 @@ describe('SettingsPage — erasing your account', () => {
     await user.click((await screen.findAllByRole('button', { name: /erase my account/i }))[0]);
 
     const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent(/only member of is deleted|alone in is deleted/i);
-    expect(dialog).toHaveTextContent(/cannot be undone|can be undone/i);
+    expect(dialog).toHaveTextContent(/only member of is deleted/i);
+    expect(dialog).toHaveTextContent(/cannot be undone/i);
   });
 });

@@ -11,22 +11,24 @@ import com.webhook.platform.api.domain.repository.EmailChangeRequestRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.ChangeEmailRequest;
 import com.webhook.platform.api.dto.EmailChangeResponse;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.exception.ConflictException;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import com.webhook.platform.api.tenancy.SystemTenant;
-import com.webhook.platform.common.util.CryptoUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -38,38 +40,20 @@ import java.util.UUID;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class EmailChangeService {
 
     static final Duration CONFIRMATION_LIFETIME = Duration.ofHours(24);
     static final Duration RECENT_SIGN_IN = Duration.ofMinutes(10);
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final EmailChangeRequestRepository changeRepository;
     private final UserSessionService userSessionService;
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final CaptchaVerifier captchaVerifier;
     private final VerificationMailBudget budget;
-
-    public EmailChangeService(UserRepository userRepository,
-                              EmailChangeRequestRepository changeRepository,
-                              UserSessionService userSessionService,
-                              JwtUtil jwtUtil,
-                              BCryptPasswordEncoder passwordEncoder,
-                              EmailService emailService,
-                              CaptchaVerifier captchaVerifier,
-                              VerificationMailBudget budget) {
-        this.userRepository = userRepository;
-        this.changeRepository = changeRepository;
-        this.userSessionService = userSessionService;
-        this.jwtUtil = jwtUtil;
-        this.passwordEncoder = passwordEncoder;
-        this.emailService = emailService;
-        this.captchaVerifier = captchaVerifier;
-        this.budget = budget;
-    }
 
     @SystemTenant("acts on the caller's own account, which is not confined to the organization the request is scoped to")
     @Transactional(readOnly = true)
@@ -85,18 +69,18 @@ public class EmailChangeService {
         User user = requireUser(userId);
         String newEmail = EmailAddresses.normalize(request.getNewEmail());
         if (newEmail.equalsIgnoreCase(user.getEmail())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "That is already your email address");
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "That is already your email address");
         }
 
         boolean verified = Boolean.TRUE.equals(user.getEmailVerified());
         if (!verified) {
             if (!captchaVerifier.verify(request.getCaptchaToken(), clientIp)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CAPTCHA verification failed. Please try again.");
+                throw new DomainException(ErrorCode.CAPTCHA_FAILED, "CAPTCHA verification failed. Please try again.");
             }
         } else if (user.getPasswordHash() != null) {
             if (request.getCurrentPassword() == null
                     || !passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+                throw new DomainException(ErrorCode.INVALID_REQUEST, "Current password is incorrect");
             }
         } else {
             requireRecentSignIn(userId, refreshToken);
@@ -114,11 +98,11 @@ public class EmailChangeService {
     public EmailChangeResponse resend(UUID userId) {
         User user = requireUser(userId);
         EmailChangeRequest pending = livePending(userId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "No email change is waiting for confirmation"));
+                new NotFoundException("No email change is waiting for confirmation"));
         budget.requireSendAllowance(user);
 
-        String token = newToken();
-        pending.setTokenHash(CryptoUtils.hashApiKey(token));
+        String token = SecureTokens.generate(32);
+        pending.setTokenHash(SecureTokens.hash(token));
         pending.setExpiresAt(Instant.now().plus(CONFIRMATION_LIFETIME));
         changeRepository.save(pending);
         budget.recordSend(userId, VerificationEmailSend.EMAIL_CHANGE_RESEND);
@@ -140,11 +124,11 @@ public class EmailChangeService {
     @Transactional
     public void confirm(String token) {
         EmailChangeRequest pending = changeRepository
-                .findByTokenHashAndStatus(CryptoUtils.hashApiKey(token), EmailChangeStatus.PENDING)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                .findByTokenHashAndStatus(SecureTokens.hash(token), EmailChangeStatus.PENDING)
+                .orElseThrow(() -> new DomainException(ErrorCode.INVALID_REQUEST,
                         "This confirmation link is invalid or has already been used."));
         if (pending.getExpiresAt() == null || pending.getExpiresAt().isBefore(Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new DomainException(ErrorCode.INVALID_REQUEST,
                     "This confirmation link has expired. Ask for the change again.");
         }
         User user = requireUser(pending.getUserId());
@@ -162,8 +146,8 @@ public class EmailChangeService {
     @Transactional
     public void cancelByToken(String cancelToken) {
         EmailChangeRequest pending = changeRepository
-                .findByCancelTokenHashAndStatus(CryptoUtils.hashApiKey(cancelToken), EmailChangeStatus.PENDING)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                .findByCancelTokenHashAndStatus(SecureTokens.hash(cancelToken), EmailChangeStatus.PENDING)
+                .orElseThrow(() -> new DomainException(ErrorCode.INVALID_REQUEST,
                         "This link is invalid or the change was already settled."));
         settle(pending, EmailChangeStatus.CANCELLED);
         // Whoever asked held a session; the owner disowning it is the reason to end it.
@@ -174,9 +158,9 @@ public class EmailChangeService {
 
     private EmailChangeResponse applyToUnverified(User user, String newEmail) {
         String previous = user.getEmail();
-        String token = newToken();
+        String token = SecureTokens.generate(32);
         user.setEmail(newEmail);
-        user.setVerificationToken(CryptoUtils.hashApiKey(token));
+        user.setVerificationToken(SecureTokens.hash(token));
         user.setVerificationTokenExpiresAt(Instant.now().plus(CONFIRMATION_LIFETIME));
         saveAddress(user);
 
@@ -202,15 +186,15 @@ public class EmailChangeService {
                     changeRepository.flush();
                 });
 
-        String token = newToken();
-        String cancelToken = newToken();
+        String token = SecureTokens.generate(32);
+        String cancelToken = SecureTokens.generate(32);
         EmailChangeRequest pending = changeRepository.save(EmailChangeRequest.builder()
                 .userId(user.getId())
                 .previousEmail(user.getEmail())
                 .newEmail(newEmail)
                 .status(EmailChangeStatus.PENDING)
-                .tokenHash(CryptoUtils.hashApiKey(token))
-                .cancelTokenHash(CryptoUtils.hashApiKey(cancelToken))
+                .tokenHash(SecureTokens.hash(token))
+                .cancelTokenHash(SecureTokens.hash(cancelToken))
                 .expiresAt(Instant.now().plus(CONFIRMATION_LIFETIME))
                 .build());
         budget.recordSend(user.getId(), VerificationEmailSend.EMAIL_CHANGE);
@@ -223,11 +207,11 @@ public class EmailChangeService {
 
     private void requireRecentSignIn(UUID userId, String refreshToken) {
         Optional<UserSession> session = Optional.ofNullable(refreshToken)
-                .filter(jwtUtil::validateToken)
-                .flatMap(token -> userSessionService.findByRefreshJti(jwtUtil.getJtiFromToken(token)))
+                .filter(jwtTokenService::validateToken)
+                .flatMap(token -> userSessionService.findByRefreshJti(jwtTokenService.getJtiFromToken(token)))
                 .filter(s -> userId.equals(s.getUserId()) && s.getRevokedAt() == null);
         if (session.isEmpty() || session.get().getCreatedAt().isBefore(Instant.now().minus(RECENT_SIGN_IN))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+            throw new ForbiddenException(
                     "Sign in with Google again, then change your email within 10 minutes.");
         }
     }
@@ -237,7 +221,7 @@ public class EmailChangeService {
         userRepository.findByEmail(EmailAddresses.normalize(email))
                 .filter(other -> !other.getId().equals(userId))
                 .ifPresent(other -> {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+                    throw new ConflictException("Email already exists");
                 });
     }
 
@@ -245,7 +229,7 @@ public class EmailChangeService {
         try {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+            throw new ConflictException("Email already exists");
         }
     }
 
@@ -262,7 +246,7 @@ public class EmailChangeService {
 
     private User requireUser(UUID userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
     private static EmailChangeResponse describe(User user, EmailChangeRequest pending) {
@@ -282,11 +266,5 @@ public class EmailChangeService {
             details.put("expiresAt", request.getExpiresAt().toString());
         }
         return details;
-    }
-
-    private static String newToken() {
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

@@ -1,6 +1,7 @@
 package com.webhook.platform.api.security;
 
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
+import lombok.Getter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 
@@ -10,8 +11,10 @@ import java.util.UUID;
 public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
 
     private final String apiKey;
+    @Getter
     private final UUID projectId;
     private final UUID organizationId;
+    @Getter
     private final ApiKeyScope scope;
 
     public ApiKeyAuthenticationToken(String apiKey) {
@@ -44,16 +47,8 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
         return projectId;
     }
 
-    public UUID getProjectId() {
-        return projectId;
-    }
-
     /** The organization owning the key's project, resolved once at authentication. */
     public UUID getOrganizationId() {
         return organizationId;
-    }
-
-    public ApiKeyScope getScope() {
-        return scope;
     }
 }

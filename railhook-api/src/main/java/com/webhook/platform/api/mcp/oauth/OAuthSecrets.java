@@ -1,6 +1,7 @@
 package com.webhook.platform.api.mcp.oauth;
 
-import com.webhook.platform.common.util.CryptoUtils;
+
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -38,7 +39,7 @@ public final class OAuthSecrets {
 
     // Unsalted: the values are random.
     public static String hash(String value) {
-        return CryptoUtils.hashApiKey(value);
+        return SecureTokens.hash(value);
     }
 
     public static boolean matches(String presented, String storedHash) {

@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -30,16 +31,11 @@ import com.webhook.platform.api.exception.ForbiddenException;
 @Tag(name = "Organizations", description = "Organization management")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class OrganizationController {
 
     private final OrganizationService organizationService;
     private final GdprExportService gdprExportService;
-
-    public OrganizationController(OrganizationService organizationService,
-                                  GdprExportService gdprExportService) {
-        this.organizationService = organizationService;
-        this.gdprExportService = gdprExportService;
-    }
 
     @Operation(summary = "List user organizations", description = "Returns all organizations the user belongs to")
     @GetMapping

@@ -5,7 +5,7 @@ import com.webhook.platform.api.dto.IngressResponse;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.service.IngressService;
 import com.webhook.platform.api.service.ingress.IngressOutcome;
-import com.webhook.platform.api.service.ingress.RateLimitExceededException;
+import com.webhook.platform.api.exception.RateLimitExceededException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;

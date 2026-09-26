@@ -16,9 +16,10 @@ import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.LoginRequest;
 import com.webhook.platform.api.dto.SwitchOrganizationRequest;
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.exception.ForbiddenException;
-import com.webhook.platform.api.security.JwtUtil;
-import com.webhook.platform.common.util.CryptoUtils;
+import com.webhook.platform.api.exception.UnauthorizedException;
+import com.webhook.platform.api.security.JwtTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -31,7 +32,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -60,7 +61,7 @@ class AuthServiceTest {
     @Mock private OrganizationRepository organizationRepository;
     @Mock private MembershipRepository membershipRepository;
     @Mock private PlanRepository planRepository;
-    @Mock private JwtUtil jwtUtil;
+    @Mock private JwtTokenService jwtTokenService;
     @Mock private TokenBlacklistService tokenBlacklistService;
     @Mock private UserSessionService userSessionService;
     @Mock private AccountLockoutService accountLockoutService;
@@ -70,10 +71,10 @@ class AuthServiceTest {
 
     @BeforeEach
     void buildService() {
-        authService = authService(jwtUtil, new BCryptPasswordEncoder(4), accountLockoutService, false);
+        authService = authService(jwtTokenService, new BCryptPasswordEncoder(4), accountLockoutService, false);
     }
 
-    private AuthService authService(JwtUtil jwt, BCryptPasswordEncoder encoder,
+    private AuthService authService(JwtTokenService jwt, BCryptPasswordEncoder encoder,
                                     AccountLockoutService lockout, boolean emailVerificationRequired) {
         return new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwt, encoder, tokenBlacklistService, userSessionService, lockout,
@@ -87,7 +88,7 @@ class AuthServiceTest {
     @DisplayName("AuthService.switchOrganization — a token for another organization you belong to")
     class OrganizationSwitch {
 
-        private JwtUtil realJwt;
+        private JwtTokenService realJwt;
 
         private final UUID userId = UUID.randomUUID();
         private final UUID homeOrgId = UUID.randomUUID();
@@ -100,7 +101,7 @@ class AuthServiceTest {
 
         @BeforeEach
         void setUp() {
-            realJwt = new JwtUtil("a-test-secret-that-is-long-enough-32", 900_000L, 86_400_000L);
+            realJwt = new JwtTokenService("a-test-secret-that-is-long-enough-32", 900_000L, 86_400_000L);
             authService = authService(realJwt, new BCryptPasswordEncoder(4), accountLockoutService, false);
 
             refreshToken = realJwt.generateRefreshToken(userId, sessionId);
@@ -125,26 +126,8 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("mints a token for the target organization and moves the session onto it")
+        @DisplayName("mints a token for the target organization, with the target's role, on the same session")
         void switchesToASecondOrganization() {
-            when(userSessionService.findByRefreshJti(session.getRefreshTokenJti()))
-                    .thenReturn(Optional.of(session));
-            when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
-                    .thenReturn(Optional.of(membership(clientOrgId, MembershipRole.DEVELOPER)));
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
-
-            AuthResponse response = authService.switchOrganization(userId, to(clientOrgId), refreshToken);
-
-            assertThat(realJwt.getOrganizationIdFromToken(response.getAccessToken())).isEqualTo(clientOrgId);
-            assertThat(session.getOrganizationId())
-                    .as("the session remembers, or the next refresh would snap back to the old organization")
-                    .isEqualTo(clientOrgId);
-            verify(userSessionService).save(session);
-        }
-
-        @Test
-        @DisplayName("the role comes from the target membership, never from the token being replaced")
-        void roleIsNotCarriedAcross() {
             when(userSessionService.findByRefreshJti(session.getRefreshTokenJti()))
                     .thenReturn(Optional.of(session));
             when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
@@ -153,7 +136,17 @@ class AuthServiceTest {
 
             AuthResponse response = authService.switchOrganization(userId, to(clientOrgId), refreshToken);
 
-            assertThat(realJwt.getRoleFromToken(response.getAccessToken())).isEqualTo(MembershipRole.VIEWER);
+            assertThat(realJwt.getOrganizationIdFromToken(response.getAccessToken())).isEqualTo(clientOrgId);
+            assertThat(realJwt.getRoleFromToken(response.getAccessToken()))
+                    .as("the role comes from the target membership, never from the token being replaced")
+                    .isEqualTo(MembershipRole.VIEWER);
+            assertThat(realJwt.getSessionIdFromToken(response.getAccessToken()))
+                    .as("the new access token stays on the same session, so it is still revocable")
+                    .isEqualTo(sessionId);
+            assertThat(session.getOrganizationId())
+                    .as("the session remembers, or the next refresh would snap back to the old organization")
+                    .isEqualTo(clientOrgId);
+            verify(userSessionService).save(session);
         }
 
         @Test
@@ -198,8 +191,7 @@ class AuthServiceTest {
                     .thenReturn(Optional.of(session));
 
             assertThatThrownBy(() -> authService.switchOrganization(userId, to(clientOrgId), refreshToken))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .hasMessageContaining("401");
+                    .isInstanceOf(UnauthorizedException.class);
 
             verify(membershipRepository, never()).findByUserIdAndOrganizationId(any(), any());
         }
@@ -212,8 +204,7 @@ class AuthServiceTest {
                     .thenReturn(Optional.of(session));
 
             assertThatThrownBy(() -> authService.switchOrganization(userId, to(clientOrgId), refreshToken))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .hasMessageContaining("401");
+                    .isInstanceOf(UnauthorizedException.class);
         }
 
         @Test
@@ -222,8 +213,7 @@ class AuthServiceTest {
             String accessToken = realJwt.generateAccessToken(userId, homeOrgId, MembershipRole.OWNER, sessionId, true);
 
             assertThatThrownBy(() -> authService.switchOrganization(userId, to(clientOrgId), accessToken))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .hasMessageContaining("401");
+                    .isInstanceOf(UnauthorizedException.class);
         }
 
         @Test
@@ -244,20 +234,6 @@ class AuthServiceTest {
             verify(tokenBlacklistService, never()).blacklist(any(), any());
             verify(tokenBlacklistService, never()).revokeAllUserTokens(any());
             verify(tokenBlacklistService, never()).revokeSession(any(), any());
-        }
-
-        @Test
-        @DisplayName("the new access token stays on the same session, so it is still revocable")
-        void keepsTheSessionId() {
-            when(userSessionService.findByRefreshJti(session.getRefreshTokenJti()))
-                    .thenReturn(Optional.of(session));
-            when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
-                    .thenReturn(Optional.of(membership(clientOrgId, MembershipRole.OWNER)));
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
-
-            AuthResponse response = authService.switchOrganization(userId, to(clientOrgId), refreshToken);
-
-            assertThat(realJwt.getSessionIdFromToken(response.getAccessToken())).isEqualTo(sessionId);
         }
 
         @Test
@@ -307,8 +283,7 @@ class AuthServiceTest {
 
             assertThatThrownBy(() -> authService.refreshToken(
                     refreshToken, SessionOrigin.of(SessionClient.WEB, "a-browser", "198.51.100.4")))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .hasMessageContaining("401");
+                    .isInstanceOf(UnauthorizedException.class);
 
             verify(tokenBlacklistService, never()).blacklist(eq(realJwt.getJtiFromToken(refreshToken)), any());
         }
@@ -341,9 +316,9 @@ class AuthServiceTest {
         @Test
         void resetPasswordRevokesEveryLiveSession() {
             String token = "plaintext-reset-token";
-            user.setPasswordResetToken(CryptoUtils.hashApiKey(token));
+            user.setPasswordResetToken(SecureTokens.hash(token));
             user.setPasswordResetTokenExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
-            when(userRepository.findByPasswordResetToken(CryptoUtils.hashApiKey(token)))
+            when(userRepository.findByPasswordResetToken(SecureTokens.hash(token)))
                     .thenReturn(Optional.of(user));
             when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -376,7 +351,7 @@ class AuthServiceTest {
         @BeforeEach
         void setUp() {
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
-            authService = authService(jwtUtil, encoder,
+            authService = authService(jwtTokenService, encoder,
                     new AccountLockoutService(userRepository, true, 3, 60, 900, 60), true);
 
             user = User.builder()
@@ -401,9 +376,9 @@ class AuthServiceTest {
                 stored.add(inv.getArgument(0));
                 return inv.getArgument(0);
             });
-            when(jwtUtil.generateRefreshToken(any(), any())).thenReturn("refresh");
-            when(jwtUtil.getJtiFromToken("refresh")).thenReturn(UUID.randomUUID().toString());
-            when(jwtUtil.getExpirationFromToken("refresh"))
+            when(jwtTokenService.generateRefreshToken(any(), any())).thenReturn("refresh");
+            when(jwtTokenService.getJtiFromToken("refresh")).thenReturn(UUID.randomUUID().toString());
+            when(jwtTokenService.getExpirationFromToken("refresh"))
                     .thenReturn(new Date(System.currentTimeMillis() + 86_400_000L));
         }
 
@@ -463,17 +438,17 @@ class AuthServiceTest {
 
             when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
             when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
-            when(jwtUtil.generateAccessToken(any(), any(), any(), any(), anyBoolean())).thenReturn("access");
-            when(jwtUtil.generateRefreshToken(any(), any())).thenReturn("refresh");
-            when(jwtUtil.validateToken(any())).thenReturn(true);
-            when(jwtUtil.getTokenType(any())).thenReturn(JwtUtil.TOKEN_TYPE_REFRESH);
-            when(jwtUtil.getJtiFromToken(any())).thenReturn(UUID.randomUUID().toString());
-            when(jwtUtil.getUserIdFromToken(any())).thenReturn(user.getId());
-            when(jwtUtil.getExpirationFromToken(any())).thenReturn(Date.from(Instant.now().plusSeconds(3600)));
+            when(jwtTokenService.generateAccessToken(any(), any(), any(), any(), anyBoolean())).thenReturn("access");
+            when(jwtTokenService.generateRefreshToken(any(), any())).thenReturn("refresh");
+            when(jwtTokenService.validateToken(any())).thenReturn(true);
+            when(jwtTokenService.getTokenType(any())).thenReturn(JwtTokenService.TOKEN_TYPE_REFRESH);
+            when(jwtTokenService.getJtiFromToken(any())).thenReturn(UUID.randomUUID().toString());
+            when(jwtTokenService.getUserIdFromToken(any())).thenReturn(user.getId());
+            when(jwtTokenService.getExpirationFromToken(any())).thenReturn(Date.from(Instant.now().plusSeconds(3600)));
             when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
             when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
             when(userSessionService.findByRefreshJti(any())).thenReturn(Optional.empty());
-            when(jwtUtil.getSessionIdFromToken(any())).thenReturn(null);
+            when(jwtTokenService.getSessionIdFromToken(any())).thenReturn(null);
             when(accountLockoutService.isLocked(any())).thenReturn(false);
         }
 
@@ -494,11 +469,11 @@ class AuthServiceTest {
 
             assertThatThrownBy(() -> authService.login(
                     LoginRequest.builder().email(user.getEmail()).password("correct-password").build(), WEB_ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.FORBIDDEN);
 
-            verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
+            verify(jwtTokenService, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
         }
 
         @Test
@@ -508,11 +483,11 @@ class AuthServiceTest {
                     .thenReturn(List.of(membership(suspendedOrgId, MembershipRole.DEVELOPER, MembershipStatus.DISABLED)));
 
             assertThatThrownBy(() -> authService.refreshToken("refresh-token", WEB_ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.FORBIDDEN);
 
-            verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
+            verify(jwtTokenService, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
         }
 
         @Test
@@ -527,7 +502,7 @@ class AuthServiceTest {
                     LoginRequest.builder().email(user.getEmail()).password("correct-password").build(), WEB_ORIGIN);
 
             assertThat(response.getAccessToken()).isEqualTo("access");
-            verify(jwtUtil).generateAccessToken(eq(user.getId()), eq(activeOrgId), eq(MembershipRole.VIEWER), any(), anyBoolean());
+            verify(jwtTokenService).generateAccessToken(eq(user.getId()), eq(activeOrgId), eq(MembershipRole.VIEWER), any(), anyBoolean());
         }
 
         @Test
@@ -538,7 +513,7 @@ class AuthServiceTest {
 
             authService.login(LoginRequest.builder().email(user.getEmail()).password("correct-password").build(), WEB_ORIGIN);
 
-            verify(jwtUtil).generateAccessToken(eq(user.getId()), eq(activeOrgId), eq(MembershipRole.DEVELOPER), any(), anyBoolean());
+            verify(jwtTokenService).generateAccessToken(eq(user.getId()), eq(activeOrgId), eq(MembershipRole.DEVELOPER), any(), anyBoolean());
         }
     }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Shield, Plus, Trash2, Loader2, Sparkles, EyeOff, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,8 @@ import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import { EnabledBadge } from '../components/StatusBadge';
 import { RuleStats, RuleRow, MatchExpression, RuleActionChip } from '../components/RuleLayout';
-import { piiRulesApi, type PiiMaskingRuleResponse, type MaskStyle } from '../api/piiRules.api';
+import type { PiiMaskingRuleResponse, MaskStyle } from '../api/piiRules.api';
+import { usePiiRules, useSeedPiiRules, useCreatePiiRule, useUpdatePiiRule, useDeletePiiRule } from '../api/queries';
 import { Button, buttonVariants } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -31,60 +32,46 @@ export default function PiiRulesPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { canManagePiiRules } = usePermissions();
 
-  const [rules, setRules] = useState<PiiMaskingRuleResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<unknown>(null);
-  const [seeding, setSeeding] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [newPatternName, setNewPatternName] = useState('');
   const [newJsonPath, setNewJsonPath] = useState('');
   const [newMaskStyle, setNewMaskStyle] = useState<MaskStyle>('PARTIAL');
 
-  const loadRules = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      setLoading(true);
-      setRules(await piiRulesApi.list(projectId));
-      setLoadError(null);
-    } catch (err: any) {
-      setLoadError(err);
-      showApiError(err, 'piiRules.toast.loadFailed', { retry: loadRules });
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
+  const rulesQuery = usePiiRules(projectId);
+  const seedRules = useSeedPiiRules(projectId!);
+  const createRule = useCreatePiiRule(projectId!);
+  const updateRule = useUpdatePiiRule(projectId!);
+  const deleteRule = useDeletePiiRule(projectId!);
+  const { error: loadError, refetch: loadRules } = rulesQuery;
+  const rules = rulesQuery.data ?? [];
+  const seeding = seedRules.isPending;
+  const creating = createRule.isPending;
+  const deleting = deleteRule.isPending;
 
   useEffect(() => {
-    if (projectId) loadRules();
-  }, [projectId, loadRules]);
+    if (loadError) showApiError(loadError, 'piiRules.toast.loadFailed', { retry: () => loadRules() });
+  }, [loadError, loadRules]);
 
   const handleSeedDefaults = async () => {
     if (!projectId) return;
     try {
-      setSeeding(true);
-      setRules(await piiRulesApi.seedDefaults(projectId));
+      await seedRules.mutateAsync();
       showSuccess(t('piiRules.toast.seeded'));
     } catch (err: any) {
       showApiError(err, 'piiRules.toast.seedFailed');
-    } finally {
-      setSeeding(false);
     }
   };
 
   const handleCreate = async () => {
     if (!projectId || !newPatternName.trim()) return;
     try {
-      setCreating(true);
-      const rule = await piiRulesApi.create(projectId, {
+      await createRule.mutateAsync({
         patternName: newPatternName.trim(),
         jsonPath: newJsonPath.trim() || undefined,
         maskStyle: newMaskStyle,
         enabled: true,
       });
-      setRules([...rules, rule]);
       setNewPatternName('');
       setNewJsonPath('');
       setNewMaskStyle('PARTIAL');
@@ -92,20 +79,20 @@ export default function PiiRulesPage() {
       showSuccess(t('piiRules.toast.created'));
     } catch (err: any) {
       showApiError(err, 'piiRules.toast.createFailed');
-    } finally {
-      setCreating(false);
     }
   };
 
   const patchRule = async (rule: PiiMaskingRuleResponse, patch: { maskStyle?: MaskStyle; enabled?: boolean }) => {
     if (!projectId) return;
     try {
-      const updated = await piiRulesApi.update(projectId, rule.id, {
-        patternName: rule.patternName,
-        maskStyle: patch.maskStyle ?? rule.maskStyle,
-        enabled: patch.enabled ?? rule.enabled,
+      await updateRule.mutateAsync({
+        id: rule.id,
+        data: {
+          patternName: rule.patternName,
+          maskStyle: patch.maskStyle ?? rule.maskStyle,
+          enabled: patch.enabled ?? rule.enabled,
+        },
       });
-      setRules(rules.map((r) => (r.id === rule.id ? updated : r)));
     } catch (err: any) {
       showApiError(err, 'piiRules.toast.updateFailed');
     }
@@ -114,19 +101,16 @@ export default function PiiRulesPage() {
   const handleDelete = async () => {
     if (!deleteId || !projectId) return;
     try {
-      setDeleting(true);
-      await piiRulesApi.delete(projectId, deleteId);
-      setRules(rules.filter((r) => r.id !== deleteId));
+      await deleteRule.mutateAsync(deleteId);
       showSuccess(t('piiRules.toast.deleted'));
     } catch (err: any) {
       showApiError(err, 'piiRules.toast.deleteFailed');
     } finally {
-      setDeleting(false);
       setDeleteId(null);
     }
   };
 
-  if (loading) {
+  if (rulesQuery.isLoading && !rulesQuery.data) {
     return <PageSkeleton><SkeletonRows count={4} height="h-12" /></PageSkeleton>;
   }
 
@@ -200,7 +184,7 @@ export default function PiiRulesPage() {
       )}
 
       {loadError ? (
-        <ErrorState error={loadError} fallbackKey="piiRules.toast.loadFailed" onRetry={loadRules} retrying={loading} />
+        <ErrorState error={loadError} fallbackKey="piiRules.toast.loadFailed" onRetry={() => loadRules()} retrying={rulesQuery.isFetching} />
       ) : rules.length === 0 ? (
         <EmptyState
           icon={Shield}

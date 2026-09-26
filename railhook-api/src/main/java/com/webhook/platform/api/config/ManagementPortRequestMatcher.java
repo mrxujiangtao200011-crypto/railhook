@@ -1,6 +1,7 @@
 package com.webhook.platform.api.config;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.env.Environment;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
@@ -10,13 +11,10 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  * {@code port=0} says nothing about what is listening. When the ports are not split, nothing
  * matches and actuator stays behind authentication.
  */
+@RequiredArgsConstructor
 public class ManagementPortRequestMatcher implements RequestMatcher {
 
     private final Environment environment;
-
-    public ManagementPortRequestMatcher(Environment environment) {
-        this.environment = environment;
-    }
 
     @Override
     public boolean matches(HttpServletRequest request) {

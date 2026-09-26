@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.32.0] - 2026-09-26
+
+### Changed
+
+- Logs no longer carry full email addresses or customer and alert URLs (masked, host only). Per-event, per-delivery and configuration-change lines moved from INFO to DEBUG; the audit log still records every configuration change.
+- API errors that used to carry the generic `client_error` or `server_error` now carry a specific code (`invalid_request`, `captcha_failed`, `gone`, `account_locked`, `rate_limit_exceeded`, `service_unavailable`, `internal_error`, `authorization_pending`, or the existing `unauthorized`, `forbidden`, `not_found`, `conflict`); status and message are unchanged. The public contact, tester and demo forms' errors now include `status` like every other error. The errors page in the docs lists every code, and the OpenAPI spec documents every error response as `ErrorResponse`.
+
+### Fixed
+
+- `make up-pull` started the stack without its PostgreSQL container.
+- `./railhook doctor` checks the installation against the installer of the release it runs, not the newest one; `./railhook help` lists `settings`.
+- The installer's memory refusal says the real minimum (2 GiB) and both Compose-missing messages match.
+- `.env.dist` sets `APP_BASE_URL` to the port it publishes on, so emailed links from a copied `.env` open the dashboard.
+- Automatically opened status-page incidents no longer say someone is looking into it.
+- The docs' installer options table names `--admin-email` and `--refresh` and describes `--yes` correctly; the operations guide's retry totals match the ladder.
+
 ## [2.31.1] - 2026-09-25
 
 ### Changed
@@ -427,7 +443,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release: event ingestion, subscriptions, signed delivery with retries and a DLQ, and a dashboard.
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.31.1...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.32.0...HEAD
+[2.32.0]: https://github.com/vadymkykalo/railhook/compare/v2.31.1...v2.32.0
 [2.20.2]: https://github.com/vadymkykalo/railhook/compare/v2.20.1...v2.20.2
 [2.20.1]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...v2.20.1
 [2.20.0]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...v2.20.0

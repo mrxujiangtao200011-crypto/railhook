@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { History, Play, Square, Loader2, RefreshCw } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -7,11 +7,10 @@ import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import StatusBadge, { type StatusKind } from '../components/StatusBadge';
-import { projectsApi } from '../api/projects.api';
-import { endpointsApi } from '../api/endpoints.api';
-import { replayApi } from '../api/replay.api';
-import type { ReplaySessionResponse, ReplayEstimateResponse } from '../api/replay.api';
-import type { ProjectResponse, EndpointResponse } from '../types/api.types';
+import type { ReplayEstimateResponse } from '../api/replay.api';
+import {
+  useProject, useEndpoints, useReplaySessions, useEstimateReplay, useCreateReplay, useCancelReplay, isReplayInFlight,
+} from '../api/queries';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select } from '../components/ui/select';
@@ -75,74 +74,40 @@ export default function ReplayPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { canReplayDeliveries } = usePermissions();
 
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
-  const [sessions, setSessions] = useState<ReplaySessionResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<unknown>(null);
-
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [fromDate, setFromDate] = useState(() => toLocalDatetime(quickRange('24h').from));
+  const [toDate, setToDate] = useState(() => toLocalDatetime(new Date().toISOString()));
   const [eventType, setEventType] = useState('');
   const [endpointId, setEndpointId] = useState('');
   const [selectedRange, setSelectedRange] = useState('24h');
 
   const [estimate, setEstimate] = useState<ReplayEstimateResponse | null>(null);
-  const [estimating, setEstimating] = useState(false);
-
   const [showConfirm, setShowConfirm] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [pollingActive, setPollingActive] = useState(false);
 
-  const loadSessions = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      const data = await replayApi.list(projectId, 0, 50);
-      setSessions(data.content);
-    } catch {
-      // Silent — this also runs on a poll.
-    }
-  }, [projectId]);
+  const projectQuery = useProject(projectId);
+  const endpointsQuery = useEndpoints(projectId);
+  const sessionsQuery = useReplaySessions(projectId);
+  const estimateReplay = useEstimateReplay(projectId!);
+  const createReplay = useCreateReplay(projectId!);
+  const cancelReplay = useCancelReplay(projectId!);
+  const estimating = estimateReplay.isPending;
+  const creating = createReplay.isPending;
 
-  const loadData = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      setLoading(true);
-      const [projectData, endpointsData, sessionsData] = await Promise.all([
-        projectsApi.get(projectId),
-        endpointsApi.list(projectId),
-        replayApi.list(projectId, 0, 50),
-      ]);
-      setProject(projectData);
-      setEndpoints(endpointsData);
-      setSessions(sessionsData.content);
-      setLoadError(null);
-    } catch (err: any) {
-      setLoadError(err);
-      showApiError(err, 'replay.toast.loadFailed', { retry: loadData });
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
-
-  useEffect(() => { loadData(); }, [loadData]);
+  const project = projectQuery.data;
+  const endpoints = endpointsQuery.data ?? [];
+  const sessions = sessionsQuery.data ?? [];
+  const pollingActive = isReplayInFlight(sessionsQuery.data);
+  const loadError = projectQuery.error ?? endpointsQuery.error ?? (sessionsQuery.data ? null : sessionsQuery.error);
+  const retrying = projectQuery.isFetching || endpointsQuery.isFetching || sessionsQuery.isFetching;
+  const { refetch: refetchProject } = projectQuery;
+  const { refetch: refetchEndpoints } = endpointsQuery;
+  const { refetch: refetchSessions } = sessionsQuery;
 
   useEffect(() => {
-    const hasRunning = sessions.some(s =>
-      s.status === 'RUNNING' || s.status === 'PENDING' || s.status === 'ESTIMATING' || s.status === 'CANCELLING'
-    );
-    setPollingActive(hasRunning);
-    if (hasRunning) {
-      const interval = setInterval(() => loadSessions(), 2000);
-      return () => clearInterval(interval);
-    }
-  }, [sessions, loadSessions]);
-
-  useEffect(() => {
-    const range = quickRange('24h');
-    setFromDate(toLocalDatetime(range.from));
-    setToDate(toLocalDatetime(range.to));
-  }, []);
+    if (!loadError) return;
+    showApiError(loadError, 'replay.toast.loadFailed', {
+      retry: () => { refetchProject(); refetchEndpoints(); refetchSessions(); },
+    });
+  }, [loadError, refetchProject, refetchEndpoints, refetchSessions]);
 
   const handleQuickRange = (key: string) => {
     setSelectedRange(key);
@@ -156,10 +121,9 @@ export default function ReplayPage() {
 
   const handleEstimate = async () => {
     if (!projectId || !fromDate || !toDate) return;
-    setEstimating(true);
     setEstimate(null);
     try {
-      setEstimate(await replayApi.estimate(projectId, {
+      setEstimate(await estimateReplay.mutateAsync({
         fromDate: fromLocalDatetime(fromDate),
         toDate: fromLocalDatetime(toDate),
         eventType: eventType || undefined,
@@ -167,16 +131,13 @@ export default function ReplayPage() {
       }));
     } catch (err: any) {
       showApiError(err, 'replay.toast.estimateFailed');
-    } finally {
-      setEstimating(false);
     }
   };
 
   const handleCreate = async () => {
     if (!projectId || !fromDate || !toDate) return;
-    setCreating(true);
     try {
-      await replayApi.create(projectId, {
+      await createReplay.mutateAsync({
         fromDate: fromLocalDatetime(fromDate),
         toDate: fromLocalDatetime(toDate),
         eventType: eventType || undefined,
@@ -185,20 +146,16 @@ export default function ReplayPage() {
       showSuccess(t('replay.toast.created'));
       setShowConfirm(false);
       setEstimate(null);
-      loadSessions();
     } catch (err: any) {
       showApiError(err, 'replay.toast.createFailed');
-    } finally {
-      setCreating(false);
     }
   };
 
   const handleCancel = async (sessionId: string) => {
     if (!projectId) return;
     try {
-      await replayApi.cancel(projectId, sessionId);
+      await cancelReplay.mutateAsync(sessionId);
       showSuccess(t('replay.toast.cancelled'));
-      loadSessions();
     } catch (err: any) {
       showApiError(err, 'replay.toast.cancelFailed');
     }
@@ -209,7 +166,7 @@ export default function ReplayPage() {
     return endpoints.find(e => e.id === id)?.url || id.substring(0, 8);
   };
 
-  if (loading && !project) {
+  if (projectQuery.isLoading && !project) {
     return (
       <PageSkeleton maxWidth="max-w-none">
         <SkeletonCards count={3} height="h-20" cols="grid-cols-3" />
@@ -328,7 +285,7 @@ export default function ReplayPage() {
       </div>
 
       {loadError ? (
-        <ErrorState error={loadError} fallbackKey="replay.toast.loadFailed" onRetry={loadData} retrying={loading} />
+        <ErrorState error={loadError} fallbackKey="replay.toast.loadFailed" onRetry={() => { refetchProject(); refetchEndpoints(); refetchSessions(); }} retrying={retrying} />
       ) : sessions.length === 0 ? (
         <EmptyState
           icon={History}

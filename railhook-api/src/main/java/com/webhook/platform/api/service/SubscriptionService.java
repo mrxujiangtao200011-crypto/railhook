@@ -14,6 +14,7 @@ import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.SubscriptionRequest;
 import com.webhook.platform.api.dto.SubscriptionResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
@@ -40,23 +42,6 @@ public class SubscriptionService {
     private final SubscriptionMatchingCache subscriptionMatchingCache;
     private final ObjectMapper objectMapper;
     private final RetryLadderEscalationCap retryLadderEscalationCap;
-
-    public SubscriptionService(
-            SubscriptionRepository subscriptionRepository,
-            ProjectRepository projectRepository,
-            EndpointRepository endpointRepository,
-            TransformationRepository transformationRepository,
-            SubscriptionMatchingCache subscriptionMatchingCache,
-            ObjectMapper objectMapper,
-            RetryLadderEscalationCap retryLadderEscalationCap) {
-        this.subscriptionRepository = subscriptionRepository;
-        this.projectRepository = projectRepository;
-        this.endpointRepository = endpointRepository;
-        this.transformationRepository = transformationRepository;
-        this.subscriptionMatchingCache = subscriptionMatchingCache;
-        this.objectMapper = objectMapper;
-        this.retryLadderEscalationCap = retryLadderEscalationCap;
-    }
 
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)

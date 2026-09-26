@@ -1,7 +1,7 @@
 package com.webhook.platform.api.service.verification;
 
-import com.webhook.platform.common.util.WebhookSignatureUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import com.webhook.platform.common.util.RailhookSignature;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -36,7 +36,7 @@ public class GenericHmacVerifier implements WebhookVerificationStrategy {
         }
 
         if (signature.contains("t=") && signature.contains("v1=")) {
-            boolean valid = WebhookSignatureUtils.verifySignature(secret, signature, body);
+            boolean valid = RailhookSignature.verify(secret, signature, body);
             return valid ? VerificationResult.success(signatureHeader) : VerificationResult.failure("Signature mismatch");
         }
 

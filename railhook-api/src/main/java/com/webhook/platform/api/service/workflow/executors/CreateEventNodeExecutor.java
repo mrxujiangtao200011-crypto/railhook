@@ -8,6 +8,7 @@ import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.service.EventIngestService;
 import com.webhook.platform.api.service.workflow.NodeExecutor;
 import com.webhook.platform.api.service.workflow.StepResult;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -17,15 +18,12 @@ import java.util.UUID;
 /** Without a payloadTemplate the workflow input is forwarded as the payload. */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class CreateEventNodeExecutor implements NodeExecutor {
 
+    @Lazy
     private final EventIngestService eventIngestService;
     private final ObjectMapper objectMapper;
-
-    public CreateEventNodeExecutor(@Lazy EventIngestService eventIngestService, ObjectMapper objectMapper) {
-        this.eventIngestService = eventIngestService;
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     public String getType() {
@@ -75,7 +73,7 @@ public class CreateEventNodeExecutor implements NodeExecutor {
 
             EventIngestResponse response = eventIngestService.ingestEvent(projectId, request, null);
 
-            log.info("Workflow created event: {} (type={}) with {} deliveries in project {}",
+            log.debug("Workflow created event: {} (type={}) with {} deliveries in project {}",
                     response.getEventId(), eventType, response.getDeliveriesCreated(), projectId);
 
             ObjectNode output = objectMapper.createObjectNode();

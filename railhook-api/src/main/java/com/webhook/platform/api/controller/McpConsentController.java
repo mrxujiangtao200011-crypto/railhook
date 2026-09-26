@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,13 +34,10 @@ import java.util.UUID;
 @RequestMapping("/api/v1/oauth/requests")
 @Tag(name = "MCP apps", description = "Connecting AI apps to a project over OAuth, for the MCP server")
 @SecurityRequirement(name = "bearerAuth")
+@RequiredArgsConstructor
 public class McpConsentController {
 
     private final McpOAuthService oauthService;
-
-    public McpConsentController(McpOAuthService oauthService) {
-        this.oauthService = oauthService;
-    }
 
     @Operation(summary = "Describe an MCP app's sign-in request",
             description = "What the consent screen shows: the app's name, the host its code will be sent to, "

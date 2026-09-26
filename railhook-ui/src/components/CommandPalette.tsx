@@ -131,10 +131,6 @@ export function CommandPalette() {
   }, [filtered]);
 
   useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
-
-  useEffect(() => {
     listRef.current
       ?.querySelector(`[data-index="${selectedIndex}"]`)
       ?.scrollIntoView({ block: 'nearest' });
@@ -180,7 +176,7 @@ export function CommandPalette() {
           <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
             placeholder={t('commandPalette.placeholder')}
             aria-label={t('commandPalette.title')}

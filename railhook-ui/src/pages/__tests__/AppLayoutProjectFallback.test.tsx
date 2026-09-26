@@ -36,13 +36,29 @@ beforeEach(() => {
 });
 
 describe('the project the rail falls back to', () => {
-  it('is the project you were last in, not the first one', async () => {
-    vi.mocked(projectsApi.list).mockResolvedValue([
-      project('first-project', 'test'),
-      project(TEST_PROJECT_ID, 'load-test'),
-    ]);
-    localStorage.setItem('railhook:last-project', TEST_PROJECT_ID);
-    renderAt('/admin/dashboard');
+  it.each([
+    {
+      name: 'the project you were last in, not the first one',
+      projects: [project('first-project', 'test'), project(TEST_PROJECT_ID, 'load-test')],
+      remembered: TEST_PROJECT_ID,
+      path: '/admin/dashboard',
+    },
+    {
+      name: 'the first project again when the remembered one no longer exists',
+      projects: [project(TEST_PROJECT_ID, 'Production')],
+      remembered: 'deleted-project',
+      path: '/admin/dashboard',
+    },
+    {
+      name: 'a real project when the URL names none',
+      projects: [project(TEST_PROJECT_ID, 'Production')],
+      remembered: undefined,
+      path: '/admin/projects',
+    },
+  ])('is $name', async ({ projects, remembered, path }) => {
+    vi.mocked(projectsApi.list).mockResolvedValue(projects);
+    if (remembered) localStorage.setItem('railhook:last-project', remembered);
+    renderAt(path);
 
     await waitFor(() =>
       expect(screen.getByRole('link', { name: /Deliveries/i }))
@@ -59,28 +75,9 @@ describe('the project the rail falls back to', () => {
     await waitFor(() => expect(localStorage.getItem('railhook:last-project')).toBe(TEST_PROJECT_ID),
       { timeout: SETTLE_MS });
   });
-
-  it('is the first project again when the remembered one no longer exists', async () => {
-    vi.mocked(projectsApi.list).mockResolvedValue([project(TEST_PROJECT_ID, 'Production')]);
-    localStorage.setItem('railhook:last-project', 'deleted-project');
-    renderAt('/admin/dashboard');
-
-    await waitFor(() =>
-      expect(screen.getByRole('link', { name: /Deliveries/i }))
-        .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/deliveries`), { timeout: SETTLE_MS });
-  });
 });
 
 describe('the rail without a project in the URL', () => {
-  it('still points every entry at a real project', async () => {
-    vi.mocked(projectsApi.list).mockResolvedValue([project(TEST_PROJECT_ID, 'Production')]);
-    renderAt('/admin/projects');
-
-    await waitFor(() =>
-      expect(screen.getByRole('link', { name: /Deliveries/i }))
-        .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/deliveries`), { timeout: SETTLE_MS });
-  });
-
   it('names the project it fell back to instead of asking you to pick one', async () => {
     vi.mocked(projectsApi.list).mockResolvedValue([project(TEST_PROJECT_ID, 'Production')]);
     renderAt('/admin/projects');

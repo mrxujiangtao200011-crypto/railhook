@@ -12,34 +12,33 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.common.security.SecureTokens;
 
-import com.webhook.platform.common.util.CryptoUtils;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class MembershipService {
 
     private static final int INVITE_EXPIRATION_HOURS = 48;
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final MembershipRepository membershipRepository;
@@ -47,21 +46,6 @@ public class MembershipService {
     private final TokenBlacklistService tokenBlacklistService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final TunnelService tunnelService;
-
-    public MembershipService(
-            UserRepository userRepository,
-            MembershipRepository membershipRepository,
-            EmailService emailService,
-            TokenBlacklistService tokenBlacklistService,
-            BCryptPasswordEncoder passwordEncoder,
-            TunnelService tunnelService) {
-        this.userRepository = userRepository;
-        this.membershipRepository = membershipRepository;
-        this.emailService = emailService;
-        this.tokenBlacklistService = tokenBlacklistService;
-        this.passwordEncoder = passwordEncoder;
-        this.tunnelService = tunnelService;
-    }
 
     public List<MemberResponse> getOrganizationMembers() {
         UUID organizationId = TenantContext.require();
@@ -107,7 +91,7 @@ public class MembershipService {
                     User saved = userRepository.save(newUser);
                     // Never log the temp password.
                     emailService.sendTemporaryPasswordEmail(request.getEmail(), tempPass);
-                    log.info("Created new user for invite: userId={}, email={}", saved.getId(), request.getEmail());
+                    log.info("Created new user for invite: userId={}, email={}", saved.getId(), EmailService.maskRecipient(request.getEmail()));
                     return saved;
                 });
 
@@ -121,8 +105,8 @@ public class MembershipService {
                     + "Ask them to verify their email address, then invite them again.");
         }
 
-        String inviteToken = generateInviteToken();
-        String inviteTokenHash = CryptoUtils.hashApiKey(inviteToken);
+        String inviteToken = SecureTokens.generate(32);
+        String inviteTokenHash = SecureTokens.hash(inviteToken);
         Instant expiresAt = Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS);
 
         Membership membership = Membership.builder()
@@ -170,8 +154,8 @@ public class MembershipService {
             throw new ConflictException("Membership has no pending invite to re-issue");
         }
 
-        String inviteToken = generateInviteToken();
-        membership.setInviteTokenHash(CryptoUtils.hashApiKey(inviteToken));
+        String inviteToken = SecureTokens.generate(32);
+        membership.setInviteTokenHash(SecureTokens.hash(inviteToken));
         membership.setInviteExpiresAt(Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS));
         membershipRepository.save(membership);
 
@@ -198,7 +182,7 @@ public class MembershipService {
     @Auditable(action = AuditAction.INVITE_ACCEPTED, resourceType = "Member")
     @Transactional
     public MemberResponse acceptInvite(UUID organizationId, String inviteToken, UUID authenticatedUserId) {
-        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        String tokenHash = SecureTokens.hash(inviteToken);
         Membership membership = membershipRepository.findByInviteTokenHash(tokenHash)
                 .orElseThrow(() -> new NotFoundException("Invalid or expired invite token"));
 
@@ -219,7 +203,7 @@ public class MembershipService {
         }
 
         if (membership.getInviteExpiresAt() != null && Instant.now().isAfter(membership.getInviteExpiresAt())) {
-            throw new ResponseStatusException(HttpStatus.GONE, "Invite token has expired");
+            throw new DomainException(ErrorCode.GONE, "Invite token has expired");
         }
 
         membership.setStatus(MembershipStatus.ACTIVE);
@@ -245,19 +229,13 @@ public class MembershipService {
         return "Temp" + UUID.randomUUID().toString().substring(0, 8) + "!";
     }
 
-    private String generateInviteToken() {
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
     /** OWNER is never granted here, and API_KEY is not a human role. */
     private static void requireGrantableRole(MembershipRole role) {
         if (role == MembershipRole.OWNER) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot assign OWNER role through this endpoint");
+            throw new ConflictException("Cannot assign OWNER role through this endpoint");
         }
         if (role == MembershipRole.API_KEY) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "API_KEY is not a role a member can hold");
+            throw new ConflictException("API_KEY is not a role a member can hold");
         }
     }
 
@@ -267,16 +245,16 @@ public class MembershipService {
             MembershipRole requestingRole) {
         UUID organizationId = TenantContext.require();
         if (requestingRole != MembershipRole.OWNER) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can change member roles");
+            throw new ForbiddenException("Only owners can change member roles");
         }
 
         requireGrantableRole(newRole);
 
         Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
+                .orElseThrow(() -> new NotFoundException("Membership not found"));
 
         if (membership.getRole() == MembershipRole.OWNER && ownersWhoCanStillSignIn(organizationId) <= 1) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot demote the last owner");
+            throw new ConflictException("Cannot demote the last owner");
         }
 
         membership.setRole(newRole);
@@ -301,14 +279,14 @@ public class MembershipService {
     public void removeMember(UUID userId, MembershipRole requestingRole) {
         UUID organizationId = TenantContext.require();
         if (requestingRole != MembershipRole.OWNER) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can remove members");
+            throw new ForbiddenException("Only owners can remove members");
         }
 
         Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
+                .orElseThrow(() -> new NotFoundException("Membership not found"));
 
         if (membership.getRole() == MembershipRole.OWNER && ownersWhoCanStillSignIn(organizationId) <= 1) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot remove the last owner");
+            throw new ConflictException("Cannot remove the last owner");
         }
 
         membershipRepository.delete(membership);
@@ -324,24 +302,24 @@ public class MembershipService {
     public MemberResponse suspendMember(UUID userId, UUID requestingUserId, MembershipRole requestingRole) {
         UUID organizationId = TenantContext.require();
         if (requestingRole != MembershipRole.OWNER) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can suspend members");
+            throw new ForbiddenException("Only owners can suspend members");
         }
 
         if (userId.equals(requestingUserId)) {
             // Otherwise a second owner could become the only one able to lift it.
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot suspend yourself");
+            throw new ConflictException("You cannot suspend yourself");
         }
 
         Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
+                .orElseThrow(() -> new NotFoundException("Membership not found"));
 
         if (membership.getStatus() != MembershipStatus.ACTIVE) {
             // Reinstating sets ACTIVE, which would let an invitee in without accepting.
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only an active member can be suspended");
+            throw new ConflictException("Only an active member can be suspended");
         }
 
         if (membership.getRole() == MembershipRole.OWNER && ownersWhoCanStillSignIn(organizationId) <= 1) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot suspend the last owner");
+            throw new ConflictException("Cannot suspend the last owner");
         }
 
         membership.setStatus(MembershipStatus.DISABLED);
@@ -369,15 +347,15 @@ public class MembershipService {
     public MemberResponse reinstateMember(UUID userId, MembershipRole requestingRole) {
         UUID organizationId = TenantContext.require();
         if (requestingRole != MembershipRole.OWNER) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can reinstate members");
+            throw new ForbiddenException("Only owners can reinstate members");
         }
 
         Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
+                .orElseThrow(() -> new NotFoundException("Membership not found"));
 
         if (membership.getStatus() != MembershipStatus.DISABLED) {
             // Reinstating INVITED would skip accepting the invite; ACTIVE means a stale list.
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Member is not suspended");
+            throw new ConflictException("Member is not suspended");
         }
 
         membership.setStatus(MembershipStatus.ACTIVE);

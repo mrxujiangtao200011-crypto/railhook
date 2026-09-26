@@ -3,6 +3,7 @@ package com.webhook.platform.worker.service;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RPermitExpirableSemaphore;
 import org.redisson.api.RedissonClient;
@@ -30,15 +31,12 @@ public class RedisConcurrencyControlService {
      * TARGET stops one slow receiver taking the pool. It does nothing about a tenant with twenty
      * slow endpoints, whose sum is the whole worker; TENANT caps that sum.
      */
+    @RequiredArgsConstructor
     public enum Scope {
         TENANT("concurrency:tenant:"),
         TARGET("concurrency:endpoint:");
 
         private final String prefix;
-
-        Scope(String prefix) {
-            this.prefix = prefix;
-        }
     }
 
     private final RedissonClient redissonClient;

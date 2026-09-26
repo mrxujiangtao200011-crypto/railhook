@@ -11,6 +11,7 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.ProjectRequest;
 import com.webhook.platform.api.dto.ProjectResponse;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,18 +23,12 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final PiiMaskingService piiMaskingService;
     private final ApiKeyRepository apiKeyRepository;
-
-    public ProjectService(ProjectRepository projectRepository, PiiMaskingService piiMaskingService,
-            ApiKeyRepository apiKeyRepository) {
-        this.projectRepository = projectRepository;
-        this.piiMaskingService = piiMaskingService;
-        this.apiKeyRepository = apiKeyRepository;
-    }
 
     public static final String FIRST_PROJECT_NAME = "My first project";
 

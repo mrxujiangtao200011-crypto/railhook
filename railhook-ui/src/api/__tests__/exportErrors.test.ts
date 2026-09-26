@@ -18,20 +18,15 @@ describe('file exports report the server message when they fail', () => {
     vi.clearAllMocks();
   });
 
-  it('audit log CSV export', async () => {
-    vi.mocked(http.getBlob).mockRejectedValue(blobBodiedError(400, { message: 'Date range exceeds 90 days' }));
+  it.each([
+    { name: 'audit log CSV export', status: 400, message: 'Date range exceeds 90 days', run: () => auditLogApi.exportCsv() },
+    { name: 'organization data export', status: 403, message: 'Only the owner can export', run: () => organizationsApi.exportData('org-1') },
+  ])('$name', async ({ status, message, run }) => {
+    vi.mocked(http.getBlob).mockRejectedValue(blobBodiedError(status, { message }));
 
-    const err = await auditLogApi.exportCsv().catch((e: unknown) => e);
+    const err = await run().catch((e: unknown) => e);
 
-    expect(resolveErrorMessage(err, 'auditLog.exportFailed')).toBe('Date range exceeds 90 days');
-  });
-
-  it('organization data export', async () => {
-    vi.mocked(http.getBlob).mockRejectedValue(blobBodiedError(403, { message: 'Only the owner can export' }));
-
-    const err = await organizationsApi.exportData('org-1').catch((e: unknown) => e);
-
-    expect(resolveErrorMessage(err, 'org.exportFailed')).toBe('Only the owner can export');
+    expect(resolveErrorMessage(err, 'toast.errors.server')).toBe(message);
   });
 
   it('leaves a body that is not JSON as it was', async () => {

@@ -6,7 +6,6 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -51,6 +50,7 @@ class RequestSizeLimitFilterTest {
     @CsvSource({
             "/api/events,     101, true",
             "/api/events,     5,   false",
+            "/api/events,     0,   false",
             "/ingress/abc123, 150, false",
             "/ingress/abc123, 250, true",
     })
@@ -89,17 +89,6 @@ class RequestSizeLimitFilterTest {
         } else {
             verify(response, never()).setStatus(413);
         }
-    }
-
-    @Test
-    void aRequestWithNoBodyPassesThrough() throws Exception {
-        when(request.getContentLengthLong()).thenReturn(-1L);
-        when(request.getRequestURI()).thenReturn("/api/events");
-
-        filter.doFilterInternal(request, response, filterChain);
-
-        verify(filterChain).doFilter(any(), any());
-        verify(response, never()).setStatus(413);
     }
 
     private static ServletInputStream inputStream(byte[] data) {

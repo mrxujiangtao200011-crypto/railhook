@@ -9,6 +9,8 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -61,22 +63,13 @@ class WorkflowTriggerServiceTest {
     }
 
     @Test
-    void depthExceedsMax_skipsEntirely_neverTouchesWorkflowRepository() {
-        WorkflowTriggerService service = newService(3);
-
-        service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 4);
-
-        verifyNoInteractions(workflowRepository);
-        verifyNoInteractions(workflowEngine);
-    }
-
-    @Test
     void depthOneOverMax_isBlocked_depthAtMaxIsNot() {
         WorkflowTriggerService service = newService(2);
         when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of());
 
         service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 3);
         verifyNoInteractions(workflowRepository);
+        verifyNoInteractions(workflowEngine);
 
         service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 2);
         verify(workflowRepository).findEnabledWebhookWorkflows(projectId);
@@ -133,23 +126,11 @@ class WorkflowTriggerServiceTest {
         verifyNoInteractions(workflowEngine);
     }
 
-    @Test
-    void nonMatchingEventTypePattern_skipsWorkflow() {
+    @ParameterizedTest
+    @CsvSource({"order.*, true", "payment.*, false"})
+    void onlyAWorkflowWhosePatternMatchesTheEventTypeIsTriggered(String pattern, boolean triggered) {
         WorkflowTriggerService service = newService(3);
-        Workflow workflow = enabledWorkflow("payment.*");
-        when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of(workflow));
-
-        service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 0);
-
-        verify(executionRepository, never())
-                .existsByWorkflowIdAndTriggerEventId(any(), any());
-        verifyNoInteractions(workflowEngine);
-    }
-
-    @Test
-    void matchingWildcardPattern_triggersWorkflow() {
-        WorkflowTriggerService service = newService(3);
-        Workflow workflow = enabledWorkflow("order.*");
+        Workflow workflow = enabledWorkflow(pattern);
         when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of(workflow));
         when(executionRepository.existsByWorkflowIdAndTriggerEventId(workflow.getId(), eventId)).thenReturn(false);
         when(executionRepository.save(any(WorkflowExecution.class))).thenAnswer(inv -> {
@@ -160,7 +141,12 @@ class WorkflowTriggerServiceTest {
 
         service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 0);
 
-        verify(workflowEngine).execute(any(), eq(workflow.getDefinition()), any());
+        if (triggered) {
+            verify(workflowEngine).execute(any(), eq(workflow.getDefinition()), any());
+        } else {
+            verify(executionRepository, never()).existsByWorkflowIdAndTriggerEventId(any(), any());
+            verifyNoInteractions(workflowEngine);
+        }
     }
 
     @Test

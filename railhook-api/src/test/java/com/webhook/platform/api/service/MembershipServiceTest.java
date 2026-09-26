@@ -3,8 +3,6 @@ package com.webhook.platform.api.service;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
@@ -14,9 +12,9 @@ import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.exception.ConflictException;
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,7 +31,7 @@ import org.mockito.quality.Strictness;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -128,10 +126,12 @@ class MembershipServiceTest {
         }
 
         @Test
-        void invitingAnExistingUserCarriesNoLinkBecauseThereIsNoInvite() {
-            User existing = new User();
-            existing.setId(UUID.randomUUID());
-            existing.setEmail("known@example.com");
+        void invitingAnExistingUserCarriesNoLinkAndNoTemporaryPassword() {
+            User existing = User.builder()
+                    .id(UUID.randomUUID())
+                    .email("known@example.com")
+                    .passwordHash("$2a$10$existinghash")
+                    .build();
             when(userRepository.existsByEmail("known@example.com")).thenReturn(true);
             when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(existing));
 
@@ -142,6 +142,7 @@ class MembershipServiceTest {
             assertThat(response.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
             assertThat(response.getInviteUrl()).isNull();
             assertThat(response.getInviteExpiresAt()).isNull();
+            verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
         }
 
         // Whoever registered the address first became the invited member without proving it.
@@ -204,14 +205,6 @@ class MembershipServiceTest {
             ArgumentCaptor<String> token = ArgumentCaptor.forClass(String.class);
             verify(emailService).sendInviteEmail(eq("pending@example.com"), eq(organizationId.toString()), token.capture());
             assertThat(response.getInviteUrl()).contains(token.getValue());
-        }
-
-        @Test
-        void reissuingAnInviteNeverMintsAnotherTemporaryPassword() {
-            Membership pending = pendingInvite();
-
-            membershipService.reissueInvite(pending.getUserId(), MembershipRole.OWNER);
-
             verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
         }
 
@@ -231,7 +224,8 @@ class MembershipServiceTest {
             accepted.setInviteExpiresAt(null);
 
             assertThatThrownBy(() -> membershipService.reissueInvite(accepted.getUserId(), MembershipRole.OWNER))
-                    .isInstanceOf(ConflictException.class);
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessageContaining("no pending invite");
         }
 
         @Test
@@ -292,23 +286,6 @@ class MembershipServiceTest {
         }
 
         @Test
-        void memberResponseJsonSerialization() throws Exception {
-            MemberResponse response = MemberResponse.builder()
-                    .userId(UUID.randomUUID())
-                    .email("test@example.com")
-                    .role(MembershipRole.DEVELOPER)
-                    .status(MembershipStatus.INVITED)
-                    .createdAt(Instant.now())
-                    .build();
-
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.registerModule(new JavaTimeModule());
-            String json = mapper.writeValueAsString(response);
-
-            assertThat(json).doesNotContain("inviteToken").doesNotContain("invite_token");
-        }
-
-        @Test
         void tempPasswordNeverReachesLogs_andIsSentViaEmail() {
             String email = "new-invitee@example.com";
             when(userRepository.existsByEmail(email)).thenReturn(false);
@@ -327,24 +304,6 @@ class MembershipServiceTest {
                     .extracting(ILoggingEvent::getFormattedMessage)
                     .noneMatch(message -> message.contains(tempPassword));
         }
-
-        @Test
-        void existingUserInvite_doesNotSendTemporaryPasswordEmail() {
-            String email = "existing-user@example.com";
-            User existingUser = User.builder()
-                    .id(UUID.randomUUID())
-                    .email(email)
-                    .passwordHash("$2a$10$existinghash")
-                    .build();
-            when(userRepository.existsByEmail(email)).thenReturn(true);
-            when(userRepository.findByEmail(email)).thenReturn(Optional.of(existingUser));
-
-            membershipService.addMember(
-                    AddMemberRequest.builder().email(email).role(MembershipRole.VIEWER).build(),
-                    MembershipRole.OWNER);
-
-            verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
-        }
     }
 
     // Adding a member used to accept OWNER and API_KEY, which changing a role refused.
@@ -361,8 +320,8 @@ class MembershipServiceTest {
             assertThatThrownBy(() -> membershipService.addMember(
                     AddMemberRequest.builder().email("new@example.com").role(role).build(),
                     MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             verify(membershipRepository, never()).save(any());
@@ -377,8 +336,8 @@ class MembershipServiceTest {
             Membership membership = existingMember(memberId, MembershipRole.DEVELOPER, MembershipStatus.ACTIVE);
 
             assertThatThrownBy(() -> membershipService.changeMemberRole(memberId, role, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             assertThat(membership.getRole()).isEqualTo(MembershipRole.DEVELOPER);
@@ -447,23 +406,22 @@ class MembershipServiceTest {
         @DisplayName("only an owner can suspend")
         void suspendRequiresOwner() {
             assertThatThrownBy(() -> membershipService.suspendMember(memberId, ownerId, MembershipRole.DEVELOPER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.FORBIDDEN);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
         }
 
         @Test
-        @DisplayName("an owner cannot suspend themselves")
         void ownerCannotSuspendThemselves() {
             membership.setRole(MembershipRole.OWNER);
             when(membershipRepository.findByUserIdAndOrganizationId(ownerId, organizationId))
                     .thenReturn(Optional.of(membership));
 
             assertThatThrownBy(() -> membershipService.suspendMember(ownerId, ownerId, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
@@ -478,8 +436,8 @@ class MembershipServiceTest {
                     organizationId, MembershipRole.OWNER, MembershipStatus.DISABLED)).thenReturn(1L);
 
             assertThatThrownBy(() -> membershipService.suspendMember(memberId, ownerId, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
@@ -503,8 +461,8 @@ class MembershipServiceTest {
             membership.setStatus(MembershipStatus.INVITED);
 
             assertThatThrownBy(() -> membershipService.suspendMember(memberId, ownerId, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
         }
 
@@ -526,7 +484,7 @@ class MembershipServiceTest {
             membership.setStatus(MembershipStatus.DISABLED);
 
             assertThatThrownBy(() -> membershipService.reinstateMember(memberId, MembershipRole.VIEWER))
-                    .isInstanceOfAny(ResponseStatusException.class, ForbiddenException.class);
+                    .isInstanceOf(ForbiddenException.class);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.DISABLED);
         }
@@ -537,8 +495,8 @@ class MembershipServiceTest {
             membership.setStatus(MembershipStatus.INVITED);
 
             assertThatThrownBy(() -> membershipService.reinstateMember(memberId, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.INVITED);
@@ -550,23 +508,13 @@ class MembershipServiceTest {
     class StateConflicts {
 
         @Test
-        void reissuingAnInviteThatIsNoLongerPendingIsAConflict() {
-            UUID userId = UUID.randomUUID();
-            existingMember(userId, MembershipRole.DEVELOPER, MembershipStatus.ACTIVE);
-
-            assertThatThrownBy(() -> membershipService.reissueInvite(userId, MembershipRole.OWNER))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessageContaining("no pending invite");
-        }
-
-        @Test
         void acceptingAnInviteAlreadyAcceptedIsAConflict() {
             UUID userId = UUID.randomUUID();
             String token = "invite-token";
             Membership accepted = Membership.builder()
                     .userId(userId).organizationId(organizationId)
                     .role(MembershipRole.DEVELOPER).status(MembershipStatus.ACTIVE).build();
-            when(membershipRepository.findByInviteTokenHash(CryptoUtils.hashApiKey(token)))
+            when(membershipRepository.findByInviteTokenHash(SecureTokens.hash(token)))
                     .thenReturn(Optional.of(accepted));
 
             assertThatThrownBy(() -> membershipService.acceptInvite(organizationId, token, userId))

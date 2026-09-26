@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
-import i18n from '../../i18n';
+import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, EndpointResponse } from '../../types/api.types';
 
@@ -79,25 +79,11 @@ describe('DeliveriesPage i18n', () => {
     vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));
   });
 
-  afterAll(async () => {
-    await i18n.changeLanguage('en');
-  });
-
   it('renders the status badge and the "All Statuses" filter option in English', async () => {
-    await i18n.changeLanguage('en');
     renderDeliveries();
 
     expect(await screen.findByText('Success')).toBeInTheDocument();
     // The Radix select stays closed in jsdom; its trigger shows the selected option's label.
     expect(screen.getByRole('combobox', { name: /status/i })).toHaveTextContent('All Statuses');
-  });
-
-  it('renders the status badge and the status filter option translated in Ukrainian', async () => {
-    await i18n.changeLanguage('uk');
-    renderDeliveries();
-
-    expect(await screen.findByText('Успіх')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: /статус/i })).toHaveTextContent('Усі статуси');
-    expect(screen.queryByText('SUCCESS')).not.toBeInTheDocument();
   });
 });

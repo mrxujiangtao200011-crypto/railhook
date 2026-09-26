@@ -2,6 +2,7 @@ package com.webhook.platform.api.audit;
 
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.repository.AuditLogRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,17 +15,12 @@ import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class AuditLogRetentionJob {
 
     private final AuditLogRepository auditLogRepository;
+    @Value("${audit.retention-days:90}")
     private final int retentionDays;
-
-    public AuditLogRetentionJob(
-            AuditLogRepository auditLogRepository,
-            @Value("${audit.retention-days:90}") int retentionDays) {
-        this.auditLogRepository = auditLogRepository;
-        this.retentionDays = retentionDays;
-    }
 
     // A cron fires on every replica at once. The delete is idempotent; the lock only saves
     // duplicate work.

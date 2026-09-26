@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.repository.UserSessionRepository;
 import com.webhook.platform.api.dto.SessionResponse;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -22,16 +23,11 @@ import java.util.UUID;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class UserSessionService {
 
     private final UserSessionRepository userSessionRepository;
     private final TokenBlacklistService tokenBlacklistService;
-
-    public UserSessionService(UserSessionRepository userSessionRepository,
-                              TokenBlacklistService tokenBlacklistService) {
-        this.userSessionRepository = userSessionRepository;
-        this.tokenBlacklistService = tokenBlacklistService;
-    }
 
     /** Takes the built entity so the organization arrives as data, not as an organizationId parameter. */
     @SystemTenant("a session belongs to a user across organizations; user_sessions is deliberately not tenant-scoped")

@@ -83,22 +83,19 @@ class ConfigCommandTest extends CliCommandTestBase {
         assertFalse(out().contains("staging"));
     }
 
-    @Test
-    void profile_deleteDefault_isRejected() {
-        int exitCode = run("config", "profile", "delete", "default");
-
-        assertEquals(1, exitCode);
-        assertTrue(err().contains("Cannot delete the default profile"));
-    }
-
     @ParameterizedTest
-    @CsvSource({"create, staging", "use, does-not-exist", "delete, ghost"})
-    void profile_invalidTarget_returnsError(String action, String name) {
+    @CsvSource({
+            "create, staging, already exists",
+            "use, does-not-exist, not found",
+            "delete, ghost, not found",
+            "delete, default, Cannot delete the default profile"})
+    void profile_refusedAction_returnsError(String action, String name, String reason) {
         run("config", "profile", "create", "staging");
         outContent.reset();
 
         int exitCode = run("config", "profile", action, name);
 
         assertEquals(1, exitCode);
+        assertTrue(err().contains(reason), err());
     }
 }

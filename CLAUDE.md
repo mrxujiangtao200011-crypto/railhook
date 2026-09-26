@@ -90,6 +90,9 @@ Two rules carry the rest: **never commit or push directly to `main`**, and **nev
   ancestry, so `main` and `develop` lose their common base and every later merge conflicts on
   byte-identical files. This has happened twice; a ruleset on `main` now blocks squash and rebase.
 
+Commits and PRs are authored by the owner alone: no `Co-Authored-By` trailer for an AI model and
+no "Generated with …" line in commit messages or PR descriptions.
+
 `main` requires a PR with green checks and merge commits only; reviews are a convention, not a
 gate. `develop` blocks only force-push and deletion. Commit prefixes: `feat:`, `fix:`, `docs:`,
 `test:`, `refactor:`, `chore:` (`CONTRIBUTING.md` has the policy).
@@ -122,6 +125,9 @@ gate. `develop` blocks only force-push and deletion. Commit prefixes: `feat:`, `
   format. A task file is deleted when its branch merges.
 - `railhook-ui/CLAUDE.md` carries the frontend conventions and loads automatically in that
   directory — add UI rules there, not here.
+- **Boilerplate is Lombok, not hand-written**: `@RequiredArgsConstructor` with `private final`
+  fields for beans, `@Getter`/`@Setter`, `@Slf4j`. Write a constructor only when it computes or
+  validates something. No `@Data` on JPA entities; records stay records.
 - Comments explain why, never what: an invariant, a race, a past bug, a library quirk. No comments
   restating code, no section labels, no links to docs.
 - Operational procedures: `docs/OPERATIONS.md`.

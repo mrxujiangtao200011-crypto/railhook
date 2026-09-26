@@ -17,7 +17,7 @@ import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.api.service.workflow.NodeExecutor;
 import com.webhook.platform.api.service.workflow.StepResult;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
-import com.webhook.platform.common.util.PayloadCompressionUtil;
+import com.webhook.platform.common.util.PayloadCompression;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -123,7 +123,7 @@ public class DeliveryNodeExecutor implements NodeExecutor {
             });
             chargeQuota();
 
-            log.info("Workflow delivery created: {} → endpoint {} (event {})",
+            log.debug("Workflow delivery created: {} → endpoint {} (event {})",
                     delivery.getId(), endpointId, delivery.getEventId());
 
             ObjectNode result = objectMapper.createObjectNode();
@@ -146,8 +146,8 @@ public class DeliveryNodeExecutor implements NodeExecutor {
             throw new IllegalArgumentException("Event payload size (" + payloadBytes
                     + " bytes) exceeds maximum allowed size (" + maxPayloadSizeBytes + " bytes)");
         }
-        PayloadCompressionUtil.CompressionResult compression =
-                PayloadCompressionUtil.compress(payload, compressionThresholdBytes);
+        PayloadCompression.CompressionResult compression =
+                PayloadCompression.compress(payload, compressionThresholdBytes);
         return Event.builder()
                 .projectId(projectId)
                 .eventType(eventType)

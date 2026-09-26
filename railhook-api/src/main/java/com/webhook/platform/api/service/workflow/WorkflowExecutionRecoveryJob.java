@@ -2,6 +2,7 @@ package com.webhook.platform.api.service.workflow;
 
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.repository.WorkflowExecutionRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,17 +16,12 @@ import java.time.temporal.ChronoUnit;
 // Fails executions stuck in RUNNING past the threshold, such as after a crash. WAITING is not swept.
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class WorkflowExecutionRecoveryJob {
 
     private final WorkflowExecutionRepository executionRepository;
+    @Value("${workflow.execution.stuck-threshold-minutes:15}")
     private final long stuckThresholdMinutes;
-
-    public WorkflowExecutionRecoveryJob(
-            WorkflowExecutionRepository executionRepository,
-            @Value("${workflow.execution.stuck-threshold-minutes:15}") long stuckThresholdMinutes) {
-        this.executionRepository = executionRepository;
-        this.stuckThresholdMinutes = stuckThresholdMinutes;
-    }
 
     @SystemTenant
     @Scheduled(fixedDelayString = "${workflow.execution.recovery-interval-ms:120000}")

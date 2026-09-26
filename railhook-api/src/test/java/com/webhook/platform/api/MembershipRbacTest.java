@@ -1,22 +1,37 @@
 package com.webhook.platform.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.api.domain.entity.Membership;
+import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
-import com.webhook.platform.api.dto.*;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
+import com.webhook.platform.api.domain.enums.UserStatus;
+import com.webhook.platform.api.domain.repository.MembershipRepository;
+import com.webhook.platform.api.domain.repository.UserRepository;
+import com.webhook.platform.api.dto.AddMemberRequest;
+import com.webhook.platform.api.dto.AuthResponse;
+import com.webhook.platform.api.dto.CurrentUserResponse;
+import com.webhook.platform.api.dto.LoginRequest;
+import com.webhook.platform.api.dto.RegisterRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
 public class MembershipRbacTest extends AbstractIntegrationTest {
+
+    private static final String PASSWORD = "Test1234!";
 
     @Autowired
     private MockMvc mockMvc;
@@ -24,61 +39,66 @@ public class MembershipRbacTest extends AbstractIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private MembershipRepository membershipRepository;
+
     @Test
-    public void testDeveloperCannotAddMembers() throws Exception {
-        RegisterRequest ownerRequest = RegisterRequest.builder()
-                .email("owner@example.com")
-                .password("Test1234!")
-                .organizationName("Test Org")
-                .build();
-
-        MvcResult ownerResult = mockMvc.perform(post("/api/v1/auth/register")
+    public void aDeveloperCannotAddMembers() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        AuthResponse owner = read(mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(ownerRequest)))
+                        .content(objectMapper.writeValueAsString(RegisterRequest.builder()
+                                .email("rbac-owner-" + suffix + "@example.com")
+                                .password(PASSWORD)
+                                .organizationName("Rbac Org " + suffix)
+                                .build())))
                 .andExpect(status().isCreated())
-                .andReturn();
-
-        AuthResponse ownerAuth = objectMapper.readValue(
-                ownerResult.getResponse().getContentAsString(),
-                AuthResponse.class
-        );
-
-        MvcResult meResult = mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer " + ownerAuth.getAccessToken()))
+                .andReturn(), AuthResponse.class);
+        UUID orgId = read(mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + owner.getAccessToken()))
                 .andExpect(status().isOk())
-                .andReturn();
+                .andReturn(), CurrentUserResponse.class).getOrganization().getId();
 
-        CurrentUserResponse currentUser = objectMapper.readValue(
-                meResult.getResponse().getContentAsString(),
-                CurrentUserResponse.class
-        );
-
-        String orgId = currentUser.getOrganization().getId().toString();
-
-        RegisterRequest devRegisterRequest = RegisterRequest.builder()
-                .email("developer@example.com")
-                .password("Test1234!")
-                .organizationName("Dev Org")
-                .build();
-
-        MvcResult devRegisterResult = mockMvc.perform(post("/api/v1/auth/register")
+        // Seeded directly so the developer's only organization, and so its token's, is the owner's.
+        String developerEmail = "rbac-developer-" + suffix + "@example.com";
+        UUID developerId = userRepository.saveAndFlush(User.builder()
+                .email(developerEmail)
+                .passwordHash(new BCryptPasswordEncoder().encode(PASSWORD))
+                .status(UserStatus.ACTIVE)
+                .emailVerified(true)
+                .build()).getId();
+        membershipRepository.saveAndFlush(Membership.builder()
+                .userId(developerId)
+                .organizationId(orgId)
+                .role(MembershipRole.DEVELOPER)
+                .status(MembershipStatus.ACTIVE)
+                .build());
+        AuthResponse developer = read(mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(devRegisterRequest)))
-                .andExpect(status().isCreated())
-                .andReturn();
+                        .content(objectMapper.writeValueAsString(LoginRequest.builder()
+                                .email(developerEmail)
+                                .password(PASSWORD)
+                                .build())))
+                .andExpect(status().isOk())
+                .andReturn(), AuthResponse.class);
 
-        AuthResponse devAuth = objectMapper.readValue(
-                devRegisterResult.getResponse().getContentAsString(),
-                AuthResponse.class
-        );
+        String invitee = "rbac-viewer-" + suffix + "@example.com";
+        mockMvc.perform(post("/api/v1/orgs/" + orgId + "/members")
+                        .header("Authorization", "Bearer " + developer.getAccessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(AddMemberRequest.builder()
+                                .email(invitee)
+                                .role(MembershipRole.VIEWER)
+                                .build())))
+                .andExpect(status().isForbidden());
 
-        AddMemberRequest addAnotherMemberRequest = AddMemberRequest.builder()
-                .email("viewer@example.com")
-                .role(MembershipRole.VIEWER)
-                .build();
+        assertThat(userRepository.findByEmail(invitee)).isEmpty();
+    }
 
-        mockMvc.perform(get("/api/v1/orgs/" + orgId + "/members")
-                        .header("Authorization", "Bearer " + ownerAuth.getAccessToken()))
-                .andExpect(status().isOk());
+    private <T> T read(MvcResult result, Class<T> type) throws Exception {
+        return objectMapper.readValue(result.getResponse().getContentAsString(), type);
     }
 }

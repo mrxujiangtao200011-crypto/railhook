@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -15,19 +16,15 @@ import java.util.concurrent.RejectedExecutionException;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class ReplaySessionLauncher {
 
     static final String EXECUTOR_FULL =
             "Too many replays are running on this server. Try again once one of them has finished.";
 
     private final ReplayService replayService;
+    @Qualifier("replayTaskExecutor")
     private final Executor replayTaskExecutor;
-
-    public ReplaySessionLauncher(ReplayService replayService,
-                                 @Qualifier("replayTaskExecutor") Executor replayTaskExecutor) {
-        this.replayService = replayService;
-        this.replayTaskExecutor = replayTaskExecutor;
-    }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void launch(ReplaySessionCreated created) {

@@ -40,13 +40,14 @@ A post-install hook creates the topics: `deliveries.dispatch`,
 
 ### Retry ladder vs. DLQ hard-cap
 
-Outgoing deliveries retry through six tiers (1m, 5m, 15m, 1h, 6h, 24h), up to 7 attempts: about
-55h expected, 83h worst case with jitter. Incoming forwards stop after 5 attempts over 5 tiers
-(up to 6h). The two ladders differ on purpose and live in `RetryLadderDefaults`, not in env vars.
+Outgoing deliveries make up to 7 attempts with waits of 1m, 5m, 15m, 1h, 6h, 24h, about 31h from
+first to last attempt. Incoming forwards stop after 5 attempts (1m, 5m, 15m, 1h), about 1h20m.
+The two ladders differ on purpose and live in `RetryLadderDefaults`, not in env vars.
 
 `StaleDeliveryEscalationService` moves any `PENDING` delivery older than
 `DELIVERY_ESCALATION_HARD_CAP_HOURS` (default 96) to the DLQ. The worker refuses to start if a
-ladder's worst case does not fit inside that cap. If that check fails, raise the cap.
+ladder's worst case does not fit inside that cap: one wait per attempt, each at the top of the
+jitter range, about 83h for the default outgoing ladder. If that check fails, raise the cap.
 
 Per-subscription and per-destination ladders are set through the API. A malformed `retryDelays`
 gets a `400`. A stored one that does not parse fails the delivery with `INVALID_RETRY_LADDER`.
@@ -321,26 +322,18 @@ WHERE e.id IS NULL;
 `spring.jpa.open-in-view: false`. A handler that returns a lazy association outside a transaction
 fails with `LazyInitializationException: could not initialize proxy - no session` (a 500).
 
-## Security Checklist
+## Production settings
 
-Production must have:
-- [ ] `WEBHOOK_ENCRYPTION_KEY`: unique 32-char random key
-- [ ] `JWT_SECRET`: unique 64-char random key
-- [ ] `DB_PASSWORD`: strong, not default
-- [ ] `REDIS_PASSWORD`: strong, not default
-- [ ] `WEBHOOK_ALLOW_PRIVATE_IPS=false`
-- [ ] `SWAGGER_ENABLED=false`
-- [ ] `DB_SSL_MODE=require`
-- [ ] TLS termination at ingress/load balancer
-- [ ] `AUTH_BCRYPT_STRENGTH` at 12 unless login is measurably slow
-- [ ] `AUTH_LOCKOUT_ENABLED=true` unless something in front already limits attempts per account
+Start with [Settings you must decide](https://railhook.io/docs/self-hosting/configuration/). On top
+of that, production should have:
 
-## Environment Variables
-
-- `APP_ENV=production`: production mode
-- `LOG_LEVEL=WARN`: less log output
-- `DB_POOL_MAX_SIZE=20` (API); `WORKER_DB_POOL_MAX_SIZE=40` (worker)
-- `KAFKA_DELIVERY_CONCURRENCY=8`: parallel deliveries per worker
+- `DB_SSL_MODE=require`
+- `SWAGGER_ENABLED=false`
+- TLS terminated at the ingress or load balancer
+- `AUTH_BCRYPT_STRENGTH` at 12 unless login is measurably slow
+- `AUTH_LOCKOUT_ENABLED=true` unless something in front already limits attempts per account
+- `DB_POOL_MAX_SIZE=20` (API), `WORKER_DB_POOL_MAX_SIZE=40` (worker),
+  `KAFKA_DELIVERY_CONCURRENCY=8` as a starting point for pool sizes
 
 All variables: `.env.dist`.
 

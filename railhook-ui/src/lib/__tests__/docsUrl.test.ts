@@ -2,30 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { docsUrl } from '../docsUrl';
 
 describe('docsUrl', () => {
-  it('addresses the docs home with a trailing slash', () => {
-    expect(docsUrl('en')).toBe('/docs/');
-  });
-
-  it('addresses a page under the English root', () => {
-    expect(docsUrl('en', 'outgoing/retries')).toBe('/docs/outgoing/retries/');
-  });
-
-  it('sends a Ukrainian reader to the Ukrainian copy', () => {
-    expect(docsUrl('uk', 'outgoing/retries')).toBe('/docs/uk/outgoing/retries/');
-    expect(docsUrl('uk')).toBe('/docs/uk/');
-  });
-
-  it('treats a regional tag as its language', () => {
-    expect(docsUrl('uk-UA', 'tools/cli')).toBe('/docs/uk/tools/cli/');
-    expect(docsUrl('en-GB', 'tools/cli')).toBe('/docs/tools/cli/');
-  });
-
-  it('falls back to English for a language the docs are not written in', () => {
-    expect(docsUrl('de', 'tools/cli')).toBe('/docs/tools/cli/');
-    expect(docsUrl(undefined)).toBe('/docs/');
-  });
-
-  it('tolerates slashes around the slug', () => {
-    expect(docsUrl('en', '/outgoing/replay/')).toBe('/docs/outgoing/replay/');
+  it.each([
+    ['the docs home, with a trailing slash', 'en', undefined, '/docs/'],
+    ['a page under the English root', 'en', 'outgoing/retries', '/docs/outgoing/retries/'],
+    ['the Ukrainian copy for a Ukrainian reader', 'uk', 'outgoing/retries', '/docs/uk/outgoing/retries/'],
+    ['the Ukrainian home', 'uk', undefined, '/docs/uk/'],
+    ['a regional tag as its language', 'uk-UA', 'tools/cli', '/docs/uk/tools/cli/'],
+    ['an English regional tag as English', 'en-GB', 'tools/cli', '/docs/tools/cli/'],
+    ['English for a language the docs are not written in', 'de', 'tools/cli', '/docs/tools/cli/'],
+    ['English when the language is unknown', undefined, undefined, '/docs/'],
+    ['a slug with slashes around it', 'en', '/outgoing/replay/', '/docs/outgoing/replay/'],
+  ])('addresses %s', (_, language, slug, url) => {
+    expect(docsUrl(language, slug)).toBe(url);
   });
 });

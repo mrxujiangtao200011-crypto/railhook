@@ -32,22 +32,29 @@ public class RegistrationWithoutEmailIntegrationTest extends AbstractIntegration
     private UserRepository userRepository;
 
     @Test
-    public void registrationCompletesVerifiedWhenEmailIsDisabled() throws Exception {
+    public void registrationCompletesVerifiedAndUsableWhenEmailIsDisabled() throws Exception {
         RegisterRequest request = RegisterRequest.builder()
                 .email("nomail@example.com")
                 .password("Test1234!")
                 .organizationName("No Mail Co")
                 .build();
 
-        mockMvc.perform(post("/api/v1/auth/register")
+        String body = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.emailVerified").value(true));
+                .andExpect(jsonPath("$.emailVerified").value(true))
+                .andReturn().getResponse().getContentAsString();
 
         User stored = userRepository.findByEmail("nomail@example.com").orElseThrow();
         assertThat(stored.getStatus()).isEqualTo(UserStatus.ACTIVE);
         assertThat(stored.getEmailVerified()).isTrue();
+
+        // VerificationGate derives emailVerified from status alone; /me has no field of its own.
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + objectMapper.readTree(body).get("accessToken").asText()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.status").value("ACTIVE"));
     }
 
     @Test
@@ -88,28 +95,5 @@ public class RegistrationWithoutEmailIntegrationTest extends AbstractIntegration
         mockMvc.perform(get("/api/v1/projects").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
-    }
-
-    @Test
-    public void theDashboardIsUsableImmediatelyAfterRegistering() throws Exception {
-        RegisterRequest request = RegisterRequest.builder()
-                .email("usable@example.com")
-                .password("Test1234!")
-                .organizationName("Usable Co")
-                .build();
-
-        String body = mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-
-        String accessToken = objectMapper.readTree(body).get("accessToken").asText();
-
-        // VerificationGate derives emailVerified from status alone; /me has no field of its own.
-        mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user.status").value("ACTIVE"));
     }
 }

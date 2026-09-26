@@ -34,3 +34,17 @@ globalThis.matchMedia ??= ((query: string) => ({
   removeListener: () => {},
   dispatchEvent: () => false,
 })) as unknown as typeof matchMedia;
+
+// jsdom has no IntersectionObserver and only a noisy stub of scrollTo; the landing page uses both on mount.
+globalThis.IntersectionObserver ??= class {
+  readonly root = null;
+  readonly rootMargin = '';
+  readonly thresholds = [];
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+} as unknown as typeof IntersectionObserver;
+globalThis.scrollTo = () => {};

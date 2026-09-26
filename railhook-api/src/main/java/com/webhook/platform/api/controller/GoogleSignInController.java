@@ -1,6 +1,8 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.SignInProvidersResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthCookies;
 import com.webhook.platform.api.security.TrustedProxyResolver;
@@ -14,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,27 +25,17 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Authentication", description = "User registration and login")
+@RequiredArgsConstructor
 public class GoogleSignInController {
 
     private final GoogleSignInService googleSignInService;
     private final AuthRateLimiterService authRateLimiterService;
     private final TrustedProxyResolver trustedProxyResolver;
     private final AuthCookies authCookies;
-
-    public GoogleSignInController(GoogleSignInService googleSignInService,
-                                  AuthRateLimiterService authRateLimiterService,
-                                  TrustedProxyResolver trustedProxyResolver,
-                                  AuthCookies authCookies) {
-        this.googleSignInService = googleSignInService;
-        this.authRateLimiterService = authRateLimiterService;
-        this.trustedProxyResolver = trustedProxyResolver;
-        this.authCookies = authCookies;
-    }
 
     @Operation(summary = "List sign-in providers",
             description = "Which identity providers the sign-in and registration pages offer on this deployment. "
@@ -70,7 +63,7 @@ public class GoogleSignInController {
             HttpServletResponse response) {
         requireEnabled();
         if (!authRateLimiterService.allowTokenAction(trustedProxyResolver.resolve(request), "google-start")) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         GoogleSignInService.Start start = googleSignInService.start(intent, returnTo);
         response.addHeader(HttpHeaders.SET_COOKIE,
@@ -98,7 +91,7 @@ public class GoogleSignInController {
         requireEnabled();
         if (!authRateLimiterService.allowTokenAction(trustedProxyResolver.resolve(request),
                 state == null ? "google-callback" : state)) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         GoogleSignInService.Completion completion = googleSignInService.complete(code, state, error, stateCookie);
         // Spent either way: a state is good for one callback.

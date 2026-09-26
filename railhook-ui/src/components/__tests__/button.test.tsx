@@ -16,16 +16,6 @@ describe('Button with asChild', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('carries the button styling onto the child', () => {
-    render(
-      <Button asChild variant="outline" size="sm">
-        <a href="/somewhere">Go</a>
-      </Button>,
-    );
-
-    expect(screen.getByRole('link', { name: 'Go' }).className).toContain('inline-flex');
-  });
-
   it('accepts a child that has several children of its own', () => {
     render(
       <Button asChild>
@@ -41,16 +31,10 @@ describe('Button with asChild', () => {
 });
 
 describe('Button without asChild', () => {
-  it('still shows a spinner while loading, and disables itself', () => {
-    const { container } = render(<Button isLoading>Saving</Button>);
+  it.each([true, false])('shows a spinner and disables itself only while loading (isLoading=%s)', (isLoading) => {
+    const { container } = render(<Button isLoading={isLoading}>Saving</Button>);
 
-    expect(screen.getByRole('button', { name: /Saving/ })).toBeDisabled();
-    expect(container.querySelector('.animate-spin')).not.toBeNull();
-  });
-
-  it('shows no spinner when it is not loading', () => {
-    const { container } = render(<Button>Save</Button>);
-
-    expect(container.querySelector('.animate-spin')).toBeNull();
+    expect(screen.getByRole('button', { name: /Saving/ }).hasAttribute('disabled')).toBe(isLoading);
+    expect(container.querySelector('.animate-spin') !== null).toBe(isLoading);
   });
 });

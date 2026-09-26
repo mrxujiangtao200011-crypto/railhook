@@ -6,6 +6,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -17,15 +18,12 @@ import java.io.IOException;
  * filter. Not a {@code @Component}: a filter bean would also be registered with the servlet
  * container and run outside the security chain.
  */
+@RequiredArgsConstructor
 public class McpAccessTokenFilter extends OncePerRequestFilter {
 
     private static final String BEARER = "Bearer ";
 
     private final McpOAuthService oauthService;
-
-    public McpAccessTokenFilter(McpOAuthService oauthService) {
-        this.oauthService = oauthService;
-    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

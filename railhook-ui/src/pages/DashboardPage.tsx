@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, ArrowRight, ArrowUpRight, BarChart3, Bell, Flame, Radio, Send, Webhook,
@@ -89,15 +89,12 @@ export default function DashboardPage() {
     data: projects = [], isLoading: projectsLoading, isError: projectsIsError,
     error: projectsError, refetch: refetchProjects,
   } = useProjects();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-
+  const [chosenProjectId, setChosenProjectId] = useState('');
   // The project you were last in, not the account's first: Overview has no project in its URL.
-  useEffect(() => {
-    if (projects.length > 0 && !selectedProjectId) setSelectedProjectId(projectToOpen(projects) ?? '');
-  }, [projects, selectedProjectId]);
+  const selectedProjectId = chosenProjectId || (projectToOpen(projects) ?? '');
 
   const selectProject = (id: string) => {
-    setSelectedProjectId(id);
+    setChosenProjectId(id);
     rememberProject(id);
   };
 

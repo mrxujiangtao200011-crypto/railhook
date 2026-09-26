@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,13 +26,10 @@ import java.util.UUID;
 @Tag(name = "Subscriptions", description = "Event type subscriptions")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
-
-    public SubscriptionController(SubscriptionService subscriptionService) {
-        this.subscriptionService = subscriptionService;
-    }
 
     @Operation(summary = "Create subscription", description = "Subscribes an endpoint to specific event types")
     @ApiResponse(responseCode = "201", description = "Subscription created")

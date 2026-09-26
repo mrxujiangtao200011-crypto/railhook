@@ -9,7 +9,6 @@ import com.webhook.platform.api.domain.entity.Incident;
 import com.webhook.platform.api.domain.entity.IncidentTimeline;
 import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
-import com.webhook.platform.api.domain.enums.AlertType;
 import com.webhook.platform.api.domain.enums.IncidentStatus;
 import com.webhook.platform.api.domain.enums.IncidentTimelineType;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
@@ -21,28 +20,30 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertEventResponse;
 import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.dto.AlertRuleResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.security.UrlValidator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AlertService {
 
     private final AlertRuleRepository ruleRepository;
@@ -52,29 +53,10 @@ public class AlertService {
     private final IncidentTimelineRepository timelineRepository;
     private final AlertNotificationService notificationService;
     private final MembershipRepository membershipRepository;
+    @Value("${webhook.url-validation.allow-private-ips:false}")
     private final boolean allowPrivateIps;
+    @Value("${webhook.url-validation.allowed-hosts:}")
     private final List<String> allowedHosts;
-
-    public AlertService(
-            AlertRuleRepository ruleRepository,
-            AlertEventRepository eventRepository,
-            ProjectRepository projectRepository,
-            IncidentRepository incidentRepository,
-            IncidentTimelineRepository timelineRepository,
-            AlertNotificationService notificationService,
-            MembershipRepository membershipRepository,
-            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
-        this.ruleRepository = ruleRepository;
-        this.eventRepository = eventRepository;
-        this.projectRepository = projectRepository;
-        this.incidentRepository = incidentRepository;
-        this.timelineRepository = timelineRepository;
-        this.notificationService = notificationService;
-        this.membershipRepository = membershipRepository;
-        this.allowPrivateIps = allowPrivateIps;
-        this.allowedHosts = allowedHosts;
-    }
 
     /** Resolving the open alerts re-arms the rule for the next crossing. */
     @Transactional
@@ -111,14 +93,14 @@ public class AlertService {
         List<String> addresses = EmailAddresses.splitList(recipients).stream().distinct().toList();
         if (addresses.size() > AlertRuleRequest.MAX_EMAIL_RECIPIENTS
                 || !addresses.stream().allMatch(EmailAddresses::isPlausible)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new DomainException(ErrorCode.INVALID_REQUEST,
                     "Email recipients must be at most " + AlertRuleRequest.MAX_EMAIL_RECIPIENTS
                             + " addresses, separated by commas");
         }
         Set<String> members = new HashSet<>(membershipRepository.findVerifiedMemberEmailsIn(addresses));
         List<String> outsiders = addresses.stream().filter(address -> !members.contains(address)).toList();
         if (!outsiders.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new DomainException(ErrorCode.INVALID_REQUEST,
                     "Alert emails can only go to members of this organization who have verified their "
                             + "address. Not a verified member: " + String.join(", ", outsiders));
         }
@@ -150,7 +132,7 @@ public class AlertService {
                 .build();
 
         rule = ruleRepository.save(rule);
-        log.info("Created alert rule '{}' ({}) for project {}", rule.getName(), rule.getAlertType(), projectId);
+        log.debug("Created alert rule '{}' ({}) for project {}", rule.getName(), rule.getAlertType(), projectId);
         return toRuleResponse(rule);
     }
 
@@ -179,7 +161,7 @@ public class AlertService {
         if (request.getEmailRecipients() != null) rule.setEmailRecipients(requireMemberRecipients(request.getEmailRecipients()));
 
         rule = ruleRepository.save(rule);
-        log.info("Updated alert rule '{}' for project {}", rule.getName(), projectId);
+        log.debug("Updated alert rule '{}' for project {}", rule.getName(), projectId);
         return toRuleResponse(rule);
     }
 
@@ -190,7 +172,7 @@ public class AlertService {
         AlertRule rule = ruleRepository.findByIdAndProjectId(ruleId, projectId)
                 .orElseThrow(() -> new NotFoundException("Alert rule not found"));
         ruleRepository.delete(rule);
-        log.info("Deleted alert rule '{}' from project {}", rule.getName(), projectId);
+        log.debug("Deleted alert rule '{}' from project {}", rule.getName(), projectId);
     }
 
     @Transactional(readOnly = true)

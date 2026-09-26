@@ -42,12 +42,9 @@ export default function OrgSettingsPage() {
     data: projects = [], isLoading: projectsLoading, isError: projectsFailed,
     error: projectsError, refetch: refetchProjects,
   } = useProjects();
-  const [exportProjectId, setExportProjectId] = useState('');
-  const selectedProject = projects.find((p) => p.id === exportProjectId);
-
-  useEffect(() => {
-    if (projects.length > 0 && !exportProjectId) setExportProjectId(projects[0].id);
-  }, [projects, exportProjectId]);
+  const [chosenExportProjectId, setExportProjectId] = useState('');
+  const selectedProject = projects.find((p) => p.id === chosenExportProjectId) ?? projects[0];
+  const exportProjectId = selectedProject?.id ?? '';
 
   useEffect(() => {
     setName(orgName);

@@ -2,13 +2,13 @@
   "source": ".env.dist",
   "sections": [
     {
-      "title": "Deployment mode (required)",
+      "title": "Database location",
       "variables": [
         {
           "name": "DB_MODE",
           "default": "embedded",
           "example": null,
-          "description": "Where PostgreSQL runs: embedded (in Docker) | external (managed database)."
+          "description": "embedded | external. Read by `make backup-db`, `restore-db` and `shell-db` only; Compose starts\nthe PostgreSQL container when COMPOSE_PROFILES includes embedded-db."
         },
         {
           "name": "COMPOSE_PROJECT_NAME",
@@ -35,14 +35,14 @@
         },
         {
           "name": "APP_BASE_URL",
-          "default": "http://localhost",
+          "default": "http://localhost:8080",
           "example": null,
-          "description": "Public origin of the dashboard, used in emails, shared links, canonical tags and the sitemap.\nInclude the port when it is not 80, e.g. http://localhost:8080."
+          "description": "Public origin of the dashboard, used in emails, shared links, canonical tags and the sitemap.\nInclude the port when it is not 80; this one matches RAILHOOK_PORT below."
         }
       ]
     },
     {
-      "title": "Database - embedded mode (when DB_MODE=embedded)",
+      "title": "Database - embedded mode (COMPOSE_PROFILES=embedded-db)",
       "variables": [
         {
           "name": "POSTGRES_IMAGE",
@@ -71,7 +71,7 @@
       ]
     },
     {
-      "title": "Database - external mode (when DB_MODE=external)",
+      "title": "Database - external mode (no embedded-db profile)",
       "variables": [
         {
           "name": "DB_HOST",
@@ -266,13 +266,13 @@
           "name": "WEBHOOK_ENCRYPTION_KEY",
           "default": "dev_encryption_key_32_chars_min!",
           "example": null,
-          "description": "Key that encrypts stored secrets, 32+ characters. Change it in production."
+          "description": "Key that encrypts stored secrets, 32+ characters."
         },
         {
           "name": "WEBHOOK_ENCRYPTION_SALT",
           "default": "dev_encryption_salt_16_chars",
           "example": null,
-          "description": "PBKDF2 salt for the AES-256 key, 16+ characters, unique per deployment. Change it in production."
+          "description": "PBKDF2 salt for the AES-256 key, 16+ characters, unique per deployment."
         },
         {
           "name": "WEBHOOK_ENCRYPTION_KEYS",
@@ -290,7 +290,7 @@
           "name": "JWT_SECRET",
           "default": "dev_jwt_secret_key_32_chars_minimum",
           "example": null,
-          "description": "JWT signing secret, 32+ characters. Change it in production."
+          "description": "JWT signing secret, 32+ characters."
         },
         {
           "name": "PLATFORM_ADMIN_TOKEN",
@@ -388,7 +388,7 @@
           "name": "RAILHOOK_CONTACT_DOMAIN",
           "default": "",
           "example": null,
-          "description": "Domain for the sales@ and support@ addresses on /contact and in the footer, e.g. example.com.\nEmpty offers no addresses. Read by the ui container at start."
+          "description": "Domain for the sales@ and support@ addresses in the contact form and footer, e.g. example.com.\nEmpty offers no addresses. Read by the ui container at start."
         }
       ]
     },
@@ -1862,7 +1862,7 @@
           "name": "API_REPLICAS",
           "default": "1",
           "example": null,
-          "description": "API containers. Two make `railhook upgrade` seamless (about 600 MB more); one costs ~30s of 502\nper upgrade while the JVM starts."
+          "description": "API containers. Two keep the API answering during `railhook upgrade` (about 600 MB more); one\ncosts ~30s of 502 per upgrade while the JVM starts."
         },
         {
           "name": "UI_MEMORY_LIMIT",

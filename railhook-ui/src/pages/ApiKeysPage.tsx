@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Key, Loader2, Trash2, Copy, Check, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -12,9 +12,8 @@ import PermissionGate from '../components/PermissionGate';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ConnectedMcpApps from '../components/ConnectedMcpApps';
-import { apiKeysApi, ApiKeyResponse, ApiKeyScope } from '../api/apiKeys.api';
-import { projectsApi } from '../api/projects.api';
-import type { ProjectResponse, PageResponse } from '../types/api.types';
+import type { ApiKeyResponse, ApiKeyScope } from '../api/apiKeys.api';
+import { useProject, useApiKeysPaged, useCreateApiKey, useRotateApiKey, useRevokeApiKey } from '../api/queries';
 import { cn } from '../lib/utils';
 import { sendEventCurl } from '../lib/publicSnippets';
 import { Button } from '../components/ui/button';
@@ -50,53 +49,33 @@ export default function ApiKeysPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageApiKeys } = usePermissions();
 
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [apiKeys, setApiKeys] = useState<ApiKeyResponse[]>([]);
-  const [pageInfo, setPageInfo] = useState<PageResponse<ApiKeyResponse> | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<unknown>(null);
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [name, setName] = useState('');
   const [scope, setScope] = useState<ApiKeyScope>('READ_WRITE');
   const [expiresIn, setExpiresIn] = useState('');
-  const [creating, setCreating] = useState(false);
 
   const [revoking, setRevoking] = useState<ApiKeyResponse | null>(null);
-  const [revokePending, setRevokePending] = useState(false);
   const [rotating, setRotating] = useState<ApiKeyResponse | null>(null);
   const [rotateGraceHours, setRotateGraceHours] = useState('24');
-  const [rotatePending, setRotatePending] = useState(false);
   const [newApiKey, setNewApiKey] = useState<ApiKeyResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const loadData = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      setLoading(true);
-      const [projectData, apiKeysData] = await Promise.all([
-        projectsApi.get(projectId),
-        apiKeysApi.listPaged(projectId, currentPage, pageSize),
-      ]);
-      setProject(projectData);
-      setApiKeys(apiKeysData.content);
-      setPageInfo(apiKeysData);
-      setLoadError(null);
-    } catch (err: any) {
-      setLoadError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, currentPage, pageSize]);
+  const project = useProject(projectId);
+  const keysPage = useApiKeysPaged(projectId, currentPage, pageSize);
+  const createKey = useCreateApiKey(projectId!);
+  const rotateKey = useRotateApiKey(projectId!);
+  const revokeKey = useRevokeApiKey(projectId!);
+  const creating = createKey.isPending;
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const loading = (project.isLoading && !project.data) || (keysPage.isLoading && !keysPage.data);
+  const apiKeys = keysPage.data?.content ?? [];
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId) return;
-    setCreating(true);
     try {
       let expiresAt: string | undefined;
       if (expiresIn) {
@@ -104,51 +83,41 @@ export default function ApiKeysPage() {
         d.setDate(d.getDate() + parseInt(expiresIn));
         expiresAt = d.toISOString();
       }
-      const response = await apiKeysApi.create(projectId, { name, scope, expiresAt });
+      const response = await createKey.mutateAsync({ name, scope, expiresAt });
       setShowCreateDialog(false);
       setName('');
       setScope('READ_WRITE');
       setExpiresIn('');
       setCopied(false);
       setNewApiKey(response);
-      loadData();
     } catch (err: any) {
       showApiError(err, 'apiKeys.toast.createFailed');
-    } finally {
-      setCreating(false);
     }
   };
 
   const handleRevoke = async () => {
     if (!revoking || !projectId) return;
-    setRevokePending(true);
     try {
-      await apiKeysApi.revoke(projectId, revoking.id);
+      await revokeKey.mutateAsync(revoking.id);
       showSuccess(t('apiKeys.toast.revoked'));
       setRevoking(null);
-      loadData();
     } catch (err: any) {
       showApiError(err, 'apiKeys.toast.revokeFailed');
-    } finally {
-      setRevokePending(false);
     }
   };
 
   const handleRotate = async () => {
     if (!rotating || !projectId) return;
-    setRotatePending(true);
     try {
-      const replacement = await apiKeysApi.rotate(projectId, rotating.id, {
-        gracePeriodHours: parseInt(rotateGraceHours, 10),
+      const replacement = await rotateKey.mutateAsync({
+        id: rotating.id,
+        data: { gracePeriodHours: parseInt(rotateGraceHours, 10) },
       });
       setRotating(null);
       setCopied(false);
       setNewApiKey(replacement);
-      loadData();
     } catch (err: any) {
       showApiError(err, 'apiKeys.toast.rotateFailed');
-    } finally {
-      setRotatePending(false);
     }
   };
 
@@ -167,10 +136,14 @@ export default function ApiKeysPage() {
     );
   }
 
-  if (loadError || !project) {
+  if (project.isError || keysPage.isError || !project.data) {
     return (
       <div className="p-4 lg:p-6">
-        <ErrorState error={loadError} fallbackKey="apiKeys.toast.loadFailed" onRetry={loadData} />
+        <ErrorState
+          error={project.error ?? keysPage.error}
+          fallbackKey="apiKeys.toast.loadFailed"
+          onRetry={() => { project.refetch(); keysPage.refetch(); }}
+        />
       </div>
     );
   }
@@ -178,7 +151,7 @@ export default function ApiKeysPage() {
   return (
     <div className="p-4 lg:p-6">
       <PageHeader
-        eyebrow={project.name}
+        eyebrow={project.data.name}
         title={t('apiKeys.title')}
         description={t('apiKeys.subtitlePlain')}
         actions={
@@ -276,12 +249,12 @@ export default function ApiKeysPage() {
             );
           })}
 
-          {pageInfo && (
+          {keysPage.data && (
             <TablePagination
               page={currentPage}
               pageSize={pageSize}
-              totalElements={pageInfo.totalElements}
-              totalPages={pageInfo.totalPages}
+              totalElements={keysPage.data.totalElements}
+              totalPages={keysPage.data.totalPages}
               onPageChange={setCurrentPage}
               onPageSizeChange={setPageSize}
             />
@@ -373,7 +346,7 @@ export default function ApiKeysPage() {
         description={t('apiKeys.rotateDialog.description')}
         confirmLabel={t('apiKeys.rotate')}
         destructive={false}
-        loading={rotatePending}
+        loading={rotateKey.isPending}
         onConfirm={handleRotate}
       >
         <div className="space-y-2">
@@ -382,7 +355,7 @@ export default function ApiKeysPage() {
             id="rotate-grace"
             value={rotateGraceHours}
             onChange={(e) => setRotateGraceHours(e.target.value)}
-            disabled={rotatePending}
+            disabled={rotateKey.isPending}
           >
             <option value="0">{t('apiKeys.rotateDialog.grace0')}</option>
             <option value="1">{t('apiKeys.rotateDialog.grace1h')}</option>
@@ -408,7 +381,7 @@ export default function ApiKeysPage() {
           t('apiKeys.revokeDialog.impactPermanent'),
         ]}
         onConfirm={handleRevoke}
-        loading={revokePending}
+        loading={revokeKey.isPending}
         confirmLabel={t('apiKeys.revoke')}
       />
 

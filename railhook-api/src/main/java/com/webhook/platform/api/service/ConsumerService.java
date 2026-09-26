@@ -107,7 +107,7 @@ public class ConsumerService {
         endpointRepository.saveAll(endpoints);
         portalSessionRepository.deleteByConsumerId(consumer.getId());
         consumerRepository.delete(consumer);
-        log.info("Deleted consumer {} of project {} with {} endpoints", consumerId, projectId, endpoints.size());
+        log.debug("Deleted consumer {} of project {} with {} endpoints", consumerId, projectId, endpoints.size());
     }
 
     private Map<UUID, Long> liveEndpointCounts(List<Consumer> consumers) {

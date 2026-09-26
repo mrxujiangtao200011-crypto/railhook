@@ -21,21 +21,21 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// JwtUtil's ThreadLocal claims cache is safe only because the filter clears it in finally.
+// JwtTokenService's ThreadLocal claims cache is safe only because the filter clears it in finally.
 class JwtAuthenticationFilterTest {
 
     private static final String SECRET = "test-secret-key-at-least-32-characters-long-for-hmac";
 
     @Test
     void requestCacheIsEmptyOnThisThreadAfterFilterChainCompletes() throws Exception {
-        JwtUtil jwtUtil = new JwtUtil(SECRET, 900_000L, 86_400_000L);
+        JwtTokenService jwtTokenService = new JwtTokenService(SECRET, 900_000L, 86_400_000L);
         TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
         when(blacklistService.isBlacklisted(anyString())).thenReturn(false);
         when(blacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
 
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenService, blacklistService);
 
-        String token = jwtUtil.generateAccessToken(UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, null, true);
+        String token = jwtTokenService.generateAccessToken(UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, null, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
@@ -43,16 +43,16 @@ class JwtAuthenticationFilterTest {
         FilterChain chain = mock(FilterChain.class);
 
         // The token is cached during the request, so the assertion below proves a clear.
-        assertThat(jwtUtil.validateToken(token)).isTrue();
+        assertThat(jwtTokenService.validateToken(token)).isTrue();
 
         filter.doFilter(request, response, chain);
 
         @SuppressWarnings("unchecked")
         ThreadLocal<Map<String, Claims>> requestCache =
-                (ThreadLocal<Map<String, Claims>>) ReflectionTestUtils.getField(JwtUtil.class, "REQUEST_CACHE");
+                (ThreadLocal<Map<String, Claims>>) ReflectionTestUtils.getField(JwtTokenService.class, "REQUEST_CACHE");
 
         assertThat(requestCache.get())
-                .as("JwtUtil's per-request claims cache must be empty on this thread once the filter chain " +
+                .as("JwtTokenService's per-request claims cache must be empty on this thread once the filter chain " +
                         "returns, or a future request handled on the same thread would start out with another " +
                         "request's already-parsed claims")
                 .isEmpty();
@@ -61,13 +61,13 @@ class JwtAuthenticationFilterTest {
     // Access tokens live fifteen minutes, so a signed-out session must be refused per request.
     @Test
     void tokenFromARevokedSessionDoesNotAuthenticate() throws Exception {
-        JwtUtil jwtUtil = new JwtUtil(SECRET, 900_000L, 86_400_000L);
+        JwtTokenService jwtTokenService = new JwtTokenService(SECRET, 900_000L, 86_400_000L);
         TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
         UUID sessionId = UUID.randomUUID();
         when(blacklistService.isSessionRevoked(sessionId)).thenReturn(true);
 
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
-        String token = jwtUtil.generateAccessToken(
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenService, blacklistService);
+        String token = jwtTokenService.generateAccessToken(
                 UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, sessionId, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -89,11 +89,11 @@ class JwtAuthenticationFilterTest {
     // Tokens minted before sessions carry no sid and must keep working until they expire.
     @Test
     void tokenWithoutASessionStillAuthenticates() throws Exception {
-        JwtUtil jwtUtil = new JwtUtil(SECRET, 900_000L, 86_400_000L);
+        JwtTokenService jwtTokenService = new JwtTokenService(SECRET, 900_000L, 86_400_000L);
         TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
 
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
-        String token = jwtUtil.generateAccessToken(
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenService, blacklistService);
+        String token = jwtTokenService.generateAccessToken(
                 UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, null, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -113,9 +113,9 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void requestCacheIsEmptyEvenWhenTokenIsRejected() throws Exception {
-        JwtUtil jwtUtil = new JwtUtil(SECRET, 900_000L, 86_400_000L);
+        JwtTokenService jwtTokenService = new JwtTokenService(SECRET, 900_000L, 86_400_000L);
         TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenService, blacklistService);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer not-a-real-jwt");
@@ -126,7 +126,7 @@ class JwtAuthenticationFilterTest {
 
         @SuppressWarnings("unchecked")
         ThreadLocal<Map<String, Claims>> requestCache =
-                (ThreadLocal<Map<String, Claims>>) ReflectionTestUtils.getField(JwtUtil.class, "REQUEST_CACHE");
+                (ThreadLocal<Map<String, Claims>>) ReflectionTestUtils.getField(JwtTokenService.class, "REQUEST_CACHE");
 
         assertThat(requestCache.get()).isEmpty();
     }

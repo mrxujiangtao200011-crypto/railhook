@@ -7,13 +7,17 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ErrorResponseWriter;
+import com.webhook.platform.api.exception.RequestBodyTooLargeException;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -22,17 +26,13 @@ import java.io.InputStreamReader;
 @Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
+@RequiredArgsConstructor
 public class RequestSizeLimitFilter extends OncePerRequestFilter {
 
+    @Value("${webhook.max-payload-size-bytes:262144}")
     private final long maxPayloadSizeBytes;
+    @Value("${webhook.incoming.max-payload-size-bytes:524288}")
     private final long ingressMaxPayloadSizeBytes;
-
-    public RequestSizeLimitFilter(
-            @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
-            @Value("${webhook.incoming.max-payload-size-bytes:524288}") long ingressMaxPayloadSizeBytes) {
-        this.maxPayloadSizeBytes = maxPayloadSizeBytes;
-        this.ingressMaxPayloadSizeBytes = ingressMaxPayloadSizeBytes;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -51,7 +51,7 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
 
         try {
             filterChain.doFilter(wrappedRequest, response);
-        } catch (PayloadTooLargeException e) {
+        } catch (RequestBodyTooLargeException e) {
             log.warn("Request rejected mid-stream: body exceeds max payload size {} bytes (URI: {})",
                     effectiveLimit, request.getRequestURI());
             if (!response.isCommitted()) {
@@ -79,28 +79,19 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
     }
 
     private void rejectRequest(HttpServletResponse response, long limit) throws IOException {
-        response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
-        response.setContentType("application/json");
-        response.getWriter().write(
-                "{\"error\":\"payload_too_large\",\"message\":\"Request body exceeds maximum allowed size of "
-                        + limit + " bytes\",\"status\":413}");
+        ErrorResponseWriter.write(response, ErrorCode.PAYLOAD_TOO_LARGE,
+                "Request body exceeds maximum allowed size of " + limit + " bytes");
     }
 
     private boolean hasPayloadTooLargeCause(Throwable e) {
         Throwable cause = e;
         while (cause != null) {
-            if (cause instanceof PayloadTooLargeException) {
+            if (cause instanceof RequestBodyTooLargeException) {
                 return true;
             }
             cause = cause.getCause();
         }
         return false;
-    }
-
-    public static class PayloadTooLargeException extends IOException {
-        public PayloadTooLargeException(long limit) {
-            super("Request body exceeds maximum allowed size of " + limit + " bytes");
-        }
     }
 
     private static class ContentLimitedRequestWrapper extends HttpServletRequestWrapper {
@@ -124,16 +115,12 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
         }
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     private static class LimitedServletInputStream extends ServletInputStream {
 
         private final ServletInputStream delegate;
         private final long maxBytes;
         private long bytesRead = 0;
-
-        LimitedServletInputStream(ServletInputStream delegate, long maxBytes) {
-            this.delegate = delegate;
-            this.maxBytes = maxBytes;
-        }
 
         @Override
         public int read() throws IOException {
@@ -155,9 +142,9 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
             return count;
         }
 
-        private void checkLimit() throws PayloadTooLargeException {
+        private void checkLimit() throws RequestBodyTooLargeException {
             if (bytesRead > maxBytes) {
-                throw new PayloadTooLargeException(maxBytes);
+                throw new RequestBodyTooLargeException(maxBytes);
             }
         }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showWarning } from '../lib/toast';
@@ -60,10 +60,9 @@ export default function SendTestEventModal({
     }
   }, [open, projectId]);
 
-  const matchingCount = useMemo(() => {
-    if (!eventType.trim()) return -1;
-    return subscriptions.filter(s => s.enabled && eventTypeMatchesSubscription(eventType.trim(), s.eventType)).length;
-  }, [eventType, subscriptions]);
+  const matchingCount = eventType.trim()
+    ? subscriptions.filter(s => s.enabled && eventTypeMatchesSubscription(eventType.trim(), s.eventType)).length
+    : -1;
 
   const validateJson = (text: string): boolean => {
     try {

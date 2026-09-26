@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -93,7 +94,7 @@ class WorkflowDelaySuspensionTest {
 
     @Test
     @DisplayName("time spent suspended is not charged against the execution budget")
-    void suspendedTimeDoesNotCountTowardsTheTimeout() {
+    void suspendedTimeDoesNotCountTowardsTheTimeout() throws Exception {
         AtomicInteger afterRuns = new AtomicInteger();
         UUID executionId = UUID.randomUUID();
         String definition = definition("""
@@ -105,10 +106,17 @@ class WorkflowDelaySuspensionTest {
                 List.of(new DelayNodeExecutor(), counting("after", afterRuns)), 1);
 
         engine.execute(executionId, definition, mapper.createObjectNode());
+        ArgumentCaptor<Long> workedBeforeSuspending = ArgumentCaptor.forClass(Long.class);
+        verify(persistence).suspendExecution(eq(executionId), any(Instant.class), any(), workedBeforeSuspending.capture());
+        // Suspended for longer than the whole one-second budget, as the resume job would find it.
+        Thread.sleep(1_100);
         engine.resume(executionId, definition, mapper.createObjectNode(),
-                stateResumingAt("c"), 0L);
+                stateResumingAt("c"), workedBeforeSuspending.getValue());
 
+        assertThat(workedBeforeSuspending.getValue()).isLessThan(1_000L);
         assertThat(afterRuns.get()).isEqualTo(1);
+        verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), any(), anyLong());
+        verify(persistence, never()).completeExecution(eq(executionId), eq(ExecutionStatus.FAILED), any(), anyLong());
     }
 
     private JsonNode stateResumingAt(String nodeId) {

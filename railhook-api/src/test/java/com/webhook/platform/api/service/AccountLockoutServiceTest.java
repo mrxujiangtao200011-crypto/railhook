@@ -10,7 +10,8 @@ import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.LoginRequest;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.security.JwtTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,7 +21,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -128,23 +128,8 @@ class AccountLockoutServiceTest {
     }
 
     @Test
-    @DisplayName("a success clears the count, so a correct password never accumulates a lockout")
-    void successClearsTheCount() {
-        AccountLockoutService service = service(true);
-        User user = user();
-        service.recordFailure(user);
-        service.recordFailure(user);
-
-        service.clearFailures(user);
-
-        assertThat(user.getFailedLoginAttempts()).isZero();
-        assertThat(user.getLastFailedLoginAt()).isNull();
-        assertThat(user.getLockoutExpiresAt()).isNull();
-    }
-
-    @Test
-    @DisplayName("a password reset lifts an active lockout — the way out that needs nobody's help")
-    void resetLiftsAnActiveLockout() {
+    @DisplayName("clearing (a success or a password reset) forgets the count and lifts an active lockout")
+    void clearingForgetsTheCountAndLiftsTheLockout() {
         AccountLockoutService service = service(true);
         User user = user();
         for (int i = 0; i < 6; i++) {
@@ -155,6 +140,9 @@ class AccountLockoutServiceTest {
         service.clearFailures(user);
 
         assertThat(service.isLocked(user)).isFalse();
+        assertThat(user.getFailedLoginAttempts()).isZero();
+        assertThat(user.getLastFailedLoginAt()).isNull();
+        assertThat(user.getLockoutExpiresAt()).isNull();
     }
 
     @Test
@@ -216,7 +204,7 @@ class AccountLockoutServiceTest {
         @Mock private OrganizationRepository organizationRepository;
         @Mock private MembershipRepository membershipRepository;
         @Mock private PlanRepository planRepository;
-        @Mock private JwtUtil jwtUtil;
+        @Mock private JwtTokenService jwtTokenService;
         @Mock private TokenBlacklistService tokenBlacklistService;
         @Mock private UserSessionService userSessionService;
         @Mock private EmailService emailService;
@@ -230,7 +218,7 @@ class AccountLockoutServiceTest {
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
             lockout = new AccountLockoutService(userRepository, true, 3, 60, 900, 60);
             authService = new AuthService(userRepository, organizationRepository, membershipRepository,
-                    planRepository, jwtUtil, encoder, tokenBlacklistService, userSessionService,
+                    planRepository, jwtTokenService, encoder, tokenBlacklistService, userSessionService,
                     lockout, emailService,
                     mock(VerificationMailBudget.class), mock(OnboardingMailService.class), false);
 
@@ -254,6 +242,7 @@ class AccountLockoutServiceTest {
             when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         }
 
+        // A lockout with no exit is an outage, so the 423 names the way out.
         @Test
         @DisplayName("the threshold-th wrong password locks the account, and the next try is 423")
         void wrongPasswordsEventuallyLock() {
@@ -261,27 +250,16 @@ class AccountLockoutServiceTest {
 
             for (int i = 0; i < 3; i++) {
                 assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN))
-                        .isInstanceOf(ResponseStatusException.class)
-                        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                        .isInstanceOf(DomainException.class)
+                        .extracting(e -> ((DomainException) e).getStatusCode())
                         .isEqualTo(HttpStatus.UNAUTHORIZED);
             }
 
             assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .hasMessageContaining("reset your password")
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.LOCKED);
-        }
-
-        @Test
-        @DisplayName("the message names the way out, because a lockout with no exit is an outage")
-        void lockoutMessageNamesTheUnlockPath() {
-            expectLookup();
-            for (int i = 0; i < 3; i++) {
-                assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN)).isNotNull();
-            }
-
-            assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN))
-                    .hasMessageContaining("reset your password");
         }
 
         @Test
@@ -293,8 +271,8 @@ class AccountLockoutServiceTest {
             }
 
             assertThatThrownBy(() -> authService.login(attempt(PASSWORD), ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.LOCKED);
             verify(userSessionService, never()).open(any());
         }
@@ -323,9 +301,9 @@ class AccountLockoutServiceTest {
                             .organizationId(UUID.randomUUID())
                             .role(MembershipRole.OWNER)
                             .build()));
-            when(jwtUtil.generateRefreshToken(any(), any())).thenReturn("refresh");
-            when(jwtUtil.getJtiFromToken("refresh")).thenReturn(UUID.randomUUID().toString());
-            when(jwtUtil.getExpirationFromToken("refresh"))
+            when(jwtTokenService.generateRefreshToken(any(), any())).thenReturn("refresh");
+            when(jwtTokenService.getJtiFromToken("refresh")).thenReturn(UUID.randomUUID().toString());
+            when(jwtTokenService.getExpirationFromToken("refresh"))
                     .thenReturn(new Date(System.currentTimeMillis() + 86_400_000L));
 
             assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN)).isNotNull();
@@ -347,8 +325,8 @@ class AccountLockoutServiceTest {
             request.setPassword("whatever");
 
             assertThatThrownBy(() -> authService.login(request, ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }

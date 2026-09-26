@@ -5,8 +5,9 @@
   <img src="docs/brand/railhook-logo.svg" alt="Railhook" height="48">
 </picture>
 
-**Self-hosted, open-source webhook gateway — send webhooks to your customers and receive them
-from any provider, with every delivery on record.**
+**Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe,
+GitHub and others, with retries, signatures and a record of every attempt. Self-hosted or in
+[Railhook Cloud](https://railhook.io/register).**
 
 [![Latest release](https://img.shields.io/github/v/release/vadymkykalo/railhook?label=release)](https://github.com/vadymkykalo/railhook/releases/latest)
 [![CI](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml)
@@ -25,28 +26,14 @@ from any provider, with every delivery on record.**
 
 </div>
 
+Sending webhooks yourself means a retry queue, signing, per-customer endpoints and a way to
+answer "did you send it?". Receiving them means verifying each provider's signature and not losing
+events while your app is down. Railhook does both and keeps the request and response of every
+attempt.
+
 ## Install
 
-With Docker and Compose v2 (about 4 GiB of RAM):
-
-```bash
-mkdir railhook && cd railhook
-curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/railhook/main/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/.env.dist -o .env
-# Replace the example secrets with your own, and turn on the bundled Postgres.
-for v in WEBHOOK_ENCRYPTION_KEY WEBHOOK_ENCRYPTION_SALT JWT_SECRET REDIS_PASSWORD; do
-  sed -i "s|^$v=.*|$v=$(openssl rand -hex 32)|" .env
-done
-db=$(openssl rand -hex 24)
-sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$db|; s|^DB_PASSWORD=.*|DB_PASSWORD=$db|" .env
-echo "COMPOSE_PROFILES=embedded-db" >> .env
-docker compose up -d
-```
-
-Open http://localhost:8080 and register. The first account is active immediately.
-
-Or run the installer. It does the same, pins the latest release and adds a `./railhook` helper
-(`status`, `logs`, `upgrade`, `backup`, `doctor`):
+With Docker and Compose (about 4 GiB of RAM):
 
 ```bash
 curl -fsSL https://railhook.io/install.sh | bash
@@ -54,9 +41,15 @@ curl -fsSL https://railhook.io/install.sh | bash
 curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
 ```
 
+The installer checks the machine, generates the secrets into `.env`, pins the latest release,
+starts the stack and adds a `./railhook` helper (`status`, `logs`, `upgrade`, `backup`, `doctor`).
+To do the same by hand with `docker compose`, or to install on Kubernetes with the Helm chart, see
+[Install with Docker](https://railhook.io/docs/self-hosting/install-docker/) and
+[Kubernetes](https://railhook.io/docs/self-hosting/kubernetes/).
+
 ## Send an event
 
-Create a project, an endpoint and an API key in the UI, then:
+Create a project, an endpoint and an API key in the dashboard, then:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/events \
@@ -65,6 +58,25 @@ curl -X POST http://localhost:8080/api/v1/events \
   -H "Content-Type: application/json" \
   -d '{"type":"order.completed","data":{"orderId":"ord_12345"}}'
 ```
+
+Railhook signs it and delivers it to every endpoint subscribed to `order.completed`.
+
+## Receive a webhook
+
+Create a source for the provider and a destination in your app:
+
+```ts
+const source = await client.incomingSources.create(projectId, {
+  name: 'Stripe',
+  providerType: 'STRIPE',
+  verificationMode: 'PROVIDER',
+  hmacSecret: process.env.STRIPE_WEBHOOK_SECRET,
+});
+// Paste source.ingressUrl into Stripe's webhook settings.
+```
+
+Stripe gets a `202` as soon as the signature checks out and the request is stored; Railhook then
+forwards it to your destinations and retries while your app is down.
 
 ## What it does
 
@@ -81,7 +93,7 @@ curl -X POST http://localhost:8080/api/v1/events \
 - Replay: resend one delivery, or replay a time range of events as new deliveries.
 - Incoming webhooks: one URL per source, signature verified (Stripe, GitHub, GitLab, Shopify,
   Slack, Twilio, Square, Adyen, SendGrid, HubSpot, or generic HMAC), raw request stored, then
-  forwarded to your destinations with retries after 1m, 5m, 15m, 1h and 6h.
+  forwarded to your destinations with retries after 1m, 5m, 15m and 1h (5 attempts).
 - Every attempt is recorded with its request, response and timing.
 - SDKs for [Node](sdks/node), [Python](sdks/python) and [PHP](sdks/php), a [CLI](railhook-cli)
   that tunnels webhooks to `localhost`, and an MCP server at `/mcp`.

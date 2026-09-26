@@ -12,12 +12,12 @@ import com.webhook.platform.api.dto.SharedDebugLinkResponse;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -51,7 +51,7 @@ public class SharedDebugLinkService {
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
         int expiryHours = request.getExpiryHours() != null ? request.getExpiryHours() : 24;
-        String token = CryptoUtils.generateSecureToken(32);
+        String token = SecureTokens.generate(32);
 
         SharedDebugLink link = SharedDebugLink.builder()
                 .projectId(projectId)
@@ -62,20 +62,8 @@ public class SharedDebugLinkService {
                 .build();
 
         link = linkRepository.save(link);
-        log.info("Created shared debug link for event {} in project {}, expires in {}h", eventId, projectId, expiryHours);
+        log.debug("Created shared debug link for event {} in project {}, expires in {}h", eventId, projectId, expiryHours);
         return toResponse(link);
-    }
-
-    @Transactional(readOnly = true)
-    public List<SharedDebugLinkResponse> listLinks(UUID projectId) {
-        UUID organizationId = TenantContext.require();
-        projectRepository.findById(projectId)
-                .filter(p -> p.getOrganizationId().equals(organizationId))
-                .orElseThrow(() -> new NotFoundException("Project not found"));
-
-        return linkRepository.findByProjectId(projectId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -104,7 +92,7 @@ public class SharedDebugLinkService {
                 .orElseThrow(() -> new NotFoundException("Debug link not found"));
 
         linkRepository.delete(link);
-        log.info("Deleted shared debug link {} for project {}", linkId, projectId);
+        log.debug("Deleted shared debug link {} for project {}", linkId, projectId);
     }
 
     @SystemTenant("the share token in the URL is the only identity a public debug link carries; it resolves the link and its Event unscoped")

@@ -12,14 +12,14 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.VerificationEmailSendRepository;
 import com.webhook.platform.api.domain.repository.UserIdentityRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
-import com.webhook.platform.common.util.CryptoUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +29,7 @@ import java.util.UUID;
 // and the audit log is kept under GDPR Article 17(3)(b).
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class AccountErasureService {
 
     // Reserved by RFC 2606 and resolves nowhere, so nothing can be delivered to it.
@@ -43,26 +44,6 @@ public class AccountErasureService {
     private final EmailChangeRequestRepository emailChangeRequestRepository;
     private final VerificationEmailSendRepository verificationEmailSendRepository;
     private final TunnelService tunnelService;
-
-    public AccountErasureService(UserRepository userRepository,
-                                 MembershipRepository membershipRepository,
-                                 OrganizationService organizationService,
-                                 UserSessionService userSessionService,
-                                 TokenBlacklistService tokenBlacklistService,
-                                 UserIdentityRepository userIdentityRepository,
-                                 EmailChangeRequestRepository emailChangeRequestRepository,
-                                 VerificationEmailSendRepository verificationEmailSendRepository,
-                                 TunnelService tunnelService) {
-        this.userRepository = userRepository;
-        this.membershipRepository = membershipRepository;
-        this.organizationService = organizationService;
-        this.userSessionService = userSessionService;
-        this.tokenBlacklistService = tokenBlacklistService;
-        this.userIdentityRepository = userIdentityRepository;
-        this.emailChangeRequestRepository = emailChangeRequestRepository;
-        this.verificationEmailSendRepository = verificationEmailSendRepository;
-        this.tunnelService = tunnelService;
-    }
 
     // Refusals happen before anything is written, so a refused caller has lost nothing.
     @SystemTenant("erasing a person spans every organization they belong to, not the request's own")
@@ -113,7 +94,7 @@ public class AccountErasureService {
                 continue;
             }
             if (membership.getRole() == MembershipRole.OWNER && lastOwner(organizationId)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                throw new ConflictException(
                         "You are the last owner of an organization that still has other members. "
                                 + "Make someone else an owner, or delete the organization, and then "
                                 + "erase your account.");
@@ -131,7 +112,7 @@ public class AccountErasureService {
     private void anonymise(User user) {
         user.setEmail(user.getId() + ERASED_EMAIL_DOMAIN);
         user.setFullName(null);
-        user.setPasswordHash(CryptoUtils.generateSecureToken(32));
+        user.setPasswordHash(SecureTokens.generate(32));
         user.setStatus(UserStatus.DISABLED);
         user.setEmailVerified(false);
         user.setVerificationToken(null);

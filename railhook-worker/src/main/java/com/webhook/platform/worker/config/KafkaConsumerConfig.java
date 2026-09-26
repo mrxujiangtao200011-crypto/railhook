@@ -4,6 +4,7 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -34,16 +35,12 @@ import org.apache.kafka.common.TopicPartition;
 @Configuration
 @EnableKafka
 @Slf4j
+@RequiredArgsConstructor
 public class KafkaConsumerConfig {
 
+    @Qualifier("deadLetterKafkaTemplate")
     private final KafkaOperations<String, Object> deadLetterKafkaTemplate;
     private final MeterRegistry meterRegistry;
-
-    public KafkaConsumerConfig(@Qualifier("deadLetterKafkaTemplate") KafkaOperations<String, Object> deadLetterKafkaTemplate,
-                               MeterRegistry meterRegistry) {
-        this.deadLetterKafkaTemplate = deadLetterKafkaTemplate;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;

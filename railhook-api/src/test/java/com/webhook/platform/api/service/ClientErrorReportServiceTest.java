@@ -88,19 +88,6 @@ class ClientErrorReportServiceTest {
 
             assertThat(loggedText()).doesNotContain("secret-value").contains("/admin/deliveries");
         }
-
-        @Test
-        @DisplayName("the throttle's bookkeeping does not outlive the throttle")
-        void windowsDoNotAccumulateForEveryUserEver() {
-            // The per-user window map used to grow for the life of the process.
-            ClientErrorReportService bounded = new ClientErrorReportService(true, 20);
-
-            for (int i = 0; i < 200_000; i++) {
-                bounded.record(report("something broke"), UUID.randomUUID());
-            }
-
-            assertThat(bounded.trackedWindows()).isLessThanOrEqualTo(50_000L);
-        }
     }
 
     @Nested

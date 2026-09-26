@@ -82,7 +82,7 @@ public class RuleService {
         }
 
         ruleEngineService.invalidate(projectId);
-        log.info("Created rule '{}' for project {}", rule.getName(), projectId);
+        log.debug("Created rule '{}' for project {}", rule.getName(), projectId);
         return mapToResponse(rule);
     }
 
@@ -161,7 +161,7 @@ public class RuleService {
         }
 
         ruleEngineService.invalidate(rule.getProjectId());
-        log.info("Updated rule '{}' ({})", rule.getName(), id);
+        log.debug("Updated rule '{}' ({})", rule.getName(), id);
         return mapToResponse(rule);
     }
 
@@ -172,7 +172,7 @@ public class RuleService {
 
         ruleRepository.deleteById(id);
         ruleEngineService.invalidate(projectId);
-        log.info("Deleted rule '{}' ({})", rule.getName(), id);
+        log.debug("Deleted rule '{}' ({})", rule.getName(), id);
     }
 
     @Transactional

@@ -3,23 +3,26 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.domain.entity.TunnelRequestLog;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 
 import java.util.concurrent.Executor;
-import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 
 /** Admission (tunnel up, rate limit, body size) is decided here, so a refusal never reaches the CLI. */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class TunnelIngressService {
 
     private static final int MAX_BODY_SIZE = 512 * 1024;
@@ -30,7 +33,7 @@ public class TunnelIngressService {
         record Answered(TunnelResponseMessage response) implements Outcome {
         }
 
-        record Refused(String error, String message) implements Outcome {
+        record Refused(ErrorCode error, String message) implements Outcome {
         }
 
         record TimedOut() implements Outcome {
@@ -46,37 +49,20 @@ public class TunnelIngressService {
     private final TunnelRequestLogRepository requestLogRepository;
     private final TunnelBandwidthService bandwidthService;
     private final MeterRegistry meterRegistry;
+    @Qualifier("tunnelMeteringExecutor")
     private final Executor tunnelMeteringExecutor;
     private final SuspensionCheck suspensionCheck;
 
-    public TunnelIngressService(TunnelService tunnelService,
-            RedisTunnelCoordinator redisTunnelCoordinator,
-            RedisRateLimiterService rateLimiterService,
-            TunnelRequestLogRepository requestLogRepository,
-            TunnelBandwidthService bandwidthService,
-            MeterRegistry meterRegistry,
-            @Qualifier("tunnelMeteringExecutor") Executor tunnelMeteringExecutor,
-            SuspensionCheck suspensionCheck) {
-        this.tunnelService = tunnelService;
-        this.redisTunnelCoordinator = redisTunnelCoordinator;
-        this.rateLimiterService = rateLimiterService;
-        this.requestLogRepository = requestLogRepository;
-        this.bandwidthService = bandwidthService;
-        this.meterRegistry = meterRegistry;
-        this.tunnelMeteringExecutor = tunnelMeteringExecutor;
-        this.suspensionCheck = suspensionCheck;
-    }
-
     public Outcome forward(String slug, TunnelRequestMessage request, byte[] body) {
         if (!redisTunnelCoordinator.isActiveInCluster(slug)) {
-            return refuse("offline", "tunnel_offline", "Tunnel is not connected");
+            return refuse("offline", ErrorCode.TUNNEL_OFFLINE, "Tunnel is not connected");
         }
         if (!rateLimiterService.tryAcquireForSlug(slug, RATE_LIMIT_PER_SECOND)) {
             log.warn("Rate limit exceeded for tunnel slug: {}", slug);
-            return refuse("rate_limited", "rate_limit_exceeded", "Too many requests to this tunnel");
+            return refuse("rate_limited", ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests to this tunnel");
         }
         if (body != null && body.length > MAX_BODY_SIZE) {
-            return refuse("payload_too_large", "payload_too_large", "Request body exceeds maximum size");
+            return refuse("payload_too_large", ErrorCode.PAYLOAD_TOO_LARGE, "Request body exceeds maximum size");
         }
 
         // Unscoped: the slug is the only thing naming an organization. Suspension is refused here
@@ -84,13 +70,13 @@ public class TunnelIngressService {
         TunnelSession session;
         try {
             session = TenantContext.callAsSystem(() -> tunnelService.getActiveBySlug(slug));
-        } catch (ResponseStatusException e) {
-            return refuse("offline", "tunnel_offline", "Tunnel is not connected");
+        } catch (DomainException e) {
+            return refuse("offline", ErrorCode.TUNNEL_OFFLINE, "Tunnel is not connected");
         }
         if (suspensionCheck.suspensionReason(session.getOrganizationId()).isPresent()) {
             log.warn("Tunnel request refused: organization {} is suspended (slug={})",
                     session.getOrganizationId(), slug);
-            return refuse("suspended", "tunnel_suspended", "This tunnel is not accepting requests");
+            return refuse("suspended", ErrorCode.TUNNEL_SUSPENDED, "This tunnel is not accepting requests");
         }
 
         long startMs = System.currentTimeMillis();
@@ -115,7 +101,7 @@ public class TunnelIngressService {
         return new Outcome.Answered(response);
     }
 
-    private Outcome refuse(String outcome, String error, String message) {
+    private Outcome refuse(String outcome, ErrorCode error, String message) {
         outcomeCounter(outcome).increment();
         return new Outcome.Refused(error, message);
     }

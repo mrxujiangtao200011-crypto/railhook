@@ -2,27 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { nginxLocations } from '../test/nginxLocations';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const conf = readFileSync(join(repoRoot, 'railhook-ui/nginx.conf'), 'utf8');
 
 /** Only hashed names may be immutable: browsers kept showing old public/ files after deploys. */
-function locations(): { head: string; body: string }[] {
-  const out: { head: string; body: string }[] = [];
-  const re = /^\s*location\s+([^{]+)\{/gm;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(conf))) {
-    let depth = 1;
-    let i = re.lastIndex;
-    while (depth > 0 && i < conf.length) {
-      if (conf[i] === '{') depth++;
-      else if (conf[i] === '}') depth--;
-      i++;
-    }
-    out.push({ head: m[1].trim(), body: conf.slice(re.lastIndex, i - 1) });
-  }
-  return out;
-}
+const locations = () => nginxLocations(conf);
 
 const HASHED = ['^~ /assets/', '^~ /docs/_astro/'];
 

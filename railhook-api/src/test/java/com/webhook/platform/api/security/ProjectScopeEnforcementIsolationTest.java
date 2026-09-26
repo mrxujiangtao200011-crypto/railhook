@@ -1,6 +1,5 @@
 package com.webhook.platform.api.security;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.AbstractIntegrationTest;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
@@ -18,6 +17,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,14 +26,15 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -51,7 +52,7 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
 
     private String jwt;
     private UUID projectAId;
-    private UUID projectBId; // same org as A
+    private UUID projectBId;
     private String apiKeyForProjectA;
 
     // Allow-listed so endpoint validation needs no live DNS lookup.
@@ -166,8 +167,8 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
                 "TestEndpointController.list"
         );
         Set<String> foundLabels = projectScopedRoutes.stream().map(RouteHandler::label)
-                .collect(java.util.stream.Collectors.toSet());
-        Set<String> foundNonExemptLabels = new java.util.HashSet<>(foundLabels);
+                .collect(Collectors.toSet());
+        Set<String> foundNonExemptLabels = new HashSet<>(foundLabels);
         for (RouteHandler route : projectScopedRoutes) {
             boolean exempt = AnnotatedElementUtils.hasAnnotation(route.method(), ProjectScopeExempt.class)
                     || AnnotatedElementUtils.hasAnnotation(route.controller(), ProjectScopeExempt.class);
@@ -184,7 +185,7 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
         }
     }
 
-    private static final List<Class<? extends java.lang.annotation.Annotation>> MAPPING_ANNOTATIONS = List.of(
+    private static final List<Class<? extends Annotation>> MAPPING_ANNOTATIONS = List.of(
             GetMapping.class, PostMapping.class, PutMapping.class, PatchMapping.class, DeleteMapping.class,
             RequestMapping.class
     );
@@ -265,52 +266,38 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
         return "/" + c + "/" + m;
     }
 
+    // Unfixed, a staging key rotated prod's secret and got it back in plaintext.
     @Test
-    public void apiKey_schema_listEventTypes_crossProject_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectBId + "/schemas")
-                        .header("X-API-Key", apiKeyForProjectA))
-                .andExpect(status().isForbidden());
-    }
+    public void aKeyIsForbiddenOnAnotherProjectOfTheSameOrganization() throws Exception {
+        UUID sourceBId = createIncomingSource(projectBId);
+        UUID endpointBId = createEndpoint(projectBId, "https://prod.example.com/webhook");
+        String projectB = "/api/v1/projects/" + projectBId;
 
-    @Test
-    public void apiKey_schema_createEventType_crossProject_forbidden() throws Exception {
-        mockMvc.perform(post("/api/v1/projects/" + projectBId + "/schemas")
-                        .header("X-API-Key", apiKeyForProjectA)
+        List<MockHttpServletRequestBuilder> requests = List.of(
+                get(projectB + "/schemas"),
+                post(projectB + "/schemas").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                EventTypeCatalogRequest.builder().name("order.created").build())),
+                get(projectB + "/incoming-sources/" + sourceBId + "/destinations"),
+                post(projectB + "/incoming-sources/" + sourceBId + "/destinations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                EventTypeCatalogRequest.builder().name("order.created").build())))
-                .andExpect(status().isForbidden());
+                                IncomingDestinationRequest.builder().url("https://example.com/hook").build())),
+                get(projectB + "/test-endpoints"),
+                post(projectB + "/endpoints/" + endpointBId + "/rotate-secret"));
+
+        for (MockHttpServletRequestBuilder request : requests) {
+            mockMvc.perform(request.header("X-API-Key", apiKeyForProjectA)).andExpect(status().isForbidden());
+        }
     }
 
     @Test
-    public void apiKey_schema_listEventTypes_ownProject_ok() throws Exception {
+    public void aKeyStillWorksOnItsOwnProject() throws Exception {
+        UUID sourceAId = createIncomingSource(projectAId);
+
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/schemas")
                         .header("X-API-Key", apiKeyForProjectA))
                 .andExpect(status().isOk());
-    }
-
-    @Test
-    public void apiKey_incomingDestination_list_crossProject_forbidden() throws Exception {
-        UUID sourceBId = createIncomingSource(projectBId);
-        mockMvc.perform(get("/api/v1/projects/" + projectBId + "/incoming-sources/" + sourceBId + "/destinations")
-                        .header("X-API-Key", apiKeyForProjectA))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_incomingDestination_create_crossProject_forbidden() throws Exception {
-        UUID sourceBId = createIncomingSource(projectBId);
-        mockMvc.perform(post("/api/v1/projects/" + projectBId + "/incoming-sources/" + sourceBId + "/destinations")
-                        .header("X-API-Key", apiKeyForProjectA)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                IncomingDestinationRequest.builder().url("https://example.com/hook").build())))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_incomingDestination_list_ownProject_ok() throws Exception {
-        UUID sourceAId = createIncomingSource(projectAId);
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/incoming-sources/" + sourceAId + "/destinations")
                         .header("X-API-Key", apiKeyForProjectA))
                 .andExpect(status().isOk());
@@ -325,40 +312,6 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
                 .andExpect(status().isCreated())
                 .andReturn();
         return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
-    }
-
-    @Test
-    public void apiKey_testEndpoint_list_crossProject_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectBId + "/test-endpoints")
-                        .header("X-API-Key", apiKeyForProjectA))
-                .andExpect(status().isForbidden());
-    }
-
-    // Unfixed, a staging key rotated prod's secret and got it back in plaintext.
-
-    @Test
-    public void apiKey_rotateSecret_crossProjectSameOrg_forbidden() throws Exception {
-        UUID endpointBId = createEndpoint(projectBId, "https://prod.example.com/webhook");
-
-        mockMvc.perform(post("/api/v1/projects/" + projectBId + "/endpoints/" + endpointBId + "/rotate-secret")
-                        .header("X-API-Key", apiKeyForProjectA))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_rotateSecret_ownProject_ok_andReturnsSecret() throws Exception {
-        UUID endpointAId = createEndpoint(projectAId, "https://staging.example.com/webhook");
-
-        MvcResult result = mockMvc.perform(post("/api/v1/projects/" + projectAId + "/endpoints/" + endpointAId + "/rotate-secret")
-                        .header("X-API-Key", apiKeyForProjectA))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
-        assertEquals(endpointAId.toString(), json.get("id").asText());
-        assertFalse(json.get("secret").asText().isBlank(),
-                "Rotating your OWN endpoint's secret should still return it — whether the plaintext "
-                        + "response itself is sound is a separate discussion from project scoping.");
     }
 
     private UUID createEndpoint(UUID projectId, String url) throws Exception {

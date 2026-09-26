@@ -1,12 +1,7 @@
-import TriggerNode from './TriggerNode';
-import FilterNode from './FilterNode';
-import TransformNode from './TransformNode';
-import HttpNode from './HttpNode';
-import SlackNode from './SlackNode';
-import DeliveryNode from './DeliveryNode';
 import BranchNode from './BranchNode';
-import DelayNode from './DelayNode';
-import CreateEventNode from './CreateEventNode';
+import {
+  TriggerNode, FilterNode, TransformNode, HttpNode, SlackNode, DeliveryNode, DelayNode, CreateEventNode,
+} from './simpleNodes';
 
 export const nodeTypes = {
   webhookTrigger: TriggerNode,

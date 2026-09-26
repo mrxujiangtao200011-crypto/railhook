@@ -8,7 +8,7 @@ import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.RateLimitResult;
 import com.webhook.platform.api.dto.SubscriptionRequest;
 import com.webhook.platform.api.dto.SubscriptionResponse;
-import com.webhook.platform.api.mcp.McpCaller.McpToolException;
+import com.webhook.platform.api.exception.McpToolException;
 import com.webhook.platform.api.service.DeliveryService;
 import com.webhook.platform.api.service.EndpointService;
 import com.webhook.platform.api.service.EventIngestService;
@@ -17,6 +17,7 @@ import com.webhook.platform.api.service.SubscriptionService;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpTool.McpAnnotations;
 import org.springframework.ai.mcp.annotation.McpToolParam;
@@ -41,6 +42,7 @@ import java.util.UUID;
  */
 @Component
 @ConditionalOnProperty(prefix = "spring.ai.mcp.server", name = "enabled", havingValue = "true", matchIfMissing = true)
+@RequiredArgsConstructor
 public class RailhookMcpTools {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
@@ -56,21 +58,6 @@ public class RailhookMcpTools {
     private final SubscriptionService subscriptionService;
     private final DeliveryService deliveryService;
     private final McpQuotaGuard quotaGuard;
-
-    public RailhookMcpTools(McpCaller caller, ObjectMapper objectMapper, EventIngestService eventIngestService,
-                            RedisRateLimiterService rateLimiterService, EntitlementService entitlementService,
-                            EndpointService endpointService, SubscriptionService subscriptionService,
-                            DeliveryService deliveryService, McpQuotaGuard quotaGuard) {
-        this.caller = caller;
-        this.objectMapper = objectMapper;
-        this.eventIngestService = eventIngestService;
-        this.rateLimiterService = rateLimiterService;
-        this.entitlementService = entitlementService;
-        this.endpointService = endpointService;
-        this.subscriptionService = subscriptionService;
-        this.deliveryService = deliveryService;
-        this.quotaGuard = quotaGuard;
-    }
 
     @McpTool(name = "send_event",
             description = "Sends an Event into the project. Railhook creates one Delivery for every enabled "

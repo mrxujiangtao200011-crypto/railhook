@@ -2,6 +2,8 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.ChangeEmailRequest;
 import com.webhook.platform.api.dto.EmailChangeResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
@@ -14,30 +16,20 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/auth/email-change")
 @Tag(name = "Authentication")
+@RequiredArgsConstructor
 public class EmailChangeController {
 
     private final EmailChangeService emailChangeService;
     private final AuthRateLimiterService authRateLimiterService;
     private final VerificationMailBudget budget;
     private final TrustedProxyResolver trustedProxyResolver;
-
-    public EmailChangeController(EmailChangeService emailChangeService,
-                                 AuthRateLimiterService authRateLimiterService,
-                                 VerificationMailBudget budget,
-                                 TrustedProxyResolver trustedProxyResolver) {
-        this.emailChangeService = emailChangeService;
-        this.authRateLimiterService = authRateLimiterService;
-        this.budget = budget;
-        this.trustedProxyResolver = trustedProxyResolver;
-    }
 
     @Operation(operationId = "getEmailChange", summary = "Get the email change state",
             description = "The account's address, and the change waiting for confirmation if there is one")
@@ -69,7 +61,7 @@ public class EmailChangeController {
         String clientIp = trustedProxyResolver.resolve(httpRequest);
         if (!authRateLimiterService.allowLogin(clientIp, request.getNewEmail())) {
             budget.recordRateLimited(auth.requireUserId(), "per-ip-and-address");
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         return ResponseEntity.ok(emailChangeService.requestChange(
                 auth.requireUserId(), request, cookieRefreshToken, clientIp));
@@ -115,7 +107,7 @@ public class EmailChangeController {
 
     private void requireTokenAllowance(String token, HttpServletRequest httpRequest) {
         if (!authRateLimiterService.allowTokenAction(trustedProxyResolver.resolve(httpRequest), token)) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
     }
 }

@@ -136,32 +136,12 @@ describe('DashboardPage', () => {
     expect(screen.getByLabelText(/project name/i)).toBeInTheDocument();
   });
 
-  it('offers a way back after the getting-started card is dismissed', async () => {
-    vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
-    vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(STATS);
-    const user = userEvent.setup();
-    renderDashboard();
-
-    await user.click(await screen.findByRole('button', { name: 'Dismiss' }, { timeout: SETTLE_MS }));
-    const restore = await screen.findByRole('button', { name: /Getting started/ });
-
-    await user.click(restore);
-    expect(await screen.findByText('What brings you to Railhook?')).toBeInTheDocument();
-  }, TEST_TIMEOUT_MS);
-
   it('renders a loading skeleton before the project list arrives', () => {
     vi.mocked(projectsApi.list).mockReturnValue(new Promise(() => {}));
     const { container } = renderDashboard();
     expect(container.querySelector('.animate-pulse')).toBeTruthy();
   });
 
-
-  it('renders populated stat cards when a project with data exists', async () => {
-    vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
-    vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(STATS);
-    renderDashboard();
-    expect(await screen.findByText('42', undefined, { timeout: SETTLE_MS })).toBeInTheDocument();
-  }, TEST_TIMEOUT_MS);
 
   it('has no detectable axe accessibility violations when populated', async () => {
     vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
@@ -189,25 +169,19 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 
-  it('renders a project whose stats payload is missing deliveryStats entirely', async () => {
-    vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
-    vi.mocked(dashboardApi.getProjectStats).mockResolvedValue({} as unknown as DashboardStats);
-    renderDashboard();
-
-    await waitFor(() => expect(screen.getByTestId('delivery-health-figure')).toHaveTextContent('—'));
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('renders a brand-new project whose every counter is zero', async () => {
-    vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
-    vi.mocked(dashboardApi.getProjectStats).mockResolvedValue({
+  it.each([
+    ['whose stats payload is missing deliveryStats entirely', {} as unknown as DashboardStats],
+    ['whose every counter is zero', {
       deliveryStats: {
         totalDeliveries: 0, successfulDeliveries: 0, failedDeliveries: 0,
         pendingDeliveries: 0, dlqDeliveries: 0, successRate: 0,
       },
       recentEvents: [],
       endpointHealth: [],
-    });
+    } as DashboardStats],
+  ])('renders a project %s without a health figure or an error', async (_, stats) => {
+    vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
+    vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(stats);
     renderDashboard();
 
     await waitFor(() => expect(screen.getByTestId('delivery-health-figure')).toHaveTextContent('—'));

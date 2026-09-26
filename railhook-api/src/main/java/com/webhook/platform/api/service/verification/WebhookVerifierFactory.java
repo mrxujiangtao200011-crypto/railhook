@@ -3,17 +3,16 @@ package com.webhook.platform.api.service.verification;
 import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class WebhookVerifierFactory {
 
+    @Value("${webhook.ingress-base-url:}")
     private final String ingressBaseUrl;
-
-    public WebhookVerifierFactory(@Value("${webhook.ingress-base-url:}") String ingressBaseUrl) {
-        this.ingressBaseUrl = ingressBaseUrl;
-    }
 
     /** Null when verification is disabled. */
     public WebhookVerificationStrategy getVerifier(IncomingSource source) {

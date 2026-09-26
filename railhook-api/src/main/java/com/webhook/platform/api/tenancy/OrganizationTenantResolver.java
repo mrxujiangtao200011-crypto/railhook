@@ -2,6 +2,7 @@ package com.webhook.platform.api.tenancy;
 
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 import org.springframework.stereotype.Component;
+import com.webhook.platform.api.exception.TenantNotResolvedException;
 
 import java.util.UUID;
 

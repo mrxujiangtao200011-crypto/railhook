@@ -153,11 +153,6 @@ describe('BlogPostPage', () => {
     expect(screen.queryByRole('link', { name: en.landing.hero.startFree })).toBeNull();
   });
 
-  it('offers the way back to the index', () => {
-    renderPost();
-    expect(screen.getByRole('link', { name: en.blog.allPosts })).toHaveAttribute('href', '/blog');
-  });
-
   it('shows the Ukrainian translation to a Ukrainian reader', async () => {
     await i18n.changeLanguage('uk');
     renderPost();

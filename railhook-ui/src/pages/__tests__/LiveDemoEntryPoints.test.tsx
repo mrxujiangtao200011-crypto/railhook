@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import '../../i18n';
 import en from '../../i18n/locales/en.json';
@@ -8,17 +8,6 @@ import LandingNav from '../landing/LandingNav';
 import PricingPage from '../PricingPage';
 
 const SIGNED_OUT = { auth: { user: null, token: null, isAuthenticated: false } };
-
-beforeAll(() => {
-  window.scrollTo = () => {};
-  if (!('IntersectionObserver' in window)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).IntersectionObserver = class {
-      observe() {}
-      disconnect() {}
-    };
-  }
-});
 
 afterEach(() => {
   delete window.__RAILHOOK__;

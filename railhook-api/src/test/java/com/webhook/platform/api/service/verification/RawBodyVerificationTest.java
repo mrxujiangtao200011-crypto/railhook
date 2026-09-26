@@ -1,10 +1,10 @@
 package com.webhook.platform.api.service.verification;
 
-import com.webhook.platform.common.util.WebhookSignatureUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import com.webhook.platform.common.util.RailhookSignature;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -46,12 +46,6 @@ class RawBodyVerificationTest {
         MockHttpServletRequest r = new MockHttpServletRequest("POST", "/ingress/tok");
         r.setContentType(contentType);
         return r;
-    }
-
-    @Test
-    @DisplayName("the test's own premise: decoding as the wrong charset really does change the bytes")
-    void theRoundTripIsLossy() {
-        assertThat(reEncoded()).isNotEqualTo(BODY);
     }
 
     @Test
@@ -103,9 +97,9 @@ class RawBodyVerificationTest {
     @DisplayName("the platform's own format verifies over bytes too")
     void platformFormat() {
         long ts = System.currentTimeMillis();
-        String header = "t=" + ts + ",v1=" + WebhookSignatureUtils.generateSignature(SECRET, ts, BODY);
+        String header = "t=" + ts + ",v1=" + RailhookSignature.sign(SECRET, ts, BODY);
 
-        assertThat(WebhookSignatureUtils.verifySignature(SECRET, header, BODY)).isTrue();
+        assertThat(RailhookSignature.verify(SECRET, header, BODY)).isTrue();
     }
 
     @Test
@@ -114,14 +108,15 @@ class RawBodyVerificationTest {
         long ts = System.currentTimeMillis();
         String body = "{\"note\":\"café\"}";
 
-        assertThat(WebhookSignatureUtils.generateSignature(SECRET, ts, body))
-                .isEqualTo(WebhookSignatureUtils.generateSignature(
+        assertThat(RailhookSignature.sign(SECRET, ts, body))
+                .isEqualTo(RailhookSignature.sign(
                         SECRET, ts, body.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
     @DisplayName("a signature over the re-encoded bytes is now correctly rejected")
     void theOldBehaviourIsNotQuietlyStillAccepted() {
+        assertThat(reEncoded()).as("decoding as the wrong charset really does change the bytes").isNotEqualTo(BODY);
         HttpServletRequest r = request("application/json; charset=iso-8859-1");
         ((MockHttpServletRequest) r).addHeader("X-Hub-Signature-256", "sha256=" + hmacHex(SECRET, reEncoded()));
 

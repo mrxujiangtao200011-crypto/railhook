@@ -6,7 +6,7 @@ import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.exception.QuotaExceededException;
-import com.webhook.platform.api.service.ingress.RateLimitExceededException;
+import com.webhook.platform.api.exception.RateLimitExceededException;
 import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
@@ -25,16 +25,15 @@ import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 import com.webhook.platform.api.service.ingress.IngressOutcome;
-import com.webhook.platform.api.service.ingress.OrganizationSuspendedException;
-import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
-import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
-import com.webhook.platform.api.service.ingress.SourceDisabledException;
-import com.webhook.platform.api.service.ingress.SourceNotFoundException;
+import com.webhook.platform.api.exception.OrganizationSuspendedException;
+import com.webhook.platform.api.exception.PayloadTooLargeException;
+import com.webhook.platform.api.exception.SignatureVerificationFailedException;
+import com.webhook.platform.api.exception.SourceDisabledException;
+import com.webhook.platform.api.exception.SourceNotFoundException;
 import com.webhook.platform.api.service.verification.ReplayDetectionService;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.api.service.ForwardDispatch;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,6 +50,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
+import com.webhook.platform.common.security.SecretEncryption;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -205,7 +205,7 @@ class IngressServiceTest {
         assertThat(event.getMethod()).isEqualTo("POST");
         assertThat(event.getRequestId()).isNotNull();
         assertThat(event.getBodySha256()).isNotNull();
-        assertThat(event.getVerified()).isNull(); // verification mode NONE
+        assertThat(event.getVerified()).isNull();
 
         verify(forwardAttemptRepository, never()).saveAll(any());
         verify(outboxMessageRepository, never()).saveAll(any());
@@ -310,21 +310,12 @@ class IngressServiceTest {
     }
 
     @Test
-    void receiveWebhook_hmacVerification_success() {
+    void receiveWebhook_validSignature_isAcceptedVerifiedAndKeepsItsReplayMarker() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
-
-        IncomingSource source = buildActiveSource();
-        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
-        source.setHmacSecretEncrypted(encrypted.getCiphertext());
-        source.setHmacSecretIv(encrypted.getIv());
-        source.setHmacHeaderName("X-Signature");
-        source.setHmacSignaturePrefix("");
-
         String body = "{\"test\":true}";
-        String expectedHmac = computeHmac(secret, body);
+        String validHmac = computeHmac(secret, body);
 
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource(secret)));
         when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
             IncomingEvent e = inv.getArgument(0);
             e.setId(eventId);
@@ -332,26 +323,19 @@ class IngressServiceTest {
         });
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
-        when(httpRequest.getHeader("X-Signature")).thenReturn(expectedHmac);
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
 
         IncomingEvent event = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
 
+        assertThat(event.getId()).isEqualTo(eventId);
         assertThat(event.getVerified()).isTrue();
         assertThat(event.getVerificationError()).isNull();
+        verify(replayDetectionService, never()).unmark(any(), any());
     }
 
     @Test
-    void receiveWebhook_hmacVerification_mismatch_withDestinations_blocksForwarding() {
-        String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
-
-        IncomingSource source = buildActiveSource();
-        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
-        source.setHmacSecretEncrypted(encrypted.getCiphertext());
-        source.setHmacSecretIv(encrypted.getIv());
-        source.setHmacHeaderName("X-Signature");
-        source.setHmacSignaturePrefix("");
-
+    void receiveWebhook_signatureMismatch_isRejectedBeforeAnyTransactionOrForward() {
         IncomingDestination dest = IncomingDestination.builder()
                 .id(destId).incomingSourceId(sourceId)
                 .url("https://example.com/hook")
@@ -359,8 +343,9 @@ class IngressServiceTest {
                 .enabled(true).maxAttempts(5).timeoutSeconds(30)
                 .retryDelays("60,300")
                 .build();
-
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(sourceRepository.findByIngressPathToken("validtoken"))
+                .thenReturn(Optional.of(signedGenericSource("my-hmac-secret")));
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of(dest));
         when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
             IncomingEvent e = inv.getArgument(0);
             e.setId(eventId);
@@ -373,6 +358,7 @@ class IngressServiceTest {
                 .isInstanceOf(SignatureVerificationFailedException.class);
 
         // Rejected before dedup/save, or a forged request could poison dedup.
+        verify(transactionManager, never()).getTransaction(any());
         verify(eventRepository, never()).save(any(IncomingEvent.class));
         verify(forwardAttemptRepository, never()).saveAll(any());
         verify(outboxMessageRepository, never()).saveAll(any());
@@ -382,7 +368,7 @@ class IngressServiceTest {
     void receiveWebhook_dedupPoisoning_attackerCannotBlockLegitimateWebhook() {
         // A forged request carrying a known providerEventId once blocked the genuine one.
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -426,7 +412,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_replayDetection_rejectsReplayedSignature() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -455,7 +441,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_replayDetection_aDifferentDeliveryWithTheSameBodyIsNotAReplay() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -524,26 +510,19 @@ class IngressServiceTest {
     }
 
     @Test
-    void receiveWebhook_duplicateProviderEventId_returnsExisting() {
-        IncomingSource source = buildActiveSource();
-        IncomingEvent existing = IncomingEvent.builder()
-                .id(eventId).incomingSourceId(sourceId)
-                .requestId("old-req").method("POST")
-                .providerEventId("evt_123")
-                .receivedAt(Instant.now())
-                .build();
-
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+    void receiveWebhook_duplicateProviderEventId_returnsExistingWithoutChargingAgain() {
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(buildActiveSource()));
         stubHttpRequest();
         when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_123");
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_123"))
-                .thenReturn(Optional.of(existing));
+                .thenReturn(Optional.of(acceptedEvent("evt_123")));
 
         IncomingEvent result = accepted(service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getId()).isEqualTo(eventId);
         verify(eventRepository, never()).save(any(IncomingEvent.class));
         verify(forwardAttemptRepository, never()).saveAll(any());
+        verify(quotaCounterService, never()).increment();
     }
 
     // Without GitLab's Idempotency-Key a resend after the replay window was forwarded twice.
@@ -615,29 +594,28 @@ class IngressServiceTest {
     }
 
     @Test
-    void receiveWebhook_duplicateRace_resolvesGracefully() {
-        IncomingSource source = buildActiveSource();
-        IncomingEvent existing = IncomingEvent.builder()
-                .id(eventId).incomingSourceId(sourceId)
-                .requestId("first-req").method("POST")
-                .providerEventId("evt_race")
-                .receivedAt(Instant.now())
-                .build();
+    void receiveWebhook_duplicateRace_resolvesToTheExistingRowAndKeepsItsReplayMarker() {
+        String secret = "my-hmac-secret";
+        String body = "{\"data\":1}";
+        String validHmac = computeHmac(secret, body);
 
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource(secret)));
         stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
         when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_race");
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_race"))
                 .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(existing));
+                .thenReturn(Optional.of(acceptedEvent("evt_race")));
         when(eventRepository.save(any(IncomingEvent.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique index violation"));
 
-        IncomingEvent result = accepted(service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest));
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getId()).isEqualTo(eventId);
         assertThat(result.getProviderEventId()).isEqualTo("evt_race");
         verify(forwardAttemptRepository, never()).saveAll(any());
+        verify(replayDetectionService, never()).unmark(any(), any());
     }
 
     @Test
@@ -682,7 +660,7 @@ class IngressServiceTest {
                     + "\"type\":\"url_verification\"}";
 
     private IncomingSource slackSource() {
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(SLACK_SECRET, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(SLACK_SECRET, ENCRYPTION_KEY, ENCRYPTION_SALT);
         IncomingSource source = buildActiveSource();
         source.setProviderType(ProviderType.SLACK);
         source.setVerificationMode(VerificationMode.PROVIDER);
@@ -824,32 +802,10 @@ class IngressServiceTest {
     }
 
     @Test
-    void receiveWebhook_signatureMismatch_rejectedWithoutOpeningTransaction() {
-        String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
-
-        IncomingSource source = buildActiveSource();
-        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
-        source.setHmacSecretEncrypted(encrypted.getCiphertext());
-        source.setHmacSecretIv(encrypted.getIv());
-        source.setHmacHeaderName("X-Signature");
-        source.setHmacSignaturePrefix("");
-
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
-        stubHttpRequest();
-        when(httpRequest.getHeader("X-Signature")).thenReturn("wrong-signature");
-
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"test\":true}".getBytes(StandardCharsets.UTF_8), httpRequest))
-                .isInstanceOf(SignatureVerificationFailedException.class);
-
-        verify(transactionManager, never()).getTransaction(any());
-    }
-
-    @Test
     void receiveWebhook_failedPersistWithNoExistingRow_releasesReplayMarker() {
         // A marker left behind after a failed persist turned the provider's resend into a replay.
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -874,81 +830,10 @@ class IngressServiceTest {
         verify(replayDetectionService).unmark(sourceId.toString(), validHmac);
     }
 
-    @Test
-    void receiveWebhook_duplicateRaceResolvedToExistingRow_doesNotReleaseReplayMarker() {
-        String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
-
-        IncomingSource source = buildActiveSource();
-        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
-        source.setHmacSecretEncrypted(encrypted.getCiphertext());
-        source.setHmacSecretIv(encrypted.getIv());
-        source.setHmacHeaderName("X-Signature");
-        source.setHmacSignaturePrefix("");
-
-        String body = "{\"data\":1}";
-        String validHmac = computeHmac(secret, body);
-
-        IncomingEvent existing = IncomingEvent.builder()
-                .id(eventId).incomingSourceId(sourceId)
-                .requestId("first-req").method("POST")
-                .providerEventId("evt_race")
-                .receivedAt(Instant.now())
-                .build();
-
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
-        stubHttpRequest();
-        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
-        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_race");
-        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
-        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_race"))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(existing));
-        when(eventRepository.save(any(IncomingEvent.class)))
-                .thenThrow(new DataIntegrityViolationException("Unique index violation"));
-
-        IncomingEvent result = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
-
-        assertThat(result.getId()).isEqualTo(eventId);
-        verify(replayDetectionService, never()).unmark(any(), any());
-    }
-
-    @Test
-    void receiveWebhook_successfulPersist_doesNotReleaseReplayMarker() {
-        String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
-
-        IncomingSource source = buildActiveSource();
-        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
-        source.setHmacSecretEncrypted(encrypted.getCiphertext());
-        source.setHmacSecretIv(encrypted.getIv());
-        source.setHmacHeaderName("X-Signature");
-        source.setHmacSignaturePrefix("");
-
-        String body = "{\"test\":true}";
-        String validHmac = computeHmac(secret, body);
-
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
-        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
-            IncomingEvent e = inv.getArgument(0);
-            e.setId(eventId);
-            return e;
-        });
-        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
-        stubHttpRequest();
-        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
-        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
-
-        IncomingEvent event = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
-
-        assertThat(event.getId()).isEqualTo(eventId);
-        verify(replayDetectionService, never()).unmark(any(), any());
-    }
-
     // Replay and quota ran before dedup, so a provider's resend of an accepted webhook got 401 or 429.
 
     private IncomingSource signedGenericSource(String secret) {
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
         source.setHmacSecretEncrypted(encrypted.getCiphertext());
@@ -968,7 +853,7 @@ class IngressServiceTest {
     }
 
     @Test
-    void aResendOfAnAcceptedSignedWebhookReturnsTheStoredEventInsteadOfAReplayRejection() {
+    void aResendOfAnAcceptedSignedWebhookReturnsTheStoredEventWithoutConsultingTheReplayMarker() {
         String secret = "my-hmac-secret";
         String body = "{\"data\":1}";
         String validHmac = computeHmac(secret, body);
@@ -985,22 +870,6 @@ class IngressServiceTest {
         assertThat(result.getId()).isEqualTo(eventId);
         verify(eventRepository, never()).save(any(IncomingEvent.class));
         verify(quotaCounterService, never()).increment();
-    }
-
-    @Test
-    void aResendThatDedupsDoesNotConsumeTheReplayMarker() {
-        String secret = "my-hmac-secret";
-        String body = "{\"data\":1}";
-        String validHmac = computeHmac(secret, body);
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource(secret)));
-        stubHttpRequest();
-        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
-        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_resent");
-        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_resent"))
-                .thenReturn(Optional.of(acceptedEvent("evt_resent")));
-
-        service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
-
         verify(replayDetectionService, never()).isReplay(any(), any());
     }
 
@@ -1039,23 +908,6 @@ class IngressServiceTest {
         verify(eventRepository, never()).findByIncomingSourceIdAndProviderEventId(any(), any());
     }
 
-    @Test
-    void anOverQuotaNewEventDoesNotBurnItsReplayMarker() {
-        // Otherwise the retry, once there is room, would be refused as a replay.
-        String secret = "my-hmac-secret";
-        String body = "{\"data\":2}";
-        String validHmac = computeHmac(secret, body);
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource(secret)));
-        stubHttpRequest();
-        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
-        doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
-                .when(entitlementService).checkEventQuota();
-
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest))
-                .isInstanceOf(QuotaExceededException.class);
-        verify(replayDetectionService, never()).isReplay(any(), any());
-    }
-
     private String computeHmac(String secret, String body) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -1070,17 +922,22 @@ class IngressServiceTest {
     }
 
     @Test
-    void overTheMonthlyQuota_isRejectedWithoutPersistingAnything() {
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(buildActiveSource()));
+    void overTheMonthlyQuota_isRejectedWithoutPersistingOrBurningTheReplayMarker() {
+        // Otherwise the retry, once there is room, would be refused as a replay.
+        String secret = "my-hmac-secret";
+        String body = "{\"data\":2}";
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource(secret)));
         stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(computeHmac(secret, body));
         doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
                 .when(entitlementService).checkEventQuota();
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(QuotaExceededException.class);
 
         verify(eventRepository, never()).save(any());
         verify(quotaCounterService, never()).increment();
+        verify(replayDetectionService, never()).isReplay(any(), any());
     }
 
     @Test
@@ -1097,35 +954,6 @@ class IngressServiceTest {
     }
 
     @Test
-    void aDeduplicatedWebhookIsNotChargedAgain() {
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(buildActiveSource()));
-        stubHttpRequest();
-        when(httpRequest.getHeader("X-GitHub-Delivery")).thenReturn("gh-1");
-        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "gh-1"))
-                .thenReturn(Optional.of(IncomingEvent.builder().id(eventId).incomingSourceId(sourceId).build()));
-
-        service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
-
-        verify(eventRepository, never()).save(any());
-        verify(quotaCounterService, never()).increment();
-    }
-
-    @Test
-    void aSourceWithNoRateLimitOfItsOwnFallsBackToTheConfiguredDefault() {
-        IncomingSource source = buildActiveSource();
-        source.setRateLimitPerSecond(null);
-        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
-        stubHttpRequest();
-        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
-        when(eventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(rateLimiterService.tryAcquireForSourceFailClosed(sourceId, DEFAULT_RATE_LIMIT)).thenReturn(true);
-
-        service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
-
-        verify(rateLimiterService).tryAcquireForSourceFailClosed(sourceId, DEFAULT_RATE_LIMIT);
-    }
-
-    @Test
     void exceedingTheDefaultRateLimitRejectsTheWebhook() {
         IncomingSource source = buildActiveSource();
         source.setRateLimitPerSecond(null);
@@ -1135,6 +963,7 @@ class IngressServiceTest {
 
         assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(RateLimitExceededException.class);
+        verify(rateLimiterService).tryAcquireForSourceFailClosed(sourceId, DEFAULT_RATE_LIMIT);
         verify(eventRepository, never()).save(any());
     }
 }

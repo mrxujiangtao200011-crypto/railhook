@@ -32,17 +32,7 @@ class RedisRateLimiterServiceTest {
     }
 
     @Test
-    void tryAcquire_redisDown_shouldUseLocalFallback() {
-        UUID projectId = UUID.randomUUID();
-        when(redissonClient.getRateLimiter(anyString()))
-                .thenThrow(new RuntimeException("Redis connection refused"));
-
-        assertTrue(service.tryAcquire(projectId));
-        assertEquals(1, getFallbackCount());
-    }
-
-    @Test
-    void tryAcquire_redisDown_localFallbackShouldEnforceLimit() {
+    void tryAcquire_redisDown_localFallbackCountsAndEnforcesTheLimit() {
         UUID projectId = UUID.randomUUID();
         int rateLimit = 3;
         service = new RedisRateLimiterService(redissonClient, meterRegistry, rateLimit);
@@ -50,7 +40,9 @@ class RedisRateLimiterServiceTest {
         when(redissonClient.getRateLimiter(anyString()))
                 .thenThrow(new RuntimeException("Redis connection refused"));
 
-        for (int i = 0; i < rateLimit; i++) {
+        assertTrue(service.tryAcquire(projectId));
+        assertEquals(1, getFallbackCount());
+        for (int i = 1; i < rateLimit; i++) {
             assertTrue(service.tryAcquire(projectId),
                     "Request " + (i + 1) + " should be allowed within limit");
         }

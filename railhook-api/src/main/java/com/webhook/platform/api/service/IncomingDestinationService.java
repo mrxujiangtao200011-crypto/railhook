@@ -17,8 +17,9 @@ import com.webhook.platform.api.dto.IncomingDestinationResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.common.security.SecretEncryption;
 import com.webhook.platform.common.security.UrlValidator;
-import com.webhook.platform.common.util.CryptoUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -35,32 +36,18 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class IncomingDestinationService {
 
     private final IncomingDestinationRepository destinationRepository;
     private final IncomingSourceRepository sourceRepository;
     private final TransformationRepository transformationRepository;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
+    @Value("${webhook.url-validation.allow-private-ips:false}")
     private final boolean allowPrivateIps;
+    @Value("${webhook.url-validation.allowed-hosts:}")
     private final List<String> allowedHosts;
     private final RetryLadderEscalationCap retryLadderEscalationCap;
-
-    public IncomingDestinationService(
-            IncomingDestinationRepository destinationRepository,
-            IncomingSourceRepository sourceRepository,
-            TransformationRepository transformationRepository,
-            EncryptionKeyRegistry encryptionKeyRegistry,
-            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
-            RetryLadderEscalationCap retryLadderEscalationCap) {
-        this.destinationRepository = destinationRepository;
-        this.sourceRepository = sourceRepository;
-        this.transformationRepository = transformationRepository;
-        this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.allowPrivateIps = allowPrivateIps;
-        this.allowedHosts = allowedHosts;
-        this.retryLadderEscalationCap = retryLadderEscalationCap;
-    }
 
     // Narrowed to the project, not just the tenant: an API key is confined to the project in the URL.
     private IncomingSource requireSource(UUID projectId, UUID sourceId) {
@@ -133,7 +120,7 @@ public class IncomingDestinationService {
                 .build();
 
         if (request.getAuthConfig() != null && !request.getAuthConfig().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
+            SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
             destination.setAuthConfigEncrypted(encrypted.getCiphertext());
             destination.setAuthConfigIv(encrypted.getIv());
             destination.setEncryptionKeyVersion(encrypted.getKeyVersion());
@@ -141,7 +128,7 @@ public class IncomingDestinationService {
 
         retryLadderEscalationCap.requireIncomingFits(destination.getRetryDelays(), destination.getMaxAttempts());
         destination = destinationRepository.saveAndFlush(destination);
-        log.info("Created incoming destination: id={}, sourceId={}, url={}", destination.getId(), sourceId, request.getUrl());
+        log.debug("Created incoming destination: id={}, sourceId={}, host={}", destination.getId(), sourceId, UrlValidator.hostOf(request.getUrl()));
         return mapToResponse(destination);
     }
 
@@ -180,7 +167,7 @@ public class IncomingDestinationService {
             destination.setAuthType(request.getAuthType());
         }
         if (request.getAuthConfig() != null && !request.getAuthConfig().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
+            SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
             destination.setAuthConfigEncrypted(encrypted.getCiphertext());
             destination.setAuthConfigIv(encrypted.getIv());
             destination.setEncryptionKeyVersion(encrypted.getKeyVersion());
@@ -221,7 +208,7 @@ public class IncomingDestinationService {
 
         retryLadderEscalationCap.requireIncomingFits(destination.getRetryDelays(), destination.getMaxAttempts());
         destination = destinationRepository.saveAndFlush(destination);
-        log.info("Updated incoming destination: id={}", id);
+        log.debug("Updated incoming destination: id={}", id);
         return mapToResponse(destination);
     }
 
@@ -230,7 +217,7 @@ public class IncomingDestinationService {
     public void deleteDestination(UUID projectId, UUID sourceId, UUID id) {
         IncomingDestination destination = requireDestination(projectId, sourceId, id);
         destinationRepository.delete(destination);
-        log.info("Deleted incoming destination: id={}", id);
+        log.debug("Deleted incoming destination: id={}", id);
     }
 
     private IncomingDestinationResponse mapToResponse(IncomingDestination destination) {

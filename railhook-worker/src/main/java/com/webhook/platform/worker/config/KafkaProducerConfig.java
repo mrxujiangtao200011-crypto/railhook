@@ -3,6 +3,7 @@ package com.webhook.platform.worker.config;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serializer;
@@ -23,13 +24,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Configuration
+@RequiredArgsConstructor
 public class KafkaProducerConfig {
 
     private final MeterRegistry meterRegistry;
-
-    public KafkaProducerConfig(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
-    }
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;

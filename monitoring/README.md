@@ -8,7 +8,7 @@ set up for Railhook. It runs as a separate Compose project next to the platform 
 On an `install.sh` deployment:
 
 ```bash
-cd /opt/railhook
+cd ~/railhook    # the install.sh --dir
 echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
 echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env     # optional
 v=$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2)

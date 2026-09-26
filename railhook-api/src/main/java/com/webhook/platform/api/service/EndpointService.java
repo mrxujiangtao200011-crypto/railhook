@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.http.SsrfProtectionCustomizer;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
@@ -11,11 +12,12 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
 import com.webhook.platform.api.dto.EndpointTestResponse;
+import com.webhook.platform.common.security.SecretEncryption;
+import com.webhook.platform.common.security.SecureTokens;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
+import com.webhook.platform.common.util.RailhookSignature;
 import com.webhook.platform.common.util.StandardWebhookSignature;
-import com.webhook.platform.common.util.WebhookSignatureUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -28,6 +30,8 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import reactor.netty.http.client.HttpClient;
 
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.dto.MtlsConfigRequest;
+import com.webhook.platform.api.dto.TestResult;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -35,8 +39,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import com.webhook.platform.api.dto.MtlsConfigRequest;
-import com.webhook.platform.api.dto.TestResult;
 
 @Slf4j
 @Service
@@ -102,9 +104,9 @@ public class EndpointService {
 
         String secret = request.getSecret();
         if (secret == null || secret.isBlank()) {
-            secret = CryptoUtils.generateSecureToken(32);
+            secret = SecureTokens.generate(32);
         }
-        CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(secret);
+        SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(secret);
         
         Endpoint endpoint = Endpoint.builder()
                 .projectId(projectId)
@@ -128,7 +130,7 @@ public class EndpointService {
 
         if (endpointVerificationRequired) {
             endpoint.setVerificationStatus(Endpoint.VerificationStatus.PENDING);
-            log.debug("Endpoint verification required, setting status to PENDING for endpoint: {}", endpoint.getUrl());
+            log.debug("Endpoint verification required, setting status to PENDING for endpoint host {}", UrlValidator.hostOf(endpoint.getUrl()));
         }
         
         endpoint = endpointRepository.saveAndFlush(endpoint);
@@ -194,7 +196,7 @@ public class EndpointService {
         }
 
         if (request.getSecret() != null && !request.getSecret().isEmpty()) {
-            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getSecret());
+            SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getSecret());
             endpoint.setSecretEncrypted(encrypted.getCiphertext());
             endpoint.setSecretIv(encrypted.getIv());
             endpoint.setEncryptionKeyVersion(encrypted.getKeyVersion());
@@ -268,11 +270,11 @@ public class EndpointService {
 
         String retiringSecret = decryptSecretOrNull(endpoint);
 
-        String newSecret = CryptoUtils.generateSecureToken(32);
-        CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(newSecret);
+        String newSecret = SecureTokens.generate(32);
+        SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(newSecret);
 
         if (retiringSecret != null) {
-            CryptoUtils.EncryptedData previous = encryptionKeyRegistry.encrypt(retiringSecret);
+            SecretEncryption.EncryptedData previous = encryptionKeyRegistry.encrypt(retiringSecret);
             endpoint.setSecretPreviousEncrypted(previous.getCiphertext());
             endpoint.setSecretPreviousIv(previous.getIv());
             endpoint.setSecretRotatedAt(Instant.now());
@@ -315,7 +317,7 @@ public class EndpointService {
         
         try {
             UrlValidator.validateWebhookUrl(endpoint.getUrl(), allowPrivateIps, allowedHosts);
-        } catch (UrlValidator.InvalidUrlException e) {
+        } catch (InvalidUrlException e) {
             return EndpointTestResponse.builder()
                     .success(false)
                     .errorMessage("SSRF protection: " + e.getMessage())
@@ -331,7 +333,7 @@ public class EndpointService {
         String testPayload = "{\"test\":true,\"message\":\"This is a test webhook\",\"timestamp\":\"" 
                 + Instant.now().toString() + "\"}";
         long timestamp = System.currentTimeMillis();
-        String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, testPayload);
+        String signature = RailhookSignature.buildSignatureHeader(secret, timestamp, testPayload);
         
         long startTime = System.currentTimeMillis();
         
@@ -376,7 +378,7 @@ public class EndpointService {
             return response;
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - startTime;
-            log.error("Endpoint test failed for {}: {}", endpoint.getUrl(), e.getMessage());
+            log.warn("Endpoint test failed for host {}: {}", UrlValidator.hostOf(endpoint.getUrl()), e.getMessage());
             return EndpointTestResponse.builder()
                     .success(false)
                     .errorMessage(e.getMessage())
@@ -426,8 +428,8 @@ public class EndpointService {
             MtlsConfigRequest request) {
         Endpoint endpoint = requireEndpoint(projectId, endpointId);
 
-        CryptoUtils.EncryptedData encryptedCert = encryptionKeyRegistry.encrypt(request.getClientCert());
-        CryptoUtils.EncryptedData encryptedKey = encryptionKeyRegistry.encrypt(request.getClientKey());
+        SecretEncryption.EncryptedData encryptedCert = encryptionKeyRegistry.encrypt(request.getClientCert());
+        SecretEncryption.EncryptedData encryptedKey = encryptionKeyRegistry.encrypt(request.getClientKey());
 
         endpoint.setMtlsEnabled(true);
         endpoint.setClientCertEncrypted(encryptedCert.getCiphertext());
@@ -438,7 +440,7 @@ public class EndpointService {
         endpoint.setEncryptionKeyVersion(encryptedCert.getKeyVersion());
 
         endpoint = endpointRepository.saveAndFlush(endpoint);
-        log.info("Configured mTLS for endpoint {}", endpointId);
+        log.debug("Configured mTLS for endpoint {}", endpointId);
 
         return mapToResponse(endpoint);
     }
@@ -455,7 +457,7 @@ public class EndpointService {
         endpoint.setCaCert(null);
 
         endpoint = endpointRepository.saveAndFlush(endpoint);
-        log.info("Disabled mTLS for endpoint {}", endpointId);
+        log.debug("Disabled mTLS for endpoint {}", endpointId);
 
         return mapToResponse(endpoint);
     }

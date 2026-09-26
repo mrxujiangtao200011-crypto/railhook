@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -36,15 +37,11 @@ import com.webhook.platform.api.dto.MtlsConfigRequest;
 @Tag(name = "Endpoints", description = "Webhook endpoint configuration")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class EndpointController {
 
     private final EndpointService endpointService;
     private final EndpointVerificationService verificationService;
-
-    public EndpointController(EndpointService endpointService, EndpointVerificationService verificationService) {
-        this.endpointService = endpointService;
-        this.verificationService = verificationService;
-    }
 
     @Operation(summary = "Create endpoint", description = "Creates a new webhook endpoint for the project")
     @ApiResponse(responseCode = "201", description = "Endpoint created")
@@ -58,13 +55,8 @@ public class EndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        try {
-            EndpointResponse response = endpointService.createEndpoint(projectId, request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (Exception e) {
-            log.error("Failed to create endpoint for project {}: {}", projectId, e.getMessage(), e);
-            throw e;
-        }
+        EndpointResponse response = endpointService.createEndpoint(projectId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @Operation(summary = "Get endpoint", description = "Returns endpoint details by ID")
@@ -146,7 +138,7 @@ public class EndpointController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         EndpointTestResponse response = endpointService.testEndpoint(projectId, id);
-        log.info("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
+        log.debug("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
         return ResponseEntity.ok(response);
     }
 
@@ -163,7 +155,6 @@ public class EndpointController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         EndpointResponse response = endpointService.configureMtls(projectId, id, request);
-        log.info("Configured mTLS for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
 
@@ -179,7 +170,6 @@ public class EndpointController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         EndpointResponse response = endpointService.disableMtls(projectId, id);
-        log.info("Disabled mTLS for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
 
@@ -194,7 +184,7 @@ public class EndpointController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         var result = verificationService.verify(projectId, id);
-        log.info("Verification attempt for endpoint {}: success={}", id, result.success());
+        log.debug("Verification attempt for endpoint {}: success={}", id, result.success());
         
         return ResponseEntity.ok(new VerificationResponse(
                 result.success(),
@@ -230,11 +220,8 @@ public class EndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        
         String reason = request != null ? request.reason() : "Skipped by administrator";
-        var endpoint = verificationService.skipVerification(projectId, id, reason);
-        log.info("Skipped verification for endpoint {}: {}", id, reason);
-        
+        verificationService.skipVerification(projectId, id, reason);
         return ResponseEntity.ok(endpointService.getEndpoint(projectId, id));
     }
 

@@ -9,11 +9,12 @@ import com.webhook.platform.api.domain.entity.VerificationEmailSend;
 import com.webhook.platform.api.domain.repository.EmailChangeRequestRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.VerificationEmailSendRepository;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +29,7 @@ import java.util.UUID;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class VerificationMailBudget {
 
     static final int MAX_SENDS_PER_DAY = 5;
@@ -40,16 +42,6 @@ public class VerificationMailBudget {
     private final MembershipRepository membershipRepository;
     private final AuditLogAspect auditLog;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    public VerificationMailBudget(VerificationEmailSendRepository sendRepository,
-                                  EmailChangeRequestRepository changeRepository,
-                                  MembershipRepository membershipRepository,
-                                  AuditLogAspect auditLog) {
-        this.sendRepository = sendRepository;
-        this.changeRepository = changeRepository;
-        this.membershipRepository = membershipRepository;
-        this.auditLog = auditLog;
-    }
 
     @SystemTenant("counts one person's mail, which is not confined to any organization they belong to")
     public void requireSendAllowance(User user) {
@@ -89,7 +81,7 @@ public class VerificationMailBudget {
     private void refuse(UUID userId, String limit, String message) {
         log.warn("Refused {} for user {}: daily cap reached", limit, userId);
         audit(userId, AuditAction.EMAIL_RATE_LIMITED, "FAILURE", message, Map.of("limit", limit));
-        throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, message);
+        throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, message);
     }
 
     private void audit(UUID userId, AuditAction action, String status, String error, Map<String, Object> details) {

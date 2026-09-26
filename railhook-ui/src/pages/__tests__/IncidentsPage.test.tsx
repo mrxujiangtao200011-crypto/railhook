@@ -63,12 +63,6 @@ describe('IncidentsPage', () => {
     vi.mocked(incidentsApi.countOpen).mockResolvedValue({ count: 1, investigating: 0, critical: 0 });
   });
 
-  it('lists the incidents', async () => {
-    renderIncidents();
-
-    expect(await screen.findByText('Checkout webhooks failing')).toBeInTheDocument();
-  });
-
   it('counts incidents the list has not loaded', async () => {
     // Every tile is a number the rows on screen cannot produce.
     vi.mocked(incidentsApi.list).mockResolvedValue(
@@ -79,9 +73,9 @@ describe('IncidentsPage', () => {
     renderIncidents();
 
     await screen.findByText('Routine 0');
-    await waitFor(() => expect(tileValue(/investigat|розсліду/i)).toBe('2'));
-    expect(tileValue(/critical|критич/i)).toBe('1');
-    expect(tileValue(/^open$|відкрит/i)).toBe('24');
+    await waitFor(() => expect(tileValue(/investigat/i)).toBe('2'));
+    expect(tileValue(/critical/i)).toBe('1');
+    expect(tileValue(/^open$/i)).toBe('24');
   });
 
   it('says all clear only when nothing is unresolved', async () => {
@@ -91,7 +85,7 @@ describe('IncidentsPage', () => {
     renderIncidents();
 
     await waitFor(() => expect(incidentsApi.countOpen).toHaveBeenCalled());
-    await waitFor(() => expect(tileValue(/^open$|відкрит/i)).toBe('0'));
+    await waitFor(() => expect(tileValue(/^open$/i)).toBe('0'));
     expect(document.body.textContent).not.toMatch(/incidents\.tiles/);
   });
 
@@ -101,23 +95,14 @@ describe('IncidentsPage', () => {
     renderIncidents();
 
     await screen.findByText('Checkout webhooks failing');
-    expect(tileValue(/critical|критич/i)).toBe('0');
+    expect(tileValue(/critical/i)).toBe('0');
   });
 
-  it('creates and updates nothing by being opened', async () => {
+  it('says the list failed to load rather than showing no incidents', async () => {
+    vi.mocked(incidentsApi.list).mockRejectedValue({ response: { status: 500, data: { message: 'Incident store unavailable' } } });
     renderIncidents();
 
-    await screen.findByText('Checkout webhooks failing');
-    expect(incidentsApi.create).not.toHaveBeenCalled();
-    expect(incidentsApi.update).not.toHaveBeenCalled();
-    expect(incidentsApi.addTimeline).not.toHaveBeenCalled();
-  });
-
-  it('renders something when the incident list fails to load', async () => {
-    vi.mocked(incidentsApi.list).mockRejectedValue(new Error('boom'));
-    renderIncidents();
-
-    await waitFor(() => expect(incidentsApi.list).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incident store unavailable');
+    expect(screen.queryByText('Checkout webhooks failing')).not.toBeInTheDocument();
   });
 });

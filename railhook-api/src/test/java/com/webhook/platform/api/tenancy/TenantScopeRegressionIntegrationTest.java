@@ -90,7 +90,7 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("a workflow triggered by the system-scoped poller is stamped with the workflow's organization")
+    @DisplayName("a workflow triggered by the system-scoped poller is stamped with, and visible to, the workflow's organization")
     void workflowExecutionGetsTheWorkflowsOrganization() {
         UUID workflowId = TenantContext.callAs(orgA, () -> workflowRepository.save(Workflow.builder()
                 .projectId(projectA)
@@ -116,22 +116,6 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
                     .hasSize(1);
             assertThat(executions.get(0).getOrganizationId()).isEqualTo(orgA);
         });
-    }
-
-    @Test
-    @DisplayName("the execution row is reachable from its own organization, not only from the system scope")
-    void workflowExecutionIsVisibleToItsTenant() {
-        UUID workflowId = TenantContext.callAs(orgA, () -> workflowRepository.save(Workflow.builder()
-                .projectId(projectA)
-                .name("regression-workflow-visible")
-                .enabled(true)
-                .definition("{\"nodes\":[],\"edges\":[]}")
-                .triggerConfig("{}")
-                .build()).getId());
-
-        TenantContext.runAsSystem(() -> workflowTriggerService.triggerWorkflowsSync(
-                projectA, UUID.randomUUID(), "order.created", "{\"id\":2}", 0));
-
         // A row stamped with the sentinel would be invisible here even though it exists.
         TenantContext.runAs(orgA, () ->
                 assertThat(workflowExecutionRepository.findAll())

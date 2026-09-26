@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Cable, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
@@ -8,7 +8,7 @@ import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
-import { tunnelsApi, TunnelSessionResponse, TunnelStatusResponse } from '../api/tunnels.api';
+import { useTunnels, useTunnelStatus, useCloseTunnel } from '../api/queries';
 import { Button, buttonVariants } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import {
@@ -26,41 +26,26 @@ import { usePermissions } from '../auth/usePermissions';
 export default function TunnelsPage() {
   const { t } = useTranslation();
   const { canManageEndpoints: canCloseTunnels } = usePermissions();
-  const [tunnels, setTunnels] = useState<TunnelSessionResponse[]>([]);
-  const [status, setStatus] = useState<TunnelStatusResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<unknown>(null);
   const [closeId, setCloseId] = useState<string | null>(null);
-  const [closing, setClosing] = useState(false);
+  const tunnelsQuery = useTunnels();
+  const statusQuery = useTunnelStatus();
+  const closeTunnel = useCloseTunnel();
+  const closing = closeTunnel.isPending;
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [tunnelsData, statusData] = await Promise.all([tunnelsApi.list(), tunnelsApi.status()]);
-      setTunnels(tunnelsData);
-      setStatus(statusData);
-      setLoadError(null);
-    } catch (err: any) {
-      setLoadError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadData(); }, [loadData]);
+  const loading = (tunnelsQuery.isLoading && !tunnelsQuery.data) || (statusQuery.isLoading && !statusQuery.data);
+  const loadError = tunnelsQuery.error ?? statusQuery.error;
+  const tunnels = tunnelsQuery.data ?? [];
+  const status = statusQuery.data;
+  const loadData = () => { tunnelsQuery.refetch(); statusQuery.refetch(); };
 
   const handleClose = async () => {
     if (!closeId) return;
-    setClosing(true);
     try {
-      await tunnelsApi.close(closeId);
+      await closeTunnel.mutateAsync(closeId);
       showSuccess(t('tunnels.toast.closed'));
       setCloseId(null);
-      loadData();
     } catch (err: any) {
       showApiError(err, 'tunnels.toast.closeFailed');
-    } finally {
-      setClosing(false);
     }
   };
 

@@ -58,19 +58,13 @@ describe('AcceptInvitePage', () => {
     await waitFor(() => expect(accept).toHaveBeenCalledWith('org-1', 'the-token'));
   });
 
-  it('does not call the backend when the link carries no token', async () => {
+  it.each([
+    ['carries no token', '?orgId=org-1'],
+    ['names no organization', '?token=the-token'],
+  ])('does not call the backend when the link %s', async (_, query) => {
     const accept = vi.spyOn(membersApi, 'acceptInvite').mockResolvedValue(undefined as never);
 
-    renderAt('?orgId=org-1', true);
-
-    await waitFor(() => expect(screen.getAllByRole('link').length).toBeGreaterThan(0));
-    expect(accept).not.toHaveBeenCalled();
-  });
-
-  it('does not call the backend when the link names no organization', async () => {
-    const accept = vi.spyOn(membersApi, 'acceptInvite').mockResolvedValue(undefined as never);
-
-    renderAt('?token=the-token', true);
+    renderAt(query, true);
 
     await waitFor(() => expect(screen.getAllByRole('link').length).toBeGreaterThan(0));
     expect(accept).not.toHaveBeenCalled();

@@ -20,7 +20,7 @@ import com.webhook.platform.api.dto.TransformationVersionResponse;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.transform.JavaScriptTransformEngine;
-import com.webhook.platform.common.transform.ScriptTransformException;
+import com.webhook.platform.common.exception.ScriptTransformException;
 import com.webhook.platform.common.transform.TransformationKind;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -160,7 +160,7 @@ public class TransformationService {
 
         transformation = transformationRepository.saveAndFlush(transformation);
         publishVersion(transformation, null, actorUserId);
-        log.info("Created transformation: id={}, project={}", transformation.getId(), projectId);
+        log.debug("Created transformation: id={}, project={}", transformation.getId(), projectId);
         return mapToResponse(transformation);
     }
 
@@ -231,7 +231,7 @@ public class TransformationService {
         if (templateChanged) {
             publishVersion(transformation, null, actorUserId);
         }
-        log.info("Updated transformation: id={}, version={}", id, transformation.getVersion());
+        log.debug("Updated transformation: id={}, version={}", id, transformation.getVersion());
         return mapToResponse(transformation);
     }
 
@@ -251,7 +251,7 @@ public class TransformationService {
 
         // transformation_versions cascades from transformations.
         transformationRepository.delete(transformation);
-        log.info("Deleted transformation: id={}", id);
+        log.debug("Deleted transformation: id={}", id);
     }
 
     @Transactional(readOnly = true)
@@ -314,7 +314,7 @@ public class TransformationService {
         transformation = transformationRepository.saveAndFlush(transformation);
         publishVersion(transformation, version, actorUserId);
 
-        log.info("Restored transformation {} to the template of version {}, published as version {}",
+        log.debug("Restored transformation {} to the template of version {}, published as version {}",
                 id, version, transformation.getVersion());
         return mapToResponse(transformation);
     }

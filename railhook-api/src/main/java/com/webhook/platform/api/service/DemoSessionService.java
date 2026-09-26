@@ -1,14 +1,15 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.dto.DemoSessionResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.common.demo.DemoTenant;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -17,23 +18,20 @@ import java.time.Instant;
 @Service
 public class DemoSessionService {
 
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
     private final JdbcTemplate jdbcTemplate;
+    @Getter
     private final boolean enabled;
     private final Duration sessionTtl;
 
-    public DemoSessionService(JwtUtil jwtUtil,
+    public DemoSessionService(JwtTokenService jwtTokenService,
                               JdbcTemplate jdbcTemplate,
                               @Value("${demo.enabled:false}") boolean enabled,
                               @Value("${demo.session-ttl-minutes:30}") long sessionTtlMinutes) {
-        this.jwtUtil = jwtUtil;
+        this.jwtTokenService = jwtTokenService;
         this.jdbcTemplate = jdbcTemplate;
         this.enabled = enabled;
         this.sessionTtl = Duration.ofMinutes(Math.max(1, Math.min(sessionTtlMinutes, 240)));
-    }
-
-    public boolean isEnabled() {
-        return enabled;
     }
 
     // A 404 where the demo is off, so an installation that never enabled it has no such thing.
@@ -51,11 +49,11 @@ public class DemoSessionService {
                         + "AND role = 'VIEWER' AND status = 'ACTIVE'",
                 Integer.class, DemoTenant.USER_ID, DemoTenant.ORGANIZATION_ID);
         if (members == null || members == 0) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+            throw new DomainException(ErrorCode.SERVICE_UNAVAILABLE,
                     "The demo is being prepared. Try again in a minute.");
         }
-        String token = jwtUtil.generateDemoAccessToken(DemoTenant.USER_ID, DemoTenant.ORGANIZATION_ID, sessionTtl);
-        Instant expiresAt = jwtUtil.getExpirationFromToken(token).toInstant();
+        String token = jwtTokenService.generateDemoAccessToken(DemoTenant.USER_ID, DemoTenant.ORGANIZATION_ID, sessionTtl);
+        Instant expiresAt = jwtTokenService.getExpirationFromToken(token).toInstant();
         return DemoSessionResponse.builder().accessToken(token).expiresAt(expiresAt).build();
     }
 }

@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RedissonClient;
@@ -12,6 +13,7 @@ import java.util.UUID;
 /** A lost Redis key is reseeded from the durable high-water mark, or ordering breaks. */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class SequenceGeneratorService {
 
     private static final String SEQUENCE_KEY_PREFIX = "seq:endpoint:";
@@ -19,15 +21,6 @@ public class SequenceGeneratorService {
     private final RedissonClient redissonClient;
     private final DeliveryRepository deliveryRepository;
     private final MeterRegistry meterRegistry;
-
-    public SequenceGeneratorService(
-            RedissonClient redissonClient,
-            DeliveryRepository deliveryRepository,
-            MeterRegistry meterRegistry) {
-        this.redissonClient = redissonClient;
-        this.deliveryRepository = deliveryRepository;
-        this.meterRegistry = meterRegistry;
-    }
 
     // Only after the delivery commits: a rollback inside the ingest burned a number.
     public long nextSequence(UUID endpointId) {

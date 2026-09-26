@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,13 +25,10 @@ import java.util.UUID;
 @Tag(name = "Schema Registry", description = "Event type catalog and schema versioning")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class SchemaController {
 
     private final SchemaRegistryService schemaRegistryService;
-
-    public SchemaController(SchemaRegistryService schemaRegistryService) {
-        this.schemaRegistryService = schemaRegistryService;
-    }
 
     @Operation(summary = "List event types", description = "Returns all registered event types for the project")
     @GetMapping

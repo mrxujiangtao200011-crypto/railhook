@@ -11,6 +11,7 @@ import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,23 +25,13 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class OrganizationService {
 
     private final OrganizationRepository organizationRepository;
     private final MembershipRepository membershipRepository;
     private final EntityManager entityManager;
     private final TunnelService tunnelService;
-
-    public OrganizationService(
-            OrganizationRepository organizationRepository,
-            MembershipRepository membershipRepository,
-            EntityManager entityManager,
-            TunnelService tunnelService) {
-        this.organizationRepository = organizationRepository;
-        this.membershipRepository = membershipRepository;
-        this.entityManager = entityManager;
-        this.tunnelService = tunnelService;
-    }
 
     // Membership is tenant-scoped, so under the request's scope this would only see the current organization.
     @SystemTenant("lists every organization the user belongs to, which is by definition not one organization")
@@ -113,7 +104,7 @@ public class OrganizationService {
 
         organization.setName(request.getName().trim());
         organization = organizationRepository.save(organization);
-        log.info("Organization {} renamed to '{}'", organizationId, organization.getName());
+        log.debug("Organization {} renamed to '{}'", organizationId, organization.getName());
 
         return OrganizationResponse.builder()
                 .id(organization.getId())

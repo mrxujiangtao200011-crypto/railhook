@@ -117,7 +117,7 @@ public class RetrySchedulerService {
             return;
         }
 
-        log.info("Claimed {} deliveries for retry dispatch", claimed.size());
+        log.debug("Claimed {} deliveries for retry dispatch", claimed.size());
 
         // Read before a hand-back clears it: the token proves the row is still ours to write.
         Map<UUID, UUID> claimedUnder = new HashMap<>();
@@ -134,7 +134,7 @@ public class RetrySchedulerService {
             if (!circuitBreakerService.isCallPermitted(delivery.getEndpointId())) {
                 rescheduleDelivery(delivery, "Circuit breaker OPEN");
                 circuitBreakerSkipped.add(delivery);
-                log.info("Skipped retry for delivery {} - circuit breaker OPEN for endpoint {}",
+                log.debug("Skipped retry for delivery {} - circuit breaker OPEN for endpoint {}",
                         delivery.getId(), delivery.getEndpointId());
                 continue;
             }
@@ -199,7 +199,7 @@ public class RetrySchedulerService {
                 // the retry partition stalled until a restart.
                 sentDeliveries++;
 
-                log.info("Scheduled retry for delivery {} to topic {} partition {} offset {}",
+                log.debug("Scheduled retry for delivery {} to topic {} partition {} offset {}",
                         delivery.getId(),
                         deliveryTopics.get(delivery.getId()),
                         metadata.partition(),

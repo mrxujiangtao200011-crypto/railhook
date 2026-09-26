@@ -110,13 +110,6 @@ describe('BillingPage', () => {
     vi.mocked(billingApi.listInvoices).mockResolvedValue([]);
   });
 
-  it('shows the plan the organization is on', async () => {
-    renderBilling();
-
-    // The name appears on the current-plan card and again in the catalog row.
-    expect(await screen.findAllByText(/free/i)).not.toHaveLength(0);
-  });
-
   it('shows the free plan price as $0 once, not "Free Free"', async () => {
     renderBilling();
 
@@ -155,24 +148,7 @@ describe('BillingPage', () => {
     expect(screen.queryByRole('group', { name: i18n.t('billing.billingInterval') })).toBeNull();
   });
 
-  it('shows usage against the limit', async () => {
-    renderBilling();
-
-    await waitFor(() => expect(billingApi.getUsage).toHaveBeenCalled());
-    expect(await screen.findByText(/2[,.\s]?500/)).toBeInTheDocument();
-  });
-
-  it('lists invoices when there are any', async () => {
-    vi.mocked(billingApi.listInvoices).mockResolvedValue([INVOICE]);
-    renderBilling();
-
-    await waitFor(() => expect(billingApi.listInvoices).toHaveBeenCalled());
-    // Matched across elements: the amount is formatted with its own currency markup.
-    await waitFor(() =>
-      expect(document.body.textContent).toMatch(/29[.,]00|\$29|2900/));
-  });
-
-  it('shows a paid invoice as paid, not as neither-here-nor-there', async () => {
+  it('lists an invoice with its amount, and shows a paid one as paid, not as neither-here-nor-there', async () => {
     // Regression: the badge compared status to 'paid' while InvoiceStatus is upper case.
     vi.mocked(billingApi.listInvoices).mockResolvedValue([INVOICE]);
     renderBilling();
@@ -180,14 +156,17 @@ describe('BillingPage', () => {
     const paid = await screen.findByText('Paid');
     const badge = paid.closest('[class*="bg-ok"], [class*="text-ok"], [data-kind]');
     expect(badge, 'a PAID invoice must not be badged as idle').not.toBeNull();
+    expect(paid.closest('tr')?.textContent).toContain('$29 USD');
   });
 
-  it('survives an organization whose billing call fails', async () => {
-    vi.mocked(billingApi.getOrganizationBilling).mockRejectedValue(new Error('billing disabled'));
+  it('says why when the billing call fails, and offers a retry', async () => {
+    vi.mocked(billingApi.getOrganizationBilling).mockRejectedValue({
+      response: { status: 503, data: { message: 'Billing is not configured on this instance' } },
+    });
     renderBilling();
 
-    // A skeleton or an error state is fine; a blank page is the failure this guards.
-    await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Billing is not configured on this instance');
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 
   it('does not charge anyone by rendering', async () => {

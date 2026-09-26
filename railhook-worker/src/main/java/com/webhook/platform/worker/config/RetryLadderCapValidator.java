@@ -2,6 +2,7 @@ package com.webhook.platform.worker.config;
 
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -10,17 +11,13 @@ import org.springframework.stereotype.Component;
  * drop the last tiers. Each direction is checked against its own cap.
  */
 @Component
+@RequiredArgsConstructor
 public class RetryLadderCapValidator {
 
+    @Value("${delivery.escalation.hard-cap-hours:96}")
     private final long deliveryHardCapHours;
+    @Value("${forward.escalation.hard-cap-hours:24}")
     private final long forwardHardCapHours;
-
-    public RetryLadderCapValidator(
-            @Value("${delivery.escalation.hard-cap-hours:96}") long deliveryHardCapHours,
-            @Value("${forward.escalation.hard-cap-hours:24}") long forwardHardCapHours) {
-        this.deliveryHardCapHours = deliveryHardCapHours;
-        this.forwardHardCapHours = forwardHardCapHours;
-    }
 
     @PostConstruct
     public void validate() {

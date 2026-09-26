@@ -11,7 +11,7 @@ import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ApiKeyResponse;
 import com.webhook.platform.api.dto.ApiKeyRotateRequest;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,30 +19,24 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.common.security.SecureTokens;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ApiKeyService {
 
     private final ApiKeyRepository apiKeyRepository;
     private final ProjectRepository projectRepository;
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int API_KEY_LENGTH = 32;
 
     private static final int DEFAULT_GRACE_PERIOD_HOURS = 24;
-
-    public ApiKeyService(ApiKeyRepository apiKeyRepository, ProjectRepository projectRepository) {
-        this.apiKeyRepository = apiKeyRepository;
-        this.projectRepository = projectRepository;
-    }
 
     @Auditable(action = AuditAction.CREATE, resourceType = "ApiKey")
     @Transactional
@@ -51,8 +45,8 @@ public class ApiKeyService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        String plainKey = generateApiKey();
-        String keyHash = CryptoUtils.hashApiKey(plainKey);
+        String plainKey = SecureTokens.generate(API_KEY_LENGTH);
+        String keyHash = SecureTokens.hash(plainKey);
         String keyPrefix = plainKey.substring(0, Math.min(8, plainKey.length()));
 
         ApiKey apiKey = ApiKey.builder()
@@ -133,11 +127,11 @@ public class ApiKeyService {
                     "API key has already been rotated; rotate its replacement instead");
         }
 
-        String plainKey = generateApiKey();
+        String plainKey = SecureTokens.generate(API_KEY_LENGTH);
         ApiKey replacement = apiKeyRepository.save(ApiKey.builder()
                 .projectId(projectId)
                 .name(retiring.getName())
-                .keyHash(CryptoUtils.hashApiKey(plainKey))
+                .keyHash(SecureTokens.hash(plainKey))
                 .keyPrefix(plainKey.substring(0, Math.min(8, plainKey.length())))
                 .scope(retiring.getScope())
                 .expiresAt(request != null ? request.getExpiresAt() : null)
@@ -164,12 +158,6 @@ public class ApiKeyService {
             return candidate;
         }
         return existing.isBefore(candidate) ? existing : candidate;
-    }
-
-    private String generateApiKey() {
-        byte[] randomBytes = new byte[API_KEY_LENGTH];
-        SECURE_RANDOM.nextBytes(randomBytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
     }
 
     private ApiKeyResponse mapToResponse(ApiKey apiKey, String plainKey) {

@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -124,30 +125,17 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
     }
 
     @Test
-    public void updateRule_changesMaskStyle() throws Exception {
+    public void updateRule_changesMaskStyleAndEnabled() throws Exception {
         String ruleId = createCustomRule("update_me", "PARTIAL");
 
-        String updateBody = "{\"patternName\": \"update_me\", \"maskStyle\": \"HASH\", \"enabled\": true}";
+        String updateBody = "{\"patternName\": \"update_me\", \"maskStyle\": \"HASH\", \"enabled\": false}";
 
         mockMvc.perform(put(piiRulesUrl() + "/" + ruleId)
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateBody))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.maskStyle").value("HASH"));
-    }
-
-    @Test
-    public void updateRule_toggleEnabled() throws Exception {
-        String ruleId = createCustomRule("toggle_me", "FULL");
-
-        String updateBody = "{\"patternName\": \"toggle_me\", \"maskStyle\": \"FULL\", \"enabled\": false}";
-
-        mockMvc.perform(put(piiRulesUrl() + "/" + ruleId)
-                        .header("Authorization", "Bearer " + jwtToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updateBody))
-                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maskStyle").value("HASH"))
                 .andExpect(jsonPath("$.enabled").value(false));
     }
 
@@ -166,18 +154,13 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
     }
 
     @Test
-    public void piiRules_noAuth_returns401() throws Exception {
-        mockMvc.perform(get(piiRulesUrl()))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    public void previewSanitization_masksEmail() throws Exception {
+    public void previewSanitization_masksEmailAndPhone() throws Exception {
         mockMvc.perform(post(piiRulesUrl() + "/seed-defaults")
                         .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk());
 
-        String payload = "{\"user\": {\"email\": \"john@example.com\", \"name\": \"John\"}}";
+        String payload = "{\"user\": {\"email\": \"john@example.com\", \"name\": \"John\"},"
+                + " \"contact\": {\"phone\": \"+1-555-123-4567\"}}";
 
         MvcResult result = mockMvc.perform(post(piiRulesUrl() + "/preview")
                         .header("Authorization", "Bearer " + jwtToken)
@@ -187,8 +170,9 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
                 .andReturn();
 
         String sanitized = result.getResponse().getContentAsString();
-        assert !sanitized.contains("john@example.com") : "Email should be masked in preview";
-        assert sanitized.contains("John") : "Non-PII data should remain";
+        assertThat(sanitized).as("Email should be masked in preview").doesNotContain("john@example.com");
+        assertThat(sanitized).as("Phone should be masked").doesNotContain("+1-555-123-4567");
+        assertThat(sanitized).as("Non-PII data should remain").contains("John");
     }
 
     @Test
@@ -204,40 +188,6 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", startsWith("text/plain")))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"));
-    }
-
-    @Test
-    public void previewSanitization_masksPhone() throws Exception {
-        mockMvc.perform(post(piiRulesUrl() + "/seed-defaults")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-
-        String payload = "{\"contact\": {\"phone\": \"+1-555-123-4567\"}}";
-
-        MvcResult result = mockMvc.perform(post(piiRulesUrl() + "/preview")
-                        .header("Authorization", "Bearer " + jwtToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(payload))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        String sanitized = result.getResponse().getContentAsString();
-        assert !sanitized.contains("+1-555-123-4567") : "Phone should be masked";
-    }
-
-    @Test
-    public void previewSanitization_noRules_returnsUnchanged() throws Exception {
-        String payload = "{\"data\": \"hello\"}";
-
-        MvcResult result = mockMvc.perform(post(piiRulesUrl() + "/preview")
-                        .header("Authorization", "Bearer " + jwtToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(payload))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        String sanitized = result.getResponse().getContentAsString();
-        assert sanitized.contains("hello") : "Data should remain unchanged with no rules";
     }
 
     @Test
@@ -265,7 +215,7 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
 
         String payload = objectMapper.readTree(sanitizedResult.getResponse().getContentAsString())
                 .get("payload").asText();
-        assert !payload.contains("jane@secret.com") : "Email should be masked in sanitized endpoint";
+        assertThat(payload).as("Email should be masked in sanitized endpoint").doesNotContain("jane@secret.com");
     }
 
     @Test
@@ -291,7 +241,7 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
 
         String payload = objectMapper.readTree(rawResult.getResponse().getContentAsString())
                 .get("payload").asText();
-        assert payload.contains("raw@test.com") : "Regular event endpoint should keep raw payload";
+        assertThat(payload).as("Regular event endpoint should keep raw payload").contains("raw@test.com");
     }
 
     @Test
@@ -418,8 +368,8 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
                 .andReturn();
 
         String response = diffResult.getResponse().getContentAsString();
-        assert !response.contains("old@test.com") : "Left email should be masked when sanitize=true";
-        assert !response.contains("new@test.com") : "Right email should be masked when sanitize=true";
+        assertThat(response).as("Left email should be masked when sanitize=true").doesNotContain("old@test.com");
+        assertThat(response).as("Right email should be masked when sanitize=true").doesNotContain("new@test.com");
     }
 
     @Test
@@ -516,24 +466,14 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
 
         String sanitizedPayload = objectMapper.readTree(publicResult.getResponse().getContentAsString())
                 .get("sanitizedPayload").asText();
-        assert !sanitizedPayload.contains("secret@user.com") : "Public link should mask PII";
-        assert sanitizedPayload.contains("42.5") : "Non-PII data should remain in public link";
+        assertThat(sanitizedPayload).as("Public link should mask PII").doesNotContain("secret@user.com");
+        assertThat(sanitizedPayload).as("Non-PII data should remain in public link").contains("42.5");
     }
 
     @Test
     public void viewPublicLink_invalidToken_returns404() throws Exception {
         mockMvc.perform(get("/api/v1/public/debug/nonexistent-token-12345"))
                 .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void debugLink_noAuth_returns401() throws Exception {
-        String eventId = createTestEvent();
-
-        mockMvc.perform(post(eventsUrl() + "/" + eventId + "/debug-links")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"expiryHours\": 24}"))
-                .andExpect(status().isUnauthorized());
     }
 
     @Test

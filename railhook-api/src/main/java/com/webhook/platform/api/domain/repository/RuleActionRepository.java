@@ -16,8 +16,4 @@ public interface RuleActionRepository extends JpaRepository<RuleAction, UUID> {
     List<RuleAction> findByRuleIdInOrderBySortOrderAsc(Collection<UUID> ruleIds);
 
     void deleteByRuleId(UUID ruleId);
-
-    long countByEndpointId(UUID endpointId);
-
-    long countByTransformationId(UUID transformationId);
 }

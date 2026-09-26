@@ -165,7 +165,7 @@ public class ReplayService {
                 .build();
 
         session = replaySessionRepository.saveAndFlush(session);
-        log.info("Created replay session {} for project {} — {} events", session.getId(), projectId, eventCount);
+        log.debug("Created replay session {} for project {} — {} events", session.getId(), projectId, eventCount);
 
         // Run by ReplaySessionLauncher once this transaction commits, never on this thread.
         events.publishEvent(new ReplaySessionCreated(session.getId()));

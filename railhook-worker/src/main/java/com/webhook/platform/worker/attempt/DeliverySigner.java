@@ -4,9 +4,11 @@ import com.webhook.platform.common.enums.SignatureScheme;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.security.SecretRotationWindow;
 import com.webhook.platform.common.util.HeaderSanitizer;
+import com.webhook.platform.common.util.RailhookSignature;
 import com.webhook.platform.common.util.StandardWebhookSignature;
-import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.webhook.platform.worker.domain.entity.Endpoint;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Clock;
@@ -15,17 +17,12 @@ import java.util.UUID;
 
 /** Both schemes sign the same bytes with the same timestamp. */
 @Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class DeliverySigner {
 
     private final Endpoint endpoint;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final Clock clock;
-
-    DeliverySigner(Endpoint endpoint, EncryptionKeyRegistry encryptionKeyRegistry, Clock clock) {
-        this.endpoint = endpoint;
-        this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.clock = clock;
-    }
 
     /** Masked for the dashboard: anyone who can read a signature can replay the delivery. */
     record Signatures(long timestampMillis, String legacy, String standard) {
@@ -53,7 +50,7 @@ class DeliverySigner {
                 : SignatureScheme.BOTH;
 
         String legacy = scheme == SignatureScheme.STANDARD ? null
-                : WebhookSignatureUtils.buildSignatureHeader(secret, previousSecret, timestamp, body);
+                : RailhookSignature.buildSignatureHeader(secret, previousSecret, timestamp, body);
 
         // The delivery id, not the event id, which would collide across a fan-out.
         String standard = scheme == SignatureScheme.LEGACY ? null

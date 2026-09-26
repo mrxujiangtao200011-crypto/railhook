@@ -18,23 +18,18 @@ describe('toggleTheme', () => {
     document.documentElement.classList.remove('light', 'dark');
   });
 
-  it('turns a dark system default light on the first click', () => {
-    systemPrefersDark(true);
+  it.each([
+    [true, 'light'],
+    [false, 'dark'],
+  ] as const)('turns a system default (dark: %s) to %s on the first click', (dark, next) => {
+    systemPrefersDark(dark);
     setTheme('system');
-    expect(isDarkApplied()).toBe(true);
+    expect(getTheme()).toBe('system');
+    expect(isDarkApplied()).toBe(dark);
 
-    expect(toggleTheme()).toBe('light');
-    expect(isDarkApplied()).toBe(false);
-    expect(getTheme()).toBe('light');
-  });
-
-  it('turns a light system default dark on the first click', () => {
-    systemPrefersDark(false);
-    setTheme('system');
-    expect(isDarkApplied()).toBe(false);
-
-    expect(toggleTheme()).toBe('dark');
-    expect(isDarkApplied()).toBe(true);
+    expect(toggleTheme()).toBe(next);
+    expect(isDarkApplied()).toBe(!dark);
+    expect(getTheme()).toBe(next);
   });
 
   it('keeps alternating after the first click', () => {
@@ -44,13 +39,5 @@ describe('toggleTheme', () => {
     expect(toggleTheme()).toBe('light');
     expect(toggleTheme()).toBe('dark');
     expect(toggleTheme()).toBe('light');
-  });
-
-  it('reports what is on the document, not what is stored', () => {
-    systemPrefersDark(true);
-    setTheme('system');
-
-    expect(getTheme()).toBe('system');
-    expect(isDarkApplied()).toBe(true);
   });
 });

@@ -16,8 +16,7 @@ NC     := \033[0m
 
 ##@ Help
 help: ## Display this help
-	@echo "Webhook Platform - Makefile"
-	@echo ""
+	@echo "Railhook"
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Lifecycle
@@ -31,54 +30,32 @@ init: ## Initialize .env from .env.dist (if not exists)
 	fi
 
 up: init ## Start services (embedded DB, dev mode)
-	@echo "$(GREEN)Starting services in embedded DB mode...$(NC)"
 	@$(MAKE) doctor
 	@$(DOCKER_COMPOSE_BUILD) --profile embedded-db --profile backup up -d --build
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
 	@$(MAKE) health
 	@echo ""
 	@echo "$(GREEN)Ready — http://localhost:$${RAILHOOK_PORT:-8080}$(NC)"
 	@echo "  Dashboard, API, docs and ingress all go through that one port."
 
 up-external-db: init ## Start services (external DB, dev mode)
-	@echo "$(GREEN)Starting services in external DB mode...$(NC)"
-	@$(MAKE) doctor
-	@if [ -z "$(DB_HOST)" ] || [ "$(DB_HOST)" = "CHANGE_ME_DB_HOST" ]; then \
-		echo "$(RED)ERROR: DB_HOST must be set for external DB mode$(NC)"; \
-		exit 1; \
-	fi
+	@$(MAKE) doctor DB_MODE=external
 	@$(DOCKER_COMPOSE_BUILD) up -d --build
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
-	@echo "$(GREEN)Services started successfully$(NC)"
 	@$(MAKE) health
 
-DOCKER_COMPOSE_PROD := $(DOCKER_COMPOSE)
-
 up-prod: init ## Start services (embedded DB, production mode)
-	@echo "$(GREEN)Starting services in PRODUCTION mode (embedded DB)...$(NC)"
 	@$(MAKE) doctor
-	@$(DOCKER_COMPOSE_PROD) --profile embedded-db up -d --no-build
+	@$(DOCKER_COMPOSE) --profile embedded-db up -d --no-build
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
-	@echo "$(GREEN)Production services started$(NC)"
 	@$(MAKE) health
 
 up-prod-external: init ## Start services (external DB, production mode)
-	@echo "$(GREEN)Starting services in PRODUCTION mode (external DB)...$(NC)"
-	@$(MAKE) doctor
-	@if [ -z "$(DB_HOST)" ] || [ "$(DB_HOST)" = "CHANGE_ME_DB_HOST" ]; then \
-		echo "$(RED)ERROR: DB_HOST must be set for external DB mode$(NC)"; \
-		exit 1; \
-	fi
-	@$(DOCKER_COMPOSE_PROD) up -d --no-build
+	@$(MAKE) doctor DB_MODE=external
+	@$(DOCKER_COMPOSE) up -d --no-build
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
-	@echo "$(GREEN)Production services started$(NC)"
 	@$(MAKE) health
 
-DOCKER_COMPOSE_PULL := $(DOCKER_COMPOSE)
 DOCKER_COMPOSE_BUILD := $(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.build.yml
 
 # For testing published images from a clone only: the .env.dist it falls back to holds this
@@ -90,10 +67,8 @@ up-pull: ## Start pre-built GHCR images from this clone (to install, use ./insta
 		echo "$(YELLOW)  Development defaults — the secrets in .env.dist are public.$(NC)"; \
 		echo "$(YELLOW)  For a real deployment run ./install.sh instead.$(NC)"; \
 	fi
-	@echo "$(GREEN)Pulling pre-built images...$(NC)"
-	@$(DOCKER_COMPOSE_PULL) pull
-	@echo "$(GREEN)Starting services (pull-based, embedded DB/Kafka/Redis)...$(NC)"
-	@$(DOCKER_COMPOSE_PULL) up -d
+	@$(DOCKER_COMPOSE) --profile embedded-db pull
+	@$(DOCKER_COMPOSE) --profile embedded-db up -d
 	@echo "$(GREEN)Waiting for the platform to answer...$(NC)"
 	@port=$${RAILHOOK_PORT:-80}; elapsed=0; \
 	while [ $$elapsed -lt 300 ]; do \
@@ -102,115 +77,81 @@ up-pull: ## Start pre-built GHCR images from this clone (to install, use ./insta
 		sleep 5; elapsed=$$((elapsed + 5)); \
 	done; \
 	if [ $$elapsed -ge 300 ]; then \
-		echo "$(RED)Did not come up in time — $(DOCKER_COMPOSE_PULL) logs$(NC)"; exit 1; \
+		echo "$(RED)Did not come up in time — $(DOCKER_COMPOSE) logs$(NC)"; exit 1; \
 	fi; \
 	echo "$(GREEN)Started — http://localhost:$$port$(NC)"
 
 down-pull: ## Stop pull-based services (keeps data)
-	@echo "$(YELLOW)Stopping pull-based services...$(NC)"
-	@$(DOCKER_COMPOSE_PULL) down
-	@echo "$(GREEN)Services stopped$(NC)"
+	@$(DOCKER_COMPOSE) --profile embedded-db down
 
 down: ## Stop services (keeps data)
-	@echo "$(YELLOW)Stopping services...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db down 2>/dev/null || true
-	@echo "$(GREEN)Services stopped$(NC)"
 
 stop: ## Stop services (alias for down)
 	@$(MAKE) down
 
 clean: ## Stop services and remove containers (keeps volumes)
-	@echo "$(YELLOW)Cleaning up containers...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db down --remove-orphans 2>/dev/null || true
-	@echo "$(GREEN)Cleanup complete (volumes preserved)$(NC)"
 
 ##@ Build
 build: ## Build all Docker images
-	@echo "$(GREEN)Building Docker images...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache
 
 rebuild: ## Rebuild and restart services (embedded DB)
-	@echo "$(GREEN)Rebuilding services...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db down
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache
 	@$(DOCKER_COMPOSE_BUILD) --profile embedded-db up -d
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
-	@echo "$(GREEN)Rebuild complete$(NC)"
 
 rebuild-external-db: ## Rebuild and restart services (external DB)
-	@echo "$(GREEN)Rebuilding services (external DB mode)...$(NC)"
 	@$(DOCKER_COMPOSE) down
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache
 	@$(DOCKER_COMPOSE_BUILD) up -d
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
-	@echo "$(GREEN)Rebuild complete$(NC)"
 
 ##@ Development (Fast Rebuilds)
 # Build and start through the overlay, which renames the images: via the base file `up -d` served
 # the stale published image. scale-* stays on the base file: prod has no locally built image.
 rebuild-api: ## Rebuild only API service (fast)
-	@echo "$(GREEN)Rebuilding API...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache api
 	@$(DOCKER_COMPOSE_BUILD) up -d api
-	@echo "$(GREEN) API rebuilt and restarted$(NC)"
 
 rebuild-worker: ## Rebuild only Worker service (fast)
-	@echo "$(GREEN)Rebuilding Worker...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache worker
 	@$(DOCKER_COMPOSE_BUILD) up -d worker
-	@echo "$(GREEN) Worker rebuilt and restarted$(NC)"
 
 rebuild-ui: ## Rebuild only UI service (fast)
-	@echo "$(GREEN)Rebuilding UI...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache ui
 	@$(DOCKER_COMPOSE_BUILD) up -d ui
-	@echo "$(GREEN) UI rebuilt and restarted$(NC)"
 
 restart-api: ## Restart API service (no rebuild)
-	@echo "$(GREEN)Restarting API...$(NC)"
 	@$(DOCKER_COMPOSE) restart api
-	@echo "$(GREEN)API restarted$(NC)"
 
 restart-worker: ## Restart Worker service (no rebuild)
-	@echo "$(GREEN)Restarting Worker...$(NC)"
 	@$(DOCKER_COMPOSE) restart worker
-	@echo "$(GREEN)Worker restarted$(NC)"
 
 restart-ui: ## Restart UI service (no rebuild)
-	@echo "$(GREEN)Restarting UI...$(NC)"
 	@$(DOCKER_COMPOSE) restart ui
-	@echo "$(GREEN)UI restarted$(NC)"
 
 dev-api: ## Quick dev: rebuild API with cache + restart
-	@echo "$(GREEN)Quick rebuild API (with cache)...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build api
 	@$(DOCKER_COMPOSE_BUILD) up -d api
-	@echo "$(GREEN) API ready$(NC)"
 	@$(MAKE) logs-api
 
 dev-worker: ## Quick dev: rebuild Worker with cache + restart
-	@echo "$(GREEN)Quick rebuild Worker (with cache)...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build worker
 	@$(DOCKER_COMPOSE_BUILD) up -d worker
-	@echo "$(GREEN) Worker ready$(NC)"
 	@$(MAKE) logs-worker
 
 dev-ui: ## Quick dev: rebuild UI with cache + restart
-	@echo "$(GREEN)Quick rebuild UI (with cache)...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build ui
 	@$(DOCKER_COMPOSE_BUILD) up -d ui
-	@echo "$(GREEN) UI ready$(NC)"
 	@$(MAKE) logs-ui
 
 test-ui: ## Run frontend unit tests (Vitest)
-	@echo "$(GREEN)Running frontend tests...$(NC)"
 	@cd railhook-ui && npm run test:ci
-	@echo "$(GREEN)Frontend tests passed$(NC)"
 
 ratchets: ## Run every @Tag("ratchet") guard test (needs Docker)
-	@echo "$(GREEN)Running ratchet guards...$(NC)"
 	@mvn test -B -Dgroups=ratchet
 
 types-check: ## Fail if the UI's generated API types are stale vs openapi.yaml (same check CI runs)
@@ -237,9 +178,7 @@ scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
 		echo "$(RED)ERROR: Please specify N=<number>, e.g. make scale-worker N=3$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(GREEN)Scaling worker to $(N) instances...$(NC)"
 	@$(DOCKER_COMPOSE) up -d --scale worker=$(N) --no-recreate
-	@echo "$(GREEN)Worker scaled to $(N) instances$(NC)"
 
 # Compose DNS round-robins nginx's `api:8080` across every replica.
 scale-api: ## Scale API instances (usage: make scale-api N=3)
@@ -247,9 +186,7 @@ scale-api: ## Scale API instances (usage: make scale-api N=3)
 		echo "$(RED)ERROR: Please specify N=<number>, e.g. make scale-api N=3$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(GREEN)Scaling api to $(N) instances (nginx load-balances across them)...$(NC)"
 	@$(DOCKER_COMPOSE) up -d --scale api=$(N) --no-recreate
-	@echo "$(GREEN)API scaled to $(N) instances — 'docker compose ps api' lists the replicas$(NC)"
 
 ##@ Release
 version-check: ## Fail if pom/Chart/UI/SDK versions disagree (same check CI runs)
@@ -260,21 +197,8 @@ version-set: ## Set the version everywhere (usage: make version-set VERSION=2.3.
 	@scripts/set-version.sh $(VERSION)
 
 ##@ Kafka
-KAFKA_PARTITIONS ?= 12
-create-topics: ## Create Kafka topics (idempotent)
-	@echo "$(GREEN)Creating Kafka topics with $(KAFKA_PARTITIONS) partitions...$(NC)"
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.dispatch --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.1m --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.5m --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.15m --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.1h --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.6h --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.24h --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.dlq --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic incoming.forward.dispatch --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic incoming.forward.retry --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic incoming.forward.dlq --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@echo "$(GREEN) Kafka topics created$(NC)"
+create-topics: ## Create the Kafka topics again (kafka-init already does it on every start)
+	@$(DOCKER_COMPOSE) up --no-deps --force-recreate kafka-init
 
 ##@ Monitoring
 logs: ## Follow logs for all services
@@ -319,7 +243,6 @@ wait-healthy: ## Wait until API and Worker are healthy (max WAIT_TIMEOUT seconds
 	exit 1
 
 health: ## Check health of all services
-	@echo "$(GREEN)Checking service health...$(NC)"
 	@echo "Postgres: $$(docker exec webhook-postgres pg_isready -U webhook_user 2>/dev/null && echo 'UP' || echo 'DOWN')"
 	@echo "Kafka:    $$(docker exec webhook-kafka nc -z localhost 9092 2>/dev/null && echo 'UP' || echo 'DOWN')"
 	@echo "Redis:    $$(docker exec webhook-redis redis-cli -a $${REDIS_PASSWORD:-webhook_redis_pass} ping 2>/dev/null | grep -q PONG && echo 'UP' || echo 'DOWN')"
@@ -367,11 +290,9 @@ restore-db: ## Restore database from backup (usage: make restore-db FILE=backups
 	@DB_MODE="$(DB_MODE)" FILE="$(FILE)" POSTGRES_USER="$(POSTGRES_USER)" POSTGRES_DB="$(POSTGRES_DB)" \
 		DB_HOST="$(DB_HOST)" DB_PORT="$(DB_PORT)" DB_NAME="$(DB_NAME)" DB_USER="$(DB_USER)" DB_PASSWORD="$(DB_PASSWORD)" \
 		./deploy/scripts/db-restore.sh
-	@echo "$(GREEN)Database restored$(NC)"
 
 ##@ Diagnostics
 doctor: ## Run pre-flight checks
-	@echo "$(GREEN)Running diagnostics...$(NC)"
 	@which docker > /dev/null || (echo "$(RED)ERROR: docker not found$(NC)" && exit 1)
 	@$(DOCKER_COMPOSE) version > /dev/null || (echo "$(RED)ERROR: docker compose not found$(NC)" && exit 1)
 	@[ -f .env ] || (echo "$(YELLOW)WARNING: .env file not found. Copy .env.dist to .env$(NC)" && exit 1)
@@ -434,9 +355,7 @@ monitoring-up: ## Start the monitoring stack (set GRAFANA_ADMIN_PASSWORD in .env
 	@echo ""
 
 monitoring-down: ## Stop monitoring stack
-	@echo "$(YELLOW)Stopping monitoring stack...$(NC)"
 	@$(MONITORING_COMPOSE) down
-	@echo "$(GREEN)Monitoring stopped$(NC)"
 
 monitoring-logs: ## Follow monitoring stack logs
 	@$(MONITORING_COMPOSE) logs -f
@@ -446,31 +365,11 @@ monitoring-check-queries: ## Run every dashboard and alert query against the run
 		python /repo/scripts/check-monitoring-queries.py $(MONITORING_CHECK_ARGS)
 
 ##@ Danger Zone
-nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
+nuke: ## Delete the platform and monitoring containers, volumes and locally built images (requires CONFIRM=YES)
 	@if [ "$(CONFIRM)" != "YES" ]; then \
-		echo "$(RED)"; \
-		echo "╔═══════════════════════════════════════════════════════════════╗"; \
-		echo "║                           WARNING                             ║"; \
-		echo "║                                                               ║"; \
-		echo "║  This will PERMANENTLY DELETE:                                ║"; \
-		echo "║    • All containers                                           ║"; \
-		echo "║    • All volumes (database data will be LOST)                 ║"; \
-		echo "║    • All images                                               ║"; \
-		echo "║    • All networks                                             ║"; \
-		echo "║                                                               ║"; \
-		echo "║  THIS CANNOT BE UNDONE!                                       ║"; \
-		echo "║                                                               ║"; \
-		echo "║  To proceed, run:                                             ║"; \
-		echo "║    make nuke CONFIRM=YES                                      ║"; \
-		echo "╚═══════════════════════════════════════════════════════════════╝"; \
-		echo "$(NC)"; \
+		echo "$(RED)Deletes all Railhook containers, volumes (the database included) and locally built images.$(NC)"; \
+		echo "Run: make nuke CONFIRM=YES"; \
 		exit 1; \
 	fi
-	@echo "$(RED)Destroying everything...$(NC)"
-	@echo "$(RED)Stopping monitoring stack...$(NC)"
 	@$(MONITORING_COMPOSE) down -v --remove-orphans 2>/dev/null || true
-	@echo "$(RED)Stopping main platform...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db down -v --remove-orphans --rmi local 2>/dev/null || true
-	@docker volume rm webhook_pgdata kafka_data redis_data 2>/dev/null || true
-	@docker network rm railhook_webhook-network 2>/dev/null || true
-	@echo "$(GREEN)Nuclear option complete — platform + monitoring destroyed$(NC)"

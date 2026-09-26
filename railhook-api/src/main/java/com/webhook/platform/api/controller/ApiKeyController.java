@@ -14,7 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,19 +25,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
-@Slf4j
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/api-keys")
 @Tag(name = "API Keys", description = "API key management for event ingestion")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;
-
-    public ApiKeyController(ApiKeyService apiKeyService) {
-        this.apiKeyService = apiKeyService;
-    }
 
     @Operation(summary = "Create API key", description = "Generates a new API key for event ingestion. The key is shown only once.")
     @ApiResponse(responseCode = "201", description = "API key created")
@@ -53,7 +49,6 @@ public class ApiKeyController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         ApiKeyResponse response = apiKeyService.createApiKey(projectId, request);
-        log.info("Created API key {} for project {}", response.getId(), projectId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -85,7 +80,6 @@ public class ApiKeyController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         ApiKeyResponse response = apiKeyService.rotateApiKey(projectId, apiKeyId, request);
-        log.info("Rotated API key {} for project {} into {}", apiKeyId, projectId, response.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -102,7 +96,6 @@ public class ApiKeyController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         apiKeyService.revokeApiKey(projectId, apiKeyId);
-        log.info("Revoked API key {} for project {}", apiKeyId, projectId);
         return ResponseEntity.noContent().build();
     }
 }

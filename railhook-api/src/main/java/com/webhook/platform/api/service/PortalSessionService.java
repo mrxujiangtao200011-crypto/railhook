@@ -9,13 +9,13 @@ import com.webhook.platform.api.dto.PortalSessionRequest;
 import com.webhook.platform.api.dto.PortalSessionResponse;
 import com.webhook.platform.api.security.PortalSessionAuthenticationToken;
 import com.webhook.platform.api.tenancy.SystemTenant;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -51,11 +51,11 @@ public class PortalSessionService {
                 ? request.getTtlMinutes() : DEFAULT_TTL_MINUTES;
         String allowedOrigin = request == null ? null : blankToNull(request.getAllowedOrigin());
 
-        String token = PortalSessionAuthenticationToken.TOKEN_PREFIX + CryptoUtils.generateSecureToken(32);
+        String token = PortalSessionAuthenticationToken.TOKEN_PREFIX + SecureTokens.generate(32);
         PortalSession session = portalSessionRepository.saveAndFlush(PortalSession.builder()
                 .projectId(projectId)
                 .consumerId(consumer.getId())
-                .tokenHash(CryptoUtils.hashApiKey(token))
+                .tokenHash(SecureTokens.hash(token))
                 .allowedOrigin(allowedOrigin)
                 .expiresAt(clock.instant().plus(Duration.ofMinutes(ttlMinutes)))
                 .build());

@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -30,19 +31,12 @@ import java.util.UUID;
 @Tag(name = "Events", description = "Event history and test events")
 @SecurityRequirement(name = "bearerAuth")
 @SecurityRequirement(name = "apiKey")
+@RequiredArgsConstructor
 public class ProjectEventsController {
 
     private final EventService eventService;
     private final EventDiffService eventDiffService;
     private final PiiMaskingService piiMaskingService;
-
-    public ProjectEventsController(EventService eventService,
-                                   EventDiffService eventDiffService,
-                                   PiiMaskingService piiMaskingService) {
-        this.eventService = eventService;
-        this.eventDiffService = eventDiffService;
-        this.piiMaskingService = piiMaskingService;
-    }
 
     @Operation(operationId = "listEvents", summary = "List events", description = "Returns paginated event history for the project")
     @GetMapping
@@ -104,7 +98,7 @@ public class ProjectEventsController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         
-        log.info("Sending test event type: {} for project: {}", request.getType(), projectId);
+        log.debug("Sending test event type: {} for project: {}", request.getType(), projectId);
         EventResponse response = eventService.sendTestEvent(projectId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

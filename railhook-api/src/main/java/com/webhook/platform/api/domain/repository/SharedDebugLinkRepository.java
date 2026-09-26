@@ -14,7 +14,6 @@ import java.util.UUID;
 @Repository
 public interface SharedDebugLinkRepository extends JpaRepository<SharedDebugLink, UUID> {
     Optional<SharedDebugLink> findByToken(String token);
-    List<SharedDebugLink> findByProjectId(UUID projectId);
     List<SharedDebugLink> findByEventId(UUID eventId);
 
     @Modifying

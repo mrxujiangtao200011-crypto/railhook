@@ -27,7 +27,7 @@ describe('public URLs follow the public origin', () => {
 
   it('.env.dist does not set an internal test endpoint origin', () => {
     const active = envDist.split('\n').filter((l) => /^TEST_ENDPOINT_BASE_URL=/.test(l));
-    for (const l of active) expect(l).not.toMatch(INTERNAL);
+    expect(active.filter((l) => INTERNAL.test(l))).toEqual([]);
   });
 
   it('the Helm chart passes the public origin to the API for test endpoints', () => {

@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.repository.TestEndpointRepository;
 import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.WebhookCaptureResponse;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.TestEndpointService;
 import com.webhook.platform.api.tenancy.TenantContext;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +31,7 @@ import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
 @RestController
 @RequestMapping("/hook")
 @Tag(name = "Webhook Capture", description = "Public endpoints to receive and capture webhook requests")
+@RequiredArgsConstructor
 public class WebhookCaptureController {
 
     private static final int RATE_LIMIT_PER_SECOND = 10;
@@ -37,16 +40,6 @@ public class WebhookCaptureController {
     private final TestEndpointRepository testEndpointRepository;
     private final ObjectMapper objectMapper;
     private final RedisRateLimiterService rateLimiterService;
-
-    public WebhookCaptureController(TestEndpointService testEndpointService,
-                                    TestEndpointRepository testEndpointRepository,
-                                    ObjectMapper objectMapper,
-                                    RedisRateLimiterService rateLimiterService) {
-        this.testEndpointService = testEndpointService;
-        this.testEndpointRepository = testEndpointRepository;
-        this.objectMapper = objectMapper;
-        this.rateLimiterService = rateLimiterService;
-    }
 
     @RequestMapping(value = "/{slug}", method = { RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
             RequestMethod.PATCH, RequestMethod.DELETE })
@@ -67,7 +60,7 @@ public class WebhookCaptureController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(WebhookCaptureResponse.builder()
                             .success(false)
-                            .error("not_found")
+                            .error(ErrorCode.NOT_FOUND.getValue())
                             .message("Test endpoint not found")
                             .build());
         }
@@ -77,7 +70,7 @@ public class WebhookCaptureController {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(WebhookCaptureResponse.builder()
                             .success(false)
-                            .error("rate_limit_exceeded")
+                            .error(ErrorCode.RATE_LIMIT_EXCEEDED.getValue())
                             .message("Too many requests to this test endpoint")
                             .build());
         }

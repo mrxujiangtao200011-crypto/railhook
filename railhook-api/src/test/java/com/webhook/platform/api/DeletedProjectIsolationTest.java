@@ -9,7 +9,6 @@ import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ProjectRequest;
 import com.webhook.platform.api.dto.RegisterRequest;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +16,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.util.UUID;
 
@@ -127,7 +127,7 @@ public class DeletedProjectIsolationTest extends AbstractIntegrationTest {
         deleteProject();
 
         ApiKey stored = TenantContext.callAsSystem(
-                () -> apiKeyRepository.findByKeyHash(CryptoUtils.hashApiKey(key))).orElseThrow();
+                () -> apiKeyRepository.findByKeyHash(SecureTokens.hash(key))).orElseThrow();
         assertThat(stored.getRevokedAt()).isNotNull();
     }
 

@@ -8,6 +8,7 @@ import com.webhook.platform.worker.domain.entity.IncomingEvent;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Component
+@RequiredArgsConstructor
 public class IncomingAttemptStoreFactory {
 
     private final IncomingForwardAttemptRepository attemptRepository;
@@ -24,33 +26,11 @@ public class IncomingAttemptStoreFactory {
     private final PayloadTransformService payloadTransformService;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final ObjectMapper objectMapper;
+    @Qualifier("incomingForwardWebClient")
     private final WebClient incomingForwardWebClient;
+    @Qualifier("incomingForwardKafkaTemplate")
     private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
     private final TargetFailureRecorder targetFailureRecorder;
-
-    public IncomingAttemptStoreFactory(
-            IncomingForwardAttemptRepository attemptRepository,
-            ProjectStatusLookup projectStatusLookup,
-            TransactionTemplate transactionTemplate,
-            TransformationCacheService transformationCacheService,
-            PayloadTransformService payloadTransformService,
-            EncryptionKeyRegistry encryptionKeyRegistry,
-            ObjectMapper objectMapper,
-            @Qualifier("incomingForwardWebClient") WebClient incomingForwardWebClient,
-            @Qualifier("incomingForwardKafkaTemplate")
-            KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate,
-            TargetFailureRecorder targetFailureRecorder) {
-        this.attemptRepository = attemptRepository;
-        this.projectStatusLookup = projectStatusLookup;
-        this.transactionTemplate = transactionTemplate;
-        this.transformationCacheService = transformationCacheService;
-        this.payloadTransformService = payloadTransformService;
-        this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.objectMapper = objectMapper;
-        this.incomingForwardWebClient = incomingForwardWebClient;
-        this.kafkaTemplate = kafkaTemplate;
-        this.targetFailureRecorder = targetFailureRecorder;
-    }
 
     public IncomingAttemptStore create(IncomingForwardMessage message, IncomingEvent event,
             IncomingDestination destination) {
