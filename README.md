@@ -56,23 +56,6 @@ curl -X POST http://localhost:8080/api/v1/events \
 
 Railhook signs it and delivers it to every endpoint subscribed to `order.completed`.
 
-## Receive a webhook
-
-Create a source for the provider and a destination in your app:
-
-```ts
-const source = await client.incomingSources.create(projectId, {
-  name: 'Stripe',
-  providerType: 'STRIPE',
-  verificationMode: 'PROVIDER',
-  hmacSecret: process.env.STRIPE_WEBHOOK_SECRET,
-});
-// Paste source.ingressUrl into Stripe's webhook settings.
-```
-
-Stripe gets a `202` as soon as the signature checks out and the request is stored; Railhook then
-forwards it to your destinations and retries while your app is down.
-
 ## What it does
 
 - Sends each event to every endpoint subscribed to its type. The event is stored in the same
