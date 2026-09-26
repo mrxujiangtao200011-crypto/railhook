@@ -66,7 +66,7 @@ public class DeliveryConsumer {
         String correlationId = extractCorrelationId(correlationIdBytes);
         MDC.put(CORRELATION_ID_KEY, correlationId);
 
-        log.info("Received delivery from {}: deliveryId={}, endpointId={}",
+        log.debug("Received delivery from {}: deliveryId={}, endpointId={}",
                 topic, message.getDeliveryId(), message.getEndpointId());
 
         backpressureDispatch.dispatch(
@@ -99,7 +99,7 @@ public class DeliveryConsumer {
         String correlationId = extractCorrelationId(correlationIdBytes);
         MDC.put(CORRELATION_ID_KEY, correlationId);
 
-        log.info("Received retry from {}: deliveryId={}, attempt={}",
+        log.debug("Received retry from {}: deliveryId={}, attempt={}",
                 topic, message.getDeliveryId(), message.getAttemptCount());
 
         backpressureDispatch.dispatch(

@@ -116,7 +116,7 @@ public class DataRetentionService {
     public void cleanupOldSuccessfulAttempts() {
         Instant cutoffTime = Instant.now().minusSeconds(successfulAttemptsRetentionDays * 86400L);
         
-        log.info("Starting successful delivery attempts cleanup (2xx status) for attempts older than {}", cutoffTime);
+        log.debug("Starting successful delivery attempts cleanup (2xx status) for attempts older than {}", cutoffTime);
         
         long totalDeleted = deleteInBatches("successful attempts cleanup", NINE_MINUTE_LOCK_BUDGET,
                 () -> deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize));
@@ -138,7 +138,7 @@ public class DataRetentionService {
     @Scheduled(cron = "${data-retention.limit-enforcement-cron:0 */30 * * * *}")
     @SchedulerLock(name = "enforcePerDeliveryAttemptLimits", lockAtMostFor = "29m", lockAtLeastFor = "1m")
     public void enforcePerDeliveryAttemptLimits() {
-        log.info("Starting per-delivery attempt limit enforcement (max {} per delivery)", maxAttemptsPerDelivery);
+        log.debug("Starting per-delivery attempt limit enforcement (max {} per delivery)", maxAttemptsPerDelivery);
         
         long totalDeleted = deleteInBatches("per-delivery attempt limit enforcement", LIMIT_ENFORCEMENT_BUDGET,
                 () -> deliveryAttemptRepository.deleteExcessAttemptsPerDelivery(maxAttemptsPerDelivery, batchSize));
@@ -163,7 +163,7 @@ public class DataRetentionService {
     public void cleanupOldIncomingEvents() {
         Instant cutoffTime = Instant.now().minusSeconds(incomingEventsRetentionDays * 86400L);
 
-        log.info("Starting incoming events cleanup for events older than {}", cutoffTime);
+        log.debug("Starting incoming events cleanup for events older than {}", cutoffTime);
 
         long totalDeleted = deleteInBatches("incoming events cleanup", NINE_MINUTE_LOCK_BUDGET,
                 () -> incomingEventRepository.deleteOldIncomingEvents(cutoffTime, batchSize));
@@ -189,7 +189,7 @@ public class DataRetentionService {
         }
 
         Instant cutoffTime = Instant.now().minusSeconds(eventsRetentionDays * 86400L);
-        log.info("Starting events cleanup for events older than {}", cutoffTime);
+        log.debug("Starting events cleanup for events older than {}", cutoffTime);
 
         long totalDeleted = deleteInBatches("events cleanup", EVENTS_CLEANUP_BUDGET,
                 () -> eventRepository.deleteOldEvents(cutoffTime, batchSize));

@@ -50,7 +50,7 @@ public class UsageDailyAggregator {
     public void aggregateYesterday() {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
-        log.info("Starting daily usage aggregation for {} to {}", today.minusDays(RECOUNT_DAYS), yesterday);
+        log.debug("Starting daily usage aggregation for {} to {}", today.minusDays(RECOUNT_DAYS), yesterday);
 
         int count = 0;
         int failed = 0;

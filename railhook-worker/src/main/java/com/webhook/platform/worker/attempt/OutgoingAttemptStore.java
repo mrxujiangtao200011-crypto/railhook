@@ -448,7 +448,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                             .sequenceNumber(delivery.getSequenceNumber())
                             .orderingEnabled(delivery.getOrderingEnabled())
                             .build());
-            log.info("Published DLQ event for delivery {}", delivery.getId());
+            log.debug("Published DLQ event for delivery {}", delivery.getId());
         } catch (Exception e) {
             log.error("Failed to publish DLQ event for delivery {}: {}", delivery.getId(), e.getMessage(), e);
         }
