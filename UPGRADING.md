@@ -3,6 +3,13 @@
 Only the releases that need something from you are listed. Everything else upgrades with
 `./railhook upgrade` (Compose) or `helm upgrade`.
 
+## v2.32.0
+
+- API errors that carried the generic `client_error` or `server_error` now carry a specific code
+  such as `not_found`, `unauthorized` or `rate_limit_exceeded`; the status and message are the
+  same. Code that branches on `error == "client_error"` should branch on the status or the new
+  code. The full list is on the [errors page](https://railhook.io/docs/platform/errors-limits/).
+
 ## v2.31.0
 
 - The `./railhook` helper no longer has a `monitoring` command, and `./railhook upgrade` no longer
