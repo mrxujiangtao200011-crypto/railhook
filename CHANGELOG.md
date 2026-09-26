@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.32.1] - 2026-09-26
+
+### Changed
+
+- The site header links to the GitHub repository again.
+
 ## [2.32.0] - 2026-09-26
 
 ### Changed
@@ -443,7 +449,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release: event ingestion, subscriptions, signed delivery with retries and a DLQ, and a dashboard.
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.32.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.32.1...HEAD
+[2.32.1]: https://github.com/vadymkykalo/railhook/compare/v2.32.0...v2.32.1
 [2.32.0]: https://github.com/vadymkykalo/railhook/compare/v2.31.1...v2.32.0
 [2.20.2]: https://github.com/vadymkykalo/railhook/compare/v2.20.1...v2.20.2
 [2.20.1]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...v2.20.1
