@@ -27,7 +27,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   if (requiredRole) {
     const userRole = (user?.role || 'VIEWER') as Role;
-    if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY[requiredRole]) {
+    if (!hasMinRole(userRole, requiredRole)) {
       return <Suspense fallback={null}><AccessDeniedPage /></Suspense>;
     }
   }

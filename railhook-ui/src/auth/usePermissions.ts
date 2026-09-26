@@ -1,11 +1,7 @@
 import { useAuth } from './auth.store';
+import { hasMinRole, type Role } from './ProtectedRoute';
 
-export type Role = 'OWNER' | 'DEVELOPER' | 'VIEWER';
-
-function hasMinRole(current: Role, required: Role): boolean {
-    const order: Record<Role, number> = { VIEWER: 0, DEVELOPER: 1, OWNER: 2 };
-    return order[current] >= order[required];
-}
+export type { Role };
 
 export function usePermissions() {
     const { user } = useAuth();

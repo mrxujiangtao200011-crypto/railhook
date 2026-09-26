@@ -45,20 +45,12 @@ describe('http client session refresh', () => {
     vi.useRealTimers();
   });
 
-  it('retries a refresh that hit a rate limit, and keeps the person signed in', async () => {
-    refreshReplies = [{ status: 429 }, { status: 200, data: { accessToken: 'fresh' } }];
+  it.each([429, 502])('retries a refresh that was rate limited or met a restarting API (%i), and keeps the person signed in', async (status) => {
+    refreshReplies = [{ status }, { status: 200, data: { accessToken: 'fresh' } }];
     const result = http.get<{ ok: boolean }>('/api/v1/projects');
     await vi.runAllTimersAsync();
     await expect(result).resolves.toEqual({ ok: true });
     expect(refreshCalls).toBe(2);
-    expect(onLogout).not.toHaveBeenCalled();
-  });
-
-  it('retries a refresh that met a restarting API (502)', async () => {
-    refreshReplies = [{ status: 502 }, { status: 200, data: { accessToken: 'fresh' } }];
-    const result = http.get<{ ok: boolean }>('/api/v1/projects');
-    await vi.runAllTimersAsync();
-    await expect(result).resolves.toEqual({ ok: true });
     expect(onLogout).not.toHaveBeenCalled();
   });
 
@@ -210,16 +202,9 @@ describe('http client refresh across tabs', () => {
 });
 
 describe('http client timeouts', () => {
-  it('has a finite default', () => {
+  it('is short enough to surface a hung backend, and longer for exports that stream a whole dataset', () => {
     expect(DEFAULT_TIMEOUT_MS).toBeGreaterThan(0);
-    expect(Number.isFinite(DEFAULT_TIMEOUT_MS)).toBe(true);
-  });
-
-  it('gives exports longer than an ordinary call, since they stream a whole dataset', () => {
-    expect(EXPORT_TIMEOUT_MS).toBeGreaterThan(DEFAULT_TIMEOUT_MS);
-  });
-
-  it('keeps the default short enough to surface a hung backend while someone is still watching', () => {
     expect(DEFAULT_TIMEOUT_MS).toBeLessThanOrEqual(60_000);
+    expect(EXPORT_TIMEOUT_MS).toBeGreaterThan(DEFAULT_TIMEOUT_MS);
   });
 });

@@ -30,17 +30,11 @@ describe('GoogleSignInButton', () => {
     expect(href.searchParams.get('returnTo')).toBe('/admin/projects');
   });
 
-  it('shows nothing when Google is not configured', async () => {
-    const providers = vi.spyOn(authApi, 'providers').mockResolvedValue({ google: false });
-
-    renderButton();
-
-    await waitFor(() => expect(providers).toHaveBeenCalled());
-    expect(screen.queryByRole('link', { name: /google/i })).not.toBeInTheDocument();
-  });
-
-  it('shows nothing when the API cannot say', async () => {
-    const providers = vi.spyOn(authApi, 'providers').mockRejectedValue(new Error('Network Error'));
+  it.each([
+    ['Google is not configured', () => Promise.resolve({ google: false })],
+    ['the API cannot say', () => Promise.reject(new Error('Network Error'))],
+  ])('shows nothing when %s', async (_, reply) => {
+    const providers = vi.spyOn(authApi, 'providers').mockImplementation(reply);
 
     renderButton();
 
