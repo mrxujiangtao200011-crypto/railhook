@@ -26,6 +26,7 @@ import java.security.spec.ECGenParameterSpec;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -69,28 +70,6 @@ class WebhookVerifierTest {
     }
 
     @Test
-    void genericHmac_missingHeader() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
-        when(request.getHeader("X-Signature")).thenReturn(null);
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("Missing signature header");
-    }
-
-    @Test
-    void genericHmac_mismatch() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
-        when(request.getHeader("X-Signature")).thenReturn("wrong_signature");
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("Signature mismatch");
-    }
-
-    @Test
     void github_success() {
         GitHubVerifier verifier = new GitHubVerifier();
         String hmac = hmacSha256Hex(SECRET, BODY);
@@ -103,17 +82,6 @@ class WebhookVerifierTest {
     }
 
     @Test
-    void github_missingHeader() {
-        GitHubVerifier verifier = new GitHubVerifier();
-        when(request.getHeader("X-Hub-Signature-256")).thenReturn(null);
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("Missing header");
-    }
-
-    @Test
     void github_wrongPrefix() {
         GitHubVerifier verifier = new GitHubVerifier();
         when(request.getHeader("X-Hub-Signature-256")).thenReturn("md5=abcdef");
@@ -122,17 +90,6 @@ class WebhookVerifierTest {
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("missing sha256= prefix");
-    }
-
-    @Test
-    void github_mismatch() {
-        GitHubVerifier verifier = new GitHubVerifier();
-        when(request.getHeader("X-Hub-Signature-256")).thenReturn("sha256=0000000000");
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("mismatch");
     }
 
     @Test
@@ -162,17 +119,6 @@ class WebhookVerifierTest {
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("tolerance");
-    }
-
-    @Test
-    void stripe_missingHeader() {
-        StripeVerifier verifier = new StripeVerifier();
-        when(request.getHeader("Stripe-Signature")).thenReturn(null);
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("Missing header");
     }
 
     @Test
@@ -227,18 +173,6 @@ class WebhookVerifierTest {
     }
 
     @Test
-    void stripe_mismatch() {
-        StripeVerifier verifier = new StripeVerifier();
-        long ts = Instant.now().getEpochSecond();
-        when(request.getHeader("Stripe-Signature")).thenReturn("t=" + ts + ",v1=wrong");
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("mismatch");
-    }
-
-    @Test
     void slack_success() {
         SlackVerifier verifier = new SlackVerifier();
         long timestamp = Instant.now().getEpochSecond();
@@ -271,30 +205,6 @@ class WebhookVerifierTest {
     }
 
     @Test
-    void slack_missingSignatureHeader() {
-        SlackVerifier verifier = new SlackVerifier();
-        when(request.getHeader("X-Slack-Signature")).thenReturn(null);
-        when(request.getHeader("X-Slack-Request-Timestamp")).thenReturn("12345");
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("Missing header: X-Slack-Signature");
-    }
-
-    @Test
-    void slack_missingTimestampHeader() {
-        SlackVerifier verifier = new SlackVerifier();
-        when(request.getHeader("X-Slack-Signature")).thenReturn("v0=abc");
-        when(request.getHeader("X-Slack-Request-Timestamp")).thenReturn(null);
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("Missing header: X-Slack-Request-Timestamp");
-    }
-
-    @Test
     void shopify_success() {
         ShopifyVerifier verifier = new ShopifyVerifier();
         String hmacBase64 = hmacSha256Base64(SECRET, BODY);
@@ -304,28 +214,6 @@ class WebhookVerifierTest {
 
         assertThat(result.verified()).isTrue();
         assertThat(result.replayKey()).isEqualTo(hmacBase64);
-    }
-
-    @Test
-    void shopify_missingHeader() {
-        ShopifyVerifier verifier = new ShopifyVerifier();
-        when(request.getHeader("X-Shopify-Hmac-SHA256")).thenReturn(null);
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("Missing header");
-    }
-
-    @Test
-    void shopify_mismatch() {
-        ShopifyVerifier verifier = new ShopifyVerifier();
-        when(request.getHeader("X-Shopify-Hmac-SHA256")).thenReturn("wrongBase64==");
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("mismatch");
     }
 
     @Test
@@ -406,16 +294,6 @@ class WebhookVerifierTest {
                 .verify(SECRET, "To=%2B15550000000&Body=hi+there".getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
-    }
-
-    @Test
-    void twilio_missingHeader() {
-        when(request.getHeader("X-Twilio-Signature")).thenReturn(null);
-
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "To=x".getBytes(StandardCharsets.UTF_8), request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("X-Twilio-Signature");
     }
 
     @Test
@@ -502,17 +380,6 @@ class WebhookVerifierTest {
         var result = new SquareVerifier(SQUARE_URL).verify(SECRET, tampered, request);
 
         assertThat(result.verified()).isFalse();
-    }
-
-    @Test
-    void square_missingHeader() {
-        when(request.getHeader("x-square-hmacsha256-signature")).thenReturn(null);
-
-        var result = new SquareVerifier(SQUARE_URL)
-                .verify(SECRET, SQUARE_BODY.getBytes(StandardCharsets.UTF_8), request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("x-square-hmacsha256-signature");
     }
 
     /** Hex, because Adyen's key is generated as hex and hex-decoded before it is used. */
@@ -682,19 +549,6 @@ class WebhookVerifierTest {
                 .verified()).isTrue();
     }
 
-    @Test
-    void sendGrid_missingTimestampHeader() throws Exception {
-        when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn("sig");
-        when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn(null);
-
-        var result = new SendGridVerifier().verify(
-                Base64.getEncoder().encodeToString(generateEcKeyPair().getPublic().getEncoded()),
-                SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("X-Twilio-Email-Event-Webhook-Timestamp");
-    }
-
     /** The source holds a verification key, not a shared secret: an HMAC secret cannot parse. */
     @Test
     void sendGrid_secretThatIsNotAPublicKeyIsRefusedWithAReason() {
@@ -788,29 +642,6 @@ class WebhookVerifierTest {
 
         assertThat(new HubSpotVerifier(SQUARE_URL)
                 .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request).verified()).isTrue();
-    }
-
-    @Test
-    void hubSpot_missingSignatureHeader() {
-        when(request.getHeader("X-HubSpot-Signature-v3")).thenReturn(null);
-
-        var result = new HubSpotVerifier(SQUARE_URL)
-                .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("X-HubSpot-Signature-v3");
-    }
-
-    @Test
-    void hubSpot_missingTimestampHeader() {
-        when(request.getHeader("X-HubSpot-Signature-v3")).thenReturn("sig");
-        when(request.getHeader("X-HubSpot-Request-Timestamp")).thenReturn(null);
-
-        var result = new HubSpotVerifier(SQUARE_URL)
-                .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("X-HubSpot-Request-Timestamp");
     }
 
     private IncomingSource buildSource(VerificationMode mode, ProviderType providerType) {
@@ -939,28 +770,6 @@ class WebhookVerifierTest {
     }
 
     @Test
-    void gitlab_tokenMismatch() {
-        GitLabVerifier verifier = new GitLabVerifier();
-        when(request.getHeader("X-Gitlab-Token")).thenReturn("someone-elses-token");
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("mismatch");
-    }
-
-    @Test
-    void gitlab_missingHeader() {
-        GitLabVerifier verifier = new GitLabVerifier();
-        when(request.getHeader("X-Gitlab-Token")).thenReturn(null);
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
-        assertThat(result.verified()).isFalse();
-        assertThat(result.error()).contains("X-Gitlab-Token");
-    }
-
-    @Test
     void gitlab_noSecretConfigured() {
         GitLabVerifier verifier = new GitLabVerifier();
         when(request.getHeader("X-Gitlab-Token")).thenReturn("anything");
@@ -969,5 +778,58 @@ class WebhookVerifierTest {
 
         // Must not pass by comparing an empty secret to an empty token.
         assertThat(result.verified()).isFalse();
+    }
+
+    static Stream<Arguments> missingHeader() throws Exception {
+        String sendGridKey = Base64.getEncoder().encodeToString(generateEcKeyPair().getPublic().getEncoded());
+        return Stream.of(
+                Arguments.of(new GenericHmacVerifier("X-Signature", ""), SECRET, BODY, Map.of(), "Missing signature header"),
+                Arguments.of(new GitHubVerifier(), SECRET, BODY, Map.of(), "Missing header"),
+                Arguments.of(new StripeVerifier(), SECRET, BODY, Map.of(), "Missing header"),
+                Arguments.of(new SlackVerifier(), SECRET, BODY,
+                        Map.of("X-Slack-Request-Timestamp", "12345"), "Missing header: X-Slack-Signature"),
+                Arguments.of(new SlackVerifier(), SECRET, BODY,
+                        Map.of("X-Slack-Signature", "v0=abc"), "Missing header: X-Slack-Request-Timestamp"),
+                Arguments.of(new ShopifyVerifier(), SECRET, BODY, Map.of(), "Missing header"),
+                Arguments.of(new TwilioVerifier(TWILIO_URL), SECRET, "To=x", Map.of(), "X-Twilio-Signature"),
+                Arguments.of(new SquareVerifier(SQUARE_URL), SECRET, SQUARE_BODY, Map.of(), "x-square-hmacsha256-signature"),
+                Arguments.of(new SendGridVerifier(), sendGridKey, SENDGRID_BODY,
+                        Map.of("X-Twilio-Email-Event-Webhook-Signature", "sig"), "X-Twilio-Email-Event-Webhook-Timestamp"),
+                Arguments.of(new HubSpotVerifier(SQUARE_URL), SECRET, HUBSPOT_BODY, Map.of(), "X-HubSpot-Signature-v3"),
+                Arguments.of(new HubSpotVerifier(SQUARE_URL), SECRET, HUBSPOT_BODY,
+                        Map.of("X-HubSpot-Signature-v3", "sig"), "X-HubSpot-Request-Timestamp"),
+                Arguments.of(new GitLabVerifier(), SECRET, BODY, Map.of(), "X-Gitlab-Token"));
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    void missingHeader(WebhookVerificationStrategy verifier, String secret, String body,
+                       Map<String, String> headers, String expectedError) {
+        headers.forEach((name, value) -> when(request.getHeader(name)).thenReturn(value));
+
+        var result = verifier.verify(secret, body.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains(expectedError);
+    }
+
+    static Stream<Arguments> mismatch() {
+        return Stream.of(
+                Arguments.of(new GenericHmacVerifier("X-Signature", ""), "X-Signature", "wrong_signature"),
+                Arguments.of(new GitHubVerifier(), "X-Hub-Signature-256", "sha256=0000000000"),
+                Arguments.of(new StripeVerifier(), "Stripe-Signature", "t=" + Instant.now().getEpochSecond() + ",v1=wrong"),
+                Arguments.of(new ShopifyVerifier(), "X-Shopify-Hmac-SHA256", "wrongBase64=="),
+                Arguments.of(new GitLabVerifier(), "X-Gitlab-Token", "someone-elses-token"));
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    void mismatch(WebhookVerificationStrategy verifier, String header, String value) {
+        when(request.getHeader(header)).thenReturn(value);
+
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("mismatch");
     }
 }

@@ -10,9 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -85,64 +87,25 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    public void jwt_listProjects() throws Exception {
-        mockMvc.perform(get("/api/v1/projects")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+    void jwtReachesProjectAndAccountRoutes() throws Exception {
+        expectGetStatus(200, "Authorization", "Bearer " + jwtToken,
+                "/api/v1/projects",
+                "/api/v1/projects/" + projectId + "/endpoints",
+                "/api/v1/projects/" + projectId + "/subscriptions",
+                "/api/v1/projects/" + projectId + "/events",
+                "/api/v1/projects/" + projectId + "/api-keys",
+                "/api/v1/projects/" + projectId + "/dlq",
+                "/api/v1/projects/" + projectId + "/incoming-sources",
+                "/api/v1/dashboard/projects/" + projectId,
+                "/api/v1/orgs",
+                "/api/v1/orgs/" + organizationId + "/members",
+                "/api/v1/billing/organization",
+                "/api/v1/billing/usage",
+                "/api/v1/audit-log");
     }
 
     @Test
-    public void jwt_listEndpoints() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/endpoints")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void jwt_listSubscriptions() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/subscriptions")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void jwt_listEvents() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/events")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void jwt_listApiKeys() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/api-keys")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void jwt_listDlq() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/dlq")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void jwt_dashboard() throws Exception {
-        mockMvc.perform(get("/api/v1/dashboard/projects/" + projectId)
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void jwt_listIncomingSources() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/incoming-sources")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void jwt_currentUser() throws Exception {
+    void jwtCurrentUserCarriesUserAndOrganization() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me")
                         .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk())
@@ -151,105 +114,49 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    public void jwt_listOrganizations() throws Exception {
-        mockMvc.perform(get("/api/v1/orgs")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+    void apiKeyReachesItsProjectRoutes() throws Exception {
+        expectGetStatus(200, "X-API-Key", apiKey,
+                "/api/v1/projects/" + projectId + "/endpoints",
+                "/api/v1/projects/" + projectId + "/subscriptions",
+                "/api/v1/projects/" + projectId + "/events",
+                "/api/v1/projects/" + projectId + "/api-keys",
+                "/api/v1/projects/" + projectId + "/dlq",
+                "/api/v1/projects/" + projectId + "/incoming-sources",
+                "/api/v1/dashboard/projects/" + projectId);
     }
 
     @Test
-    public void apiKey_listEndpoints() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/endpoints")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void apiKey_listSubscriptions() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/subscriptions")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void apiKey_listEvents() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/events")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void apiKey_listApiKeys() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/api-keys")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void apiKey_listDlq() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/dlq")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void apiKey_dashboard() throws Exception {
-        mockMvc.perform(get("/api/v1/dashboard/projects/" + projectId)
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void apiKey_listIncomingSources() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectId + "/incoming-sources")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void apiKey_currentUser_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_listOrganizations_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/orgs")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
+    void apiKeyCannotReachAccountRoutes() throws Exception {
+        expectGetStatus(403, "X-API-Key", apiKey,
+                "/api/v1/auth/me",
+                "/api/v1/orgs",
+                "/api/v1/orgs/" + organizationId + "/members",
+                "/api/v1/billing/organization",
+                "/api/v1/billing/usage",
+                "/api/v1/billing/invoices",
+                "/api/v1/audit-log",
+                "/api/v1/audit-log/export");
     }
 
     // A leaked READ_WRITE key could otherwise mint keys and outlive its own revocation.
-
     @Test
-    public void apiKey_createApiKey_forbidden() throws Exception {
+    void readWriteApiKeyCannotManageApiKeys() throws Exception {
+        String key = readWriteApiKey();
         mockMvc.perform(post("/api/v1/projects/" + projectId + "/api-keys")
-                        .header("X-API-Key", readWriteApiKey())
+                        .header("X-API-Key", key)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(ApiKeyRequest.builder().name("minted-by-key").build())))
                 .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_rotateApiKey_forbidden() throws Exception {
-        UUID target = createApiKeyWithJwt("rotate-target");
-        mockMvc.perform(post("/api/v1/projects/" + projectId + "/api-keys/" + target + "/rotate")
-                        .header("X-API-Key", readWriteApiKey()))
+        mockMvc.perform(post("/api/v1/projects/" + projectId + "/api-keys/" + createApiKeyWithJwt("rotate-target") + "/rotate")
+                        .header("X-API-Key", key))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/v1/projects/" + projectId + "/api-keys/" + createApiKeyWithJwt("revoke-target"))
+                        .header("X-API-Key", key))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    public void apiKey_revokeApiKey_forbidden() throws Exception {
-        UUID target = createApiKeyWithJwt("revoke-target");
-        mockMvc.perform(delete("/api/v1/projects/" + projectId + "/api-keys/" + target)
-                        .header("X-API-Key", readWriteApiKey()))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void jwt_rotateAndRevokeApiKey() throws Exception {
+    void jwtRotatesAndRevokesApiKeys() throws Exception {
         UUID target = createApiKeyWithJwt("jwt-managed");
         mockMvc.perform(post("/api/v1/projects/" + projectId + "/api-keys/" + target + "/rotate")
                         .header("Authorization", "Bearer " + jwtToken))
@@ -257,6 +164,53 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(delete("/api/v1/projects/" + projectId + "/api-keys/" + target)
                         .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void apiKeyIsForbiddenOnAnotherProject() throws Exception {
+        mockMvc.perform(get("/api/v1/projects/" + UUID.randomUUID() + "/endpoints")
+                        .header("X-API-Key", apiKey))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void jwtIsForbiddenOnAnotherOrganizationsMembers() throws Exception {
+        mockMvc.perform(get("/api/v1/orgs/" + UUID.randomUUID() + "/members")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void noCredentialsIsUnauthorized() throws Exception {
+        expectGetStatus(401, null, null,
+                "/api/v1/projects",
+                "/api/v1/projects/" + UUID.randomUUID() + "/endpoints",
+                "/api/v1/auth/me",
+                "/api/v1/orgs");
+    }
+
+    @Test
+    void billingWebhooksNeedNoCredentials() throws Exception {
+        for (String[] webhook : new String[][]{
+                {"stripe", "{\"type\":\"invoice.paid\"}"},
+                {"wayforpay", "{\"transactionStatus\":\"Approved\"}"}}) {
+            int status = mockMvc.perform(post("/api/v1/billing/webhook/" + webhook[0])
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(webhook[1]))
+                    .andReturn().getResponse().getStatus();
+            assertThat(status).as("POST /api/v1/billing/webhook/%s", webhook[0]).isNotEqualTo(401);
+        }
+    }
+
+    private void expectGetStatus(int expected, String header, String value, String... paths) throws Exception {
+        for (String path : paths) {
+            MockHttpServletRequestBuilder request = get(path);
+            if (header != null) {
+                request.header(header, value);
+            }
+            int actual = mockMvc.perform(request).andReturn().getResponse().getStatus();
+            assertThat(actual).as("GET %s", path).isEqualTo(expected);
+        }
     }
 
     private String readWriteApiKey() throws Exception {
@@ -278,139 +232,5 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
-    }
-
-    @Test
-    public void apiKey_crossProject_forbidden() throws Exception {
-        UUID otherProjectId = UUID.randomUUID();
-        mockMvc.perform(get("/api/v1/projects/" + otherProjectId + "/endpoints")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void jwt_listMembers() throws Exception {
-        mockMvc.perform(get("/api/v1/orgs/" + organizationId + "/members")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
-    }
-
-    @Test
-    public void jwt_listMembers_wrongOrg_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/orgs/" + UUID.randomUUID() + "/members")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_listMembers_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/orgs/" + organizationId + "/members")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_billingOrganization_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/billing/organization")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_billingUsage_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/billing/usage")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_billingInvoices_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/billing/invoices")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_auditLog_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/audit-log")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_auditLogExport_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/audit-log/export")
-                        .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void jwt_billingOrganization() throws Exception {
-        mockMvc.perform(get("/api/v1/billing/organization")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void jwt_billingUsage() throws Exception {
-        mockMvc.perform(get("/api/v1/billing/usage")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void jwt_auditLog() throws Exception {
-        mockMvc.perform(get("/api/v1/audit-log")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    public void noAuth_projects_unauthorized() throws Exception {
-        mockMvc.perform(get("/api/v1/projects"))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    public void noAuth_endpoints_unauthorized() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + UUID.randomUUID() + "/endpoints"))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    public void noAuth_currentUser_unauthorized() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me"))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    public void noAuth_organizations_unauthorized() throws Exception {
-        mockMvc.perform(get("/api/v1/orgs"))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    public void noAuth_billingWebhook_stripe_notUnauthorized() throws Exception {
-        mockMvc.perform(post("/api/v1/billing/webhook/stripe")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"invoice.paid\"}"))
-                .andExpect(result -> {
-                    int status = result.getResponse().getStatus();
-                    assert status != 401 : "Billing webhook must not return 401 (got " + status
-                            + "). SecurityConfig permitAll() for /api/v1/billing/webhook/** may be broken.";
-                });
-    }
-
-    @Test
-    public void noAuth_billingWebhook_wayforpay_notUnauthorized() throws Exception {
-        mockMvc.perform(post("/api/v1/billing/webhook/wayforpay")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"transactionStatus\":\"Approved\"}"))
-                .andExpect(result -> {
-                    int status = result.getResponse().getStatus();
-                    assert status != 401 : "Billing webhook must not return 401 (got " + status
-                            + "). SecurityConfig permitAll() for /api/v1/billing/webhook/** may be broken.";
-                });
     }
 }

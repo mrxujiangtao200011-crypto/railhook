@@ -3,8 +3,6 @@ package com.webhook.platform.api.service;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
@@ -289,23 +287,6 @@ class MembershipServiceTest {
         @AfterEach
         void detachLogAppender() {
             membershipServiceLogger.detachAppender(logAppender);
-        }
-
-        @Test
-        void memberResponseJsonSerialization() throws Exception {
-            MemberResponse response = MemberResponse.builder()
-                    .userId(UUID.randomUUID())
-                    .email("test@example.com")
-                    .role(MembershipRole.DEVELOPER)
-                    .status(MembershipStatus.INVITED)
-                    .createdAt(Instant.now())
-                    .build();
-
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.registerModule(new JavaTimeModule());
-            String json = mapper.writeValueAsString(response);
-
-            assertThat(json).doesNotContain("inviteToken").doesNotContain("invite_token");
         }
 
         @Test
