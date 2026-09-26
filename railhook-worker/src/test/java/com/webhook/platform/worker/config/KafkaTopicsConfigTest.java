@@ -4,7 +4,12 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,5 +31,17 @@ class KafkaTopicsConfigTest {
                 KafkaTopics.INCOMING_FORWARD_DISPATCH, KafkaTopics.INCOMING_FORWARD_RETRY,
                 KafkaTopics.INCOMING_FORWARD_DLQ);
         assertThat(byName.values()).allSatisfy(topic -> assertThat(topic.numPartitions()).isEqualTo(12));
+    }
+
+    // The API can send before the worker declares topics; a name missing here gets broker defaults.
+    @Test
+    void composeAndHelmCreateTheSameTopics() throws IOException {
+        List<String> declared = KafkaTopicsConfig.topics(1).stream().map(NewTopic::name).toList();
+        for (Path creator : List.of(Path.of("..", "docker-compose.yml"),
+                Path.of("..", "deploy", "helm", "railhook", "templates", "kafka-topics-job.yaml"))) {
+            String text = Files.readString(creator);
+            assertThat(declared).as(creator.toString()).allSatisfy(topic ->
+                    assertThat(text).containsPattern("(?<![\\w.])" + Pattern.quote(topic) + "(?![\\w.])"));
+        }
     }
 }
