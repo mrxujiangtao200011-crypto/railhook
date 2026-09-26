@@ -7,7 +7,6 @@ import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
@@ -28,6 +27,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.webhook.platform.common.security.SecretEncryption;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
@@ -121,7 +121,7 @@ class EncryptionKeyRotationServiceTest {
 
         @Test
         void rotatesEndpointSecret() {
-            CryptoUtils.EncryptedData secret = CryptoUtils.encryptSecret("my-secret", KEY_V1, SALT, 1);
+            SecretEncryption.EncryptedData secret = SecretEncryption.encrypt("my-secret", KEY_V1, SALT, 1);
 
             Endpoint endpoint = Endpoint.builder()
                     .id(UUID.randomUUID())
@@ -152,7 +152,7 @@ class EncryptionKeyRotationServiceTest {
             assertThat(saved.getEncryptionKeyVersion()).isEqualTo(2);
             assertThat(saved.getSecretEncrypted()).isNotEqualTo(secret.getCiphertext());
 
-            String decrypted = CryptoUtils.decryptSecret(
+            String decrypted = SecretEncryption.decrypt(
                     saved.getSecretEncrypted(), saved.getSecretIv(), KEY_V2, SALT);
             assertThat(decrypted).isEqualTo("my-secret");
         }
@@ -182,9 +182,9 @@ class EncryptionKeyRotationServiceTest {
 
         @Test
         void rotatesClientCertAndKey() {
-            CryptoUtils.EncryptedData secret = CryptoUtils.encryptSecret("sec", KEY_V1, SALT, 1);
-            CryptoUtils.EncryptedData cert = CryptoUtils.encryptSecret("cert-pem", KEY_V1, SALT, 1);
-            CryptoUtils.EncryptedData key = CryptoUtils.encryptSecret("key-pem", KEY_V1, SALT, 1);
+            SecretEncryption.EncryptedData secret = SecretEncryption.encrypt("sec", KEY_V1, SALT, 1);
+            SecretEncryption.EncryptedData cert = SecretEncryption.encrypt("cert-pem", KEY_V1, SALT, 1);
+            SecretEncryption.EncryptedData key = SecretEncryption.encrypt("key-pem", KEY_V1, SALT, 1);
 
             Endpoint endpoint = Endpoint.builder()
                     .id(UUID.randomUUID())
@@ -209,9 +209,9 @@ class EncryptionKeyRotationServiceTest {
             verify(endpointRepository).save(captor.capture());
             Endpoint saved = captor.getValue();
 
-            assertThat(CryptoUtils.decryptSecret(saved.getClientCertEncrypted(), saved.getClientCertIv(), KEY_V2, SALT))
+            assertThat(SecretEncryption.decrypt(saved.getClientCertEncrypted(), saved.getClientCertIv(), KEY_V2, SALT))
                     .isEqualTo("cert-pem");
-            assertThat(CryptoUtils.decryptSecret(saved.getClientKeyEncrypted(), saved.getClientKeyIv(), KEY_V2, SALT))
+            assertThat(SecretEncryption.decrypt(saved.getClientKeyEncrypted(), saved.getClientKeyIv(), KEY_V2, SALT))
                     .isEqualTo("key-pem");
         }
     }
@@ -222,7 +222,7 @@ class EncryptionKeyRotationServiceTest {
 
         @Test
         void rotatesHmacSecret() {
-            CryptoUtils.EncryptedData hmac = CryptoUtils.encryptSecret("hmac-secret", KEY_V1, SALT, 1);
+            SecretEncryption.EncryptedData hmac = SecretEncryption.encrypt("hmac-secret", KEY_V1, SALT, 1);
 
             IncomingSource source = IncomingSource.builder()
                     .id(UUID.randomUUID())
@@ -250,7 +250,7 @@ class EncryptionKeyRotationServiceTest {
             IncomingSource saved = captor.getValue();
 
             assertThat(saved.getEncryptionKeyVersion()).isEqualTo(2);
-            assertThat(CryptoUtils.decryptSecret(saved.getHmacSecretEncrypted(), saved.getHmacSecretIv(), KEY_V2, SALT))
+            assertThat(SecretEncryption.decrypt(saved.getHmacSecretEncrypted(), saved.getHmacSecretIv(), KEY_V2, SALT))
                     .isEqualTo("hmac-secret");
         }
 
@@ -284,7 +284,7 @@ class EncryptionKeyRotationServiceTest {
 
         @Test
         void rotatesAuthConfig() {
-            CryptoUtils.EncryptedData auth = CryptoUtils.encryptSecret("{\"type\":\"bearer\"}", KEY_V1, SALT, 1);
+            SecretEncryption.EncryptedData auth = SecretEncryption.encrypt("{\"type\":\"bearer\"}", KEY_V1, SALT, 1);
 
             IncomingDestination dest = IncomingDestination.builder()
                     .id(UUID.randomUUID())
@@ -311,7 +311,7 @@ class EncryptionKeyRotationServiceTest {
             IncomingDestination saved = captor.getValue();
 
             assertThat(saved.getEncryptionKeyVersion()).isEqualTo(2);
-            assertThat(CryptoUtils.decryptSecret(saved.getAuthConfigEncrypted(), saved.getAuthConfigIv(), KEY_V2, SALT))
+            assertThat(SecretEncryption.decrypt(saved.getAuthConfigEncrypted(), saved.getAuthConfigIv(), KEY_V2, SALT))
                     .isEqualTo("{\"type\":\"bearer\"}");
         }
     }
@@ -331,7 +331,7 @@ class EncryptionKeyRotationServiceTest {
                     .encryptionKeyVersion(1)
                     .build();
 
-            CryptoUtils.EncryptedData good = CryptoUtils.encryptSecret("good", KEY_V1, SALT, 1);
+            SecretEncryption.EncryptedData good = SecretEncryption.encrypt("good", KEY_V1, SALT, 1);
             Endpoint goodEndpoint = Endpoint.builder()
                     .id(UUID.randomUUID())
                     .projectId(UUID.randomUUID())

@@ -2,7 +2,6 @@ package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.http.SsrfProtectionCustomizer;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -13,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
+import com.github.benmanes.caffeine.cache.Cache;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -24,7 +24,6 @@ import java.security.PrivateKey;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
-import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.util.Base64;
@@ -35,7 +34,7 @@ import java.util.List;
 
 @Slf4j
 @Service
-public class MtlsWebClientFactory {
+public class MtlsWebClientCache {
 
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
@@ -49,7 +48,7 @@ public class MtlsWebClientFactory {
 
     private record CachedClient(WebClient webClient, Instant updatedAt) {}
 
-    public MtlsWebClientFactory(
+    public MtlsWebClientCache(
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,

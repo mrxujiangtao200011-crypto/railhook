@@ -17,8 +17,8 @@ import com.webhook.platform.api.dto.IncomingDestinationResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.common.security.SecretEncryption;
 import com.webhook.platform.common.security.UrlValidator;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -133,7 +133,7 @@ public class IncomingDestinationService {
                 .build();
 
         if (request.getAuthConfig() != null && !request.getAuthConfig().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
+            SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
             destination.setAuthConfigEncrypted(encrypted.getCiphertext());
             destination.setAuthConfigIv(encrypted.getIv());
             destination.setEncryptionKeyVersion(encrypted.getKeyVersion());
@@ -180,7 +180,7 @@ public class IncomingDestinationService {
             destination.setAuthType(request.getAuthType());
         }
         if (request.getAuthConfig() != null && !request.getAuthConfig().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
+            SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
             destination.setAuthConfigEncrypted(encrypted.getCiphertext());
             destination.setAuthConfigIv(encrypted.getIv());
             destination.setEncryptionKeyVersion(encrypted.getKeyVersion());

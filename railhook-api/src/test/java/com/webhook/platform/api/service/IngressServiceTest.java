@@ -34,7 +34,6 @@ import com.webhook.platform.api.service.verification.ReplayDetectionService;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.api.service.ForwardDispatch;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,6 +50,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
+import com.webhook.platform.common.security.SecretEncryption;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -312,7 +312,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_hmacVerification_success() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -343,7 +343,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_hmacVerification_mismatch_withDestinations_blocksForwarding() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -382,7 +382,7 @@ class IngressServiceTest {
     void receiveWebhook_dedupPoisoning_attackerCannotBlockLegitimateWebhook() {
         // A forged request carrying a known providerEventId once blocked the genuine one.
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -426,7 +426,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_replayDetection_rejectsReplayedSignature() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -455,7 +455,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_replayDetection_aDifferentDeliveryWithTheSameBodyIsNotAReplay() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -682,7 +682,7 @@ class IngressServiceTest {
                     + "\"type\":\"url_verification\"}";
 
     private IncomingSource slackSource() {
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(SLACK_SECRET, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(SLACK_SECRET, ENCRYPTION_KEY, ENCRYPTION_SALT);
         IncomingSource source = buildActiveSource();
         source.setProviderType(ProviderType.SLACK);
         source.setVerificationMode(VerificationMode.PROVIDER);
@@ -826,7 +826,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_signatureMismatch_rejectedWithoutOpeningTransaction() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -849,7 +849,7 @@ class IngressServiceTest {
     void receiveWebhook_failedPersistWithNoExistingRow_releasesReplayMarker() {
         // A marker left behind after a failed persist turned the provider's resend into a replay.
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -877,7 +877,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_duplicateRaceResolvedToExistingRow_doesNotReleaseReplayMarker() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -916,7 +916,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_successfulPersist_doesNotReleaseReplayMarker() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -948,7 +948,7 @@ class IngressServiceTest {
     // Replay and quota ran before dedup, so a provider's resend of an accepted webhook got 401 or 429.
 
     private IncomingSource signedGenericSource(String secret) {
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
         source.setHmacSecretEncrypted(encrypted.getCiphertext());

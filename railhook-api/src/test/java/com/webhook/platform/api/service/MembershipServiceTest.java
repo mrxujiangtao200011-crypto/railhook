@@ -16,7 +16,6 @@ import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -566,7 +566,7 @@ class MembershipServiceTest {
             Membership accepted = Membership.builder()
                     .userId(userId).organizationId(organizationId)
                     .role(MembershipRole.DEVELOPER).status(MembershipStatus.ACTIVE).build();
-            when(membershipRepository.findByInviteTokenHash(CryptoUtils.hashApiKey(token)))
+            when(membershipRepository.findByInviteTokenHash(SecureTokens.hash(token)))
                     .thenReturn(Optional.of(accepted));
 
             assertThatThrownBy(() -> membershipService.acceptInvite(organizationId, token, userId))

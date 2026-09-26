@@ -5,7 +5,7 @@ import com.webhook.platform.api.security.JwtAuthenticationFilter;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationFilter;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationToken;
 import com.webhook.platform.api.audit.AuditLogAspect;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.security.PlatformAdminAccessFilter;
 import com.webhook.platform.api.security.PortalSessionAuthenticationFilter;
 import com.webhook.platform.api.security.PortalSessionAuthenticationToken;
@@ -47,7 +47,7 @@ public class SecurityConfig {
                         PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter,
                         PortalSessionAuthenticationFilter portalSessionAuthenticationFilter,
                         PlatformAdminAccessService platformAdminAccessService,
-                        JwtUtil jwtUtil,
+                        JwtTokenService jwtTokenService,
                         AuthRateLimiterService authRateLimiterService,
                         AuditLogAspect auditLogAspect,
                         TrustedProxyResolver trustedProxyResolver,
@@ -58,7 +58,7 @@ public class SecurityConfig {
                 this.jwtAuthenticationFilter = jwtAuthenticationFilter;
                 this.platformAdminAuthenticationFilter = platformAdminAuthenticationFilter;
                 this.portalSessionAuthenticationFilter = portalSessionAuthenticationFilter;
-                this.platformAdminAccessFilter = new PlatformAdminAccessFilter(platformAdminAccessService, jwtUtil,
+                this.platformAdminAccessFilter = new PlatformAdminAccessFilter(platformAdminAccessService, jwtTokenService,
                                 authRateLimiterService, auditLogAspect, trustedProxyResolver);
                 this.corsConfigurationSource = corsConfigurationSource;
                 this.swaggerEnabled = swaggerEnabled;

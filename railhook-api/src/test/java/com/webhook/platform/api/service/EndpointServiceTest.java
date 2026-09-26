@@ -8,8 +8,7 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.common.enums.SignatureScheme;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
-import com.webhook.platform.common.util.WebhookSignatureUtils;
+import com.webhook.platform.common.security.SecretEncryption;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.reactive.function.client.WebClient;
+import com.webhook.platform.common.util.RailhookSignature;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -59,7 +59,7 @@ class EndpointServiceTest {
     }
 
     private Endpoint.EndpointBuilder endpointWithSecret(String url, String secret) {
-        CryptoUtils.EncryptedData encrypted = registry.encrypt(secret);
+        SecretEncryption.EncryptedData encrypted = registry.encrypt(secret);
         return Endpoint.builder()
                 .id(endpointId)
                 .projectId(projectId)
@@ -127,9 +127,9 @@ class EndpointServiceTest {
             assertThat(kept).isEqualTo(original);
 
             long ts = System.currentTimeMillis();
-            String header = WebhookSignatureUtils.buildSignatureHeader(newSecret, kept, ts, BODY);
-            assertThat(WebhookSignatureUtils.verifySignature(newSecret, header, BODY)).isTrue();
-            assertThat(WebhookSignatureUtils.verifySignature(original, header, BODY)).isTrue();
+            String header = RailhookSignature.buildSignatureHeader(newSecret, kept, ts, BODY);
+            assertThat(RailhookSignature.verify(newSecret, header, BODY)).isTrue();
+            assertThat(RailhookSignature.verify(original, header, BODY)).isTrue();
         }
 
         @Test

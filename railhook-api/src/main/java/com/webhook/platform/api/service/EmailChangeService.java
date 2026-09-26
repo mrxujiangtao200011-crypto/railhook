@@ -11,10 +11,9 @@ import com.webhook.platform.api.domain.repository.EmailChangeRequestRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.ChangeEmailRequest;
 import com.webhook.platform.api.dto.EmailChangeResponse;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import com.webhook.platform.api.tenancy.SystemTenant;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -22,6 +21,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -44,7 +44,7 @@ public class EmailChangeService {
     private final UserRepository userRepository;
     private final EmailChangeRequestRepository changeRepository;
     private final UserSessionService userSessionService;
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final CaptchaVerifier captchaVerifier;
@@ -53,7 +53,7 @@ public class EmailChangeService {
     public EmailChangeService(UserRepository userRepository,
                               EmailChangeRequestRepository changeRepository,
                               UserSessionService userSessionService,
-                              JwtUtil jwtUtil,
+                              JwtTokenService jwtTokenService,
                               BCryptPasswordEncoder passwordEncoder,
                               EmailService emailService,
                               CaptchaVerifier captchaVerifier,
@@ -61,7 +61,7 @@ public class EmailChangeService {
         this.userRepository = userRepository;
         this.changeRepository = changeRepository;
         this.userSessionService = userSessionService;
-        this.jwtUtil = jwtUtil;
+        this.jwtTokenService = jwtTokenService;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
         this.captchaVerifier = captchaVerifier;
@@ -114,8 +114,8 @@ public class EmailChangeService {
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "No email change is waiting for confirmation"));
         budget.requireSendAllowance(user);
 
-        String token = CryptoUtils.generateSecureToken(32);
-        pending.setTokenHash(CryptoUtils.hashApiKey(token));
+        String token = SecureTokens.generate(32);
+        pending.setTokenHash(SecureTokens.hash(token));
         pending.setExpiresAt(Instant.now().plus(CONFIRMATION_LIFETIME));
         changeRepository.save(pending);
         budget.recordSend(userId, VerificationEmailSend.EMAIL_CHANGE_RESEND);
@@ -137,7 +137,7 @@ public class EmailChangeService {
     @Transactional
     public void confirm(String token) {
         EmailChangeRequest pending = changeRepository
-                .findByTokenHashAndStatus(CryptoUtils.hashApiKey(token), EmailChangeStatus.PENDING)
+                .findByTokenHashAndStatus(SecureTokens.hash(token), EmailChangeStatus.PENDING)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "This confirmation link is invalid or has already been used."));
         if (pending.getExpiresAt() == null || pending.getExpiresAt().isBefore(Instant.now())) {
@@ -159,7 +159,7 @@ public class EmailChangeService {
     @Transactional
     public void cancelByToken(String cancelToken) {
         EmailChangeRequest pending = changeRepository
-                .findByCancelTokenHashAndStatus(CryptoUtils.hashApiKey(cancelToken), EmailChangeStatus.PENDING)
+                .findByCancelTokenHashAndStatus(SecureTokens.hash(cancelToken), EmailChangeStatus.PENDING)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "This link is invalid or the change was already settled."));
         settle(pending, EmailChangeStatus.CANCELLED);
@@ -171,9 +171,9 @@ public class EmailChangeService {
 
     private EmailChangeResponse applyToUnverified(User user, String newEmail) {
         String previous = user.getEmail();
-        String token = CryptoUtils.generateSecureToken(32);
+        String token = SecureTokens.generate(32);
         user.setEmail(newEmail);
-        user.setVerificationToken(CryptoUtils.hashApiKey(token));
+        user.setVerificationToken(SecureTokens.hash(token));
         user.setVerificationTokenExpiresAt(Instant.now().plus(CONFIRMATION_LIFETIME));
         saveAddress(user);
 
@@ -199,15 +199,15 @@ public class EmailChangeService {
                     changeRepository.flush();
                 });
 
-        String token = CryptoUtils.generateSecureToken(32);
-        String cancelToken = CryptoUtils.generateSecureToken(32);
+        String token = SecureTokens.generate(32);
+        String cancelToken = SecureTokens.generate(32);
         EmailChangeRequest pending = changeRepository.save(EmailChangeRequest.builder()
                 .userId(user.getId())
                 .previousEmail(user.getEmail())
                 .newEmail(newEmail)
                 .status(EmailChangeStatus.PENDING)
-                .tokenHash(CryptoUtils.hashApiKey(token))
-                .cancelTokenHash(CryptoUtils.hashApiKey(cancelToken))
+                .tokenHash(SecureTokens.hash(token))
+                .cancelTokenHash(SecureTokens.hash(cancelToken))
                 .expiresAt(Instant.now().plus(CONFIRMATION_LIFETIME))
                 .build());
         budget.recordSend(user.getId(), VerificationEmailSend.EMAIL_CHANGE);
@@ -220,8 +220,8 @@ public class EmailChangeService {
 
     private void requireRecentSignIn(UUID userId, String refreshToken) {
         Optional<UserSession> session = Optional.ofNullable(refreshToken)
-                .filter(jwtUtil::validateToken)
-                .flatMap(token -> userSessionService.findByRefreshJti(jwtUtil.getJtiFromToken(token)))
+                .filter(jwtTokenService::validateToken)
+                .flatMap(token -> userSessionService.findByRefreshJti(jwtTokenService.getJtiFromToken(token)))
                 .filter(s -> userId.equals(s.getUserId()) && s.getRevokedAt() == null);
         if (session.isEmpty() || session.get().getCreatedAt().isBefore(Instant.now().minus(RECENT_SIGN_IN))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,

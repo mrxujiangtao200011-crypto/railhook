@@ -12,9 +12,8 @@ import com.webhook.platform.api.domain.repository.DeviceAuthCodeRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,12 +22,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.api.domain.repository.UserRepository;
 
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
-import com.webhook.platform.api.domain.repository.UserRepository;
+import com.webhook.platform.common.security.SecureTokens;
 
 @Slf4j
 @Service
@@ -39,7 +39,7 @@ public class DeviceAuthService {
     private final MembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final UserSessionService userSessionService;
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
 
     @Value("${app.base-url:http://localhost:5173}")
     private String appBaseUrl;
@@ -51,7 +51,7 @@ public class DeviceAuthService {
     @SystemTenant("issues a device code before any user or organization is known -- device_auth_codes is deliberately not tenant-scoped for the same reason")
     @Transactional
     public DeviceCodeResponse initiateDeviceAuth() {
-        String deviceCode = CryptoUtils.generateSecureToken(32);
+        String deviceCode = SecureTokens.generate(32);
         String userCode = generateUserCode();
         Instant expiresAt = Instant.now().plus(CODE_EXPIRY_MINUTES, ChronoUnit.MINUTES);
 
@@ -155,25 +155,25 @@ public class DeviceAuthService {
 
         // A session named CLI, so the user can see and end the credential most likely to outlive its machine.
         UUID sessionId = UUID.randomUUID();
-        String refreshToken = jwtUtil.generateRefreshToken(code.getUserId(), sessionId);
+        String refreshToken = jwtTokenService.generateRefreshToken(code.getUserId(), sessionId);
 
         userSessionService.open(UserSession.builder()
                 .id(sessionId)
                 .userId(code.getUserId())
                 .organizationId(code.getOrganizationId())
-                .refreshTokenJti(jwtUtil.getJtiFromToken(refreshToken))
+                .refreshTokenJti(jwtTokenService.getJtiFromToken(refreshToken))
                 .client(SessionClient.CLI)
                 .userAgent(origin.userAgent())
                 .ipAddress(origin.ipAddress())
                 .lastSeenAt(Instant.now())
-                .expiresAt(jwtUtil.getExpirationFromToken(refreshToken).toInstant())
+                .expiresAt(jwtTokenService.getExpirationFromToken(refreshToken).toInstant())
                 .build());
 
         boolean emailVerified = userRepository.findById(code.getUserId())
                 .map(u -> Boolean.TRUE.equals(u.getEmailVerified()))
                 .orElse(false);
 
-        String accessToken = jwtUtil.generateAccessToken(
+        String accessToken = jwtTokenService.generateAccessToken(
                 code.getUserId(), code.getOrganizationId(), membership.getRole(), sessionId, emailVerified);
 
         return AuthResponse.builder()

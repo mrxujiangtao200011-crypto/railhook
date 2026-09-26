@@ -7,7 +7,6 @@ import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.webhook.platform.common.security.SecretEncryption;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -161,7 +161,7 @@ public class EncryptionKeyRotationService {
             return;
         }
         String plaintext = encryptionKeyRegistry.decryptWithFallback(ciphertext.get(), iv.get(), currentVersion);
-        CryptoUtils.EncryptedData reEncrypted = encryptionKeyRegistry.encrypt(plaintext);
+        SecretEncryption.EncryptedData reEncrypted = encryptionKeyRegistry.encrypt(plaintext);
         setCiphertext.accept(reEncrypted.getCiphertext());
         setIv.accept(reEncrypted.getIv());
     }

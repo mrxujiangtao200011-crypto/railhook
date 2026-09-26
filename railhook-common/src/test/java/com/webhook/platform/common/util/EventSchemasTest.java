@@ -9,11 +9,11 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class JsonSchemaUtilsTest {
+class EventSchemasTest {
 
     @Test
     void inferSchema_typesEachPrimitiveAndRequiresEveryField() throws Exception {
-        JsonNode schema = JsonSchemaUtils.inferSchema(
+        JsonNode schema = EventSchemas.inferSchema(
                 "{\"name\": \"Alice\", \"age\": 30, \"active\": true, \"price\": 19.99, \"data\": null}");
 
         assertEquals("object", schema.get("type").asText());
@@ -28,7 +28,7 @@ class JsonSchemaUtilsTest {
 
     @Test
     void inferSchema_descendsIntoObjectsAndArrays() throws Exception {
-        JsonNode schema = JsonSchemaUtils.inferSchema(
+        JsonNode schema = EventSchemas.inferSchema(
                 "{\"user\": {\"name\": \"Bob\"}, \"items\": [{\"id\": 1, \"name\": \"item1\"}]}");
 
         JsonNode userProp = schema.get("properties").get("user");
@@ -45,16 +45,16 @@ class JsonSchemaUtilsTest {
         String s2 = "{\"type\": \"object\", \"description\": \"v2\", \"properties\": {\"name\": {\"type\": \"string\"}}}";
         String s3 = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"integer\"}}}";
 
-        assertEquals(JsonSchemaUtils.fingerprint(s1), JsonSchemaUtils.fingerprint(s1));
-        assertEquals(JsonSchemaUtils.fingerprint(s1), JsonSchemaUtils.fingerprint(s2));
-        assertNotEquals(JsonSchemaUtils.fingerprint(s1), JsonSchemaUtils.fingerprint(s3));
+        assertEquals(EventSchemas.fingerprint(s1), EventSchemas.fingerprint(s1));
+        assertEquals(EventSchemas.fingerprint(s1), EventSchemas.fingerprint(s2));
+        assertNotEquals(EventSchemas.fingerprint(s1), EventSchemas.fingerprint(s3));
     }
 
     @Test
     void diff_addedOptionalField_notBreaking() throws Exception {
         String old = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}}, \"required\": [\"name\"]}";
         String nw = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}, \"email\": {\"type\": \"string\"}}, \"required\": [\"name\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+        EventSchemas.SchemaDiff diff = EventSchemas.diff(old, nw);
 
         assertEquals(1, diff.added().size());
         assertEquals("$.email", diff.added().get(0).path());
@@ -67,7 +67,7 @@ class JsonSchemaUtilsTest {
     void diff_removedField_breaking() throws Exception {
         String old = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}, \"email\": {\"type\": \"string\"}}, \"required\": [\"name\"]}";
         String nw = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}}, \"required\": [\"name\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+        EventSchemas.SchemaDiff diff = EventSchemas.diff(old, nw);
 
         assertEquals(1, diff.removed().size());
         assertEquals("$.email", diff.removed().get(0).path());
@@ -79,7 +79,7 @@ class JsonSchemaUtilsTest {
     void diff_typeChanged_breaking() throws Exception {
         String old = "{\"type\": \"object\", \"properties\": {\"amount\": {\"type\": \"string\"}}, \"required\": [\"amount\"]}";
         String nw = "{\"type\": \"object\", \"properties\": {\"amount\": {\"type\": \"number\"}}, \"required\": [\"amount\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+        EventSchemas.SchemaDiff diff = EventSchemas.diff(old, nw);
 
         assertEquals(1, diff.changed().size());
         assertEquals("number", diff.changed().get(0).type());
@@ -90,7 +90,7 @@ class JsonSchemaUtilsTest {
     @Test
     void diff_noChanges() throws Exception {
         String schema = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}}, \"required\": [\"name\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(schema, schema);
+        EventSchemas.SchemaDiff diff = EventSchemas.diff(schema, schema);
 
         assertTrue(diff.added().isEmpty());
         assertTrue(diff.removed().isEmpty());
@@ -103,7 +103,7 @@ class JsonSchemaUtilsTest {
         String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
         String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
                 + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\",\"email\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+        EventSchemas.SchemaDiff diff = EventSchemas.diff(old, nw);
 
         assertEquals(1, diff.added().size());
         assertTrue(diff.added().get(0).required());
@@ -116,7 +116,7 @@ class JsonSchemaUtilsTest {
         String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
                 + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\",\"email\"]}";
         String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+        EventSchemas.SchemaDiff diff = EventSchemas.diff(old, nw);
 
         assertEquals(1, diff.removed().size());
         assertTrue(diff.removed().get(0).required());
@@ -130,7 +130,7 @@ class JsonSchemaUtilsTest {
         String nw = "{\"type\":\"object\",\"properties\":{\"user\":{\"type\":\"object\","
                 + "\"properties\":{\"name\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"}},"
                 + "\"required\":[\"name\",\"id\"]}}}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+        EventSchemas.SchemaDiff diff = EventSchemas.diff(old, nw);
 
         assertEquals(1, diff.added().size());
         assertEquals("$.user.id", diff.added().get(0).path());
@@ -143,7 +143,7 @@ class JsonSchemaUtilsTest {
                 + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
         String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
                 + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\",\"email\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+        EventSchemas.SchemaDiff diff = EventSchemas.diff(old, nw);
 
         assertEquals(1, diff.tightened().size());
         assertEquals("$.email", diff.tightened().get(0).path());
@@ -156,7 +156,7 @@ class JsonSchemaUtilsTest {
                 + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\",\"email\"]}";
         String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
                 + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
+        EventSchemas.SchemaDiff diff = EventSchemas.diff(old, nw);
 
         assertEquals(1, diff.relaxed().size());
         assertEquals("$.email", diff.relaxed().get(0).path());
@@ -165,7 +165,7 @@ class JsonSchemaUtilsTest {
     @Test
     void validate_validPayload_noErrors() {
         String schema = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}, \"age\": {\"type\": \"integer\"}}, \"required\": [\"name\"]}";
-        assertTrue(JsonSchemaUtils.validate("{\"name\": \"Alice\", \"age\": 30}", schema).isEmpty());
+        assertTrue(EventSchemas.validate("{\"name\": \"Alice\", \"age\": 30}", schema).isEmpty());
     }
 
     @ParameterizedTest
@@ -178,7 +178,7 @@ class JsonSchemaUtilsTest {
             "{\"type\": \"object\", \"properties\": {\"items\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"id\": {\"type\": \"integer\"}}, \"required\": [\"id\"]}}}, \"required\": [\"items\"]} | {\"items\": [{\"id\": 1}, {\"id\": \"bad\"}]} | [1]",
     })
     void validate_reportsOneErrorNamingWhereItIs(String schema, String payload, String expectedFragment) {
-        List<String> errors = JsonSchemaUtils.validate(payload, schema);
+        List<String> errors = EventSchemas.validate(payload, schema);
 
         assertEquals(1, errors.size(), errors.toString());
         assertTrue(errors.get(0).contains(expectedFragment), errors.get(0));

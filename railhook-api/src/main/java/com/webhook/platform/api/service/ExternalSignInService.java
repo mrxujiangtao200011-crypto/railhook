@@ -15,12 +15,12 @@ import com.webhook.platform.api.service.signin.SignInFailure;
 import com.webhook.platform.api.exception.SignInRejectedException;
 import com.webhook.platform.api.service.signin.VerifiedIdentity;
 import com.webhook.platform.api.tenancy.SystemTenant;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -128,10 +128,10 @@ public class ExternalSignInService {
         Instant now = Instant.now();
         signInHandoffRepository.deleteExpiredBefore(now.minus(Duration.ofHours(1)));
 
-        String code = CryptoUtils.generateSecureToken(32);
+        String code = SecureTokens.generate(32);
 
         signInHandoffRepository.save(SignInHandoff.builder()
-                .codeHash(CryptoUtils.hashApiKey(code))
+                .codeHash(SecureTokens.hash(code))
                 .userId(userId)
                 .accountCreated(accountCreated)
                 .expiresAt(now.plus(HANDOFF_LIFETIME))
@@ -164,7 +164,7 @@ public class ExternalSignInService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "This sign-in link was opened in a different browser. Sign in again.");
         }
-        String codeHash = CryptoUtils.hashApiKey(code);
+        String codeHash = SecureTokens.hash(code);
         if (signInHandoffRepository.consume(codeHash, Instant.now()) == 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "This sign-in link has already been used or has expired. Sign in again.");

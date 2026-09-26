@@ -1,7 +1,7 @@
 package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
+import com.webhook.platform.common.security.SecretEncryption;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,8 +28,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
-@DisplayName("MtlsWebClientFactory Tests")
-class MtlsWebClientFactoryTest {
+@DisplayName("MtlsWebClientCache Tests")
+class MtlsWebClientCacheTest {
 
     private static final String ENCRYPTION_KEY = "test-encryption-key-for-mtls-32c";
     private static final String ENCRYPTION_SALT = "test-salt-value";
@@ -82,12 +82,12 @@ class MtlsWebClientFactoryTest {
             "WtTdb+rkamGAT1V4fUtmEw==\n" +
             "-----END PRIVATE KEY-----";
 
-    private MtlsWebClientFactory factory;
+    private MtlsWebClientCache factory;
 
     @BeforeEach
     void setUp() throws Exception {
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
-        factory = new MtlsWebClientFactory(encryptionKeyRegistry, true, List.of(), WebClient.builder(), ConnectionProvider.newConnection());
+        factory = new MtlsWebClientCache(encryptionKeyRegistry, true, List.of(), WebClient.builder(), ConnectionProvider.newConnection());
     }
 
     private static EncryptionKeyRegistry createTestRegistry(String key, String salt) throws Exception {
@@ -161,7 +161,7 @@ class MtlsWebClientFactoryTest {
     void buildingAnMtlsClientLeavesTheSharedBuilderUnconfigured() {
         // Set on the shared builder, a racing build could present another tenant's certificate.
         WebClient.Builder shared = spy(WebClient.builder());
-        MtlsWebClientFactory isolated = new MtlsWebClientFactory(
+        MtlsWebClientCache isolated = new MtlsWebClientCache(
                 encryptionKeyRegistry, true, List.of(), shared, ConnectionProvider.newConnection());
 
         isolated.getWebClient(createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null));
@@ -180,7 +180,7 @@ class MtlsWebClientFactoryTest {
             bothBuilding.await(500, TimeUnit.MILLISECONDS);
             return inv.callRealMethod();
         }).when(gated).decryptWithFallback(any(), any(), anyInt());
-        MtlsWebClientFactory racing = new MtlsWebClientFactory(
+        MtlsWebClientCache racing = new MtlsWebClientCache(
                 gated, true, List.of(), WebClient.builder(), ConnectionProvider.newConnection());
         Endpoint endpoint = createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null);
 
@@ -200,8 +200,8 @@ class MtlsWebClientFactoryTest {
     @Test
     @DisplayName("Should throw RuntimeException on invalid cert")
     void shouldThrowOnInvalidCert() {
-        CryptoUtils.EncryptedData enc = CryptoUtils.encryptSecret("not-a-cert", ENCRYPTION_KEY, ENCRYPTION_SALT);
-        CryptoUtils.EncryptedData encKey = CryptoUtils.encryptSecret("not-a-key", ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData enc = SecretEncryption.encrypt("not-a-cert", ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encKey = SecretEncryption.encrypt("not-a-key", ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         Endpoint endpoint = Endpoint.builder()
                 .id(UUID.randomUUID())
@@ -247,8 +247,8 @@ class MtlsWebClientFactoryTest {
     }
 
     private Endpoint createMtlsEndpoint(String certPem, String keyPem, String caCertPem) {
-        CryptoUtils.EncryptedData encCert = CryptoUtils.encryptSecret(certPem, ENCRYPTION_KEY, ENCRYPTION_SALT);
-        CryptoUtils.EncryptedData encKey = CryptoUtils.encryptSecret(keyPem, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encCert = SecretEncryption.encrypt(certPem, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        SecretEncryption.EncryptedData encKey = SecretEncryption.encrypt(keyPem, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         return Endpoint.builder()
                 .id(UUID.randomUUID())

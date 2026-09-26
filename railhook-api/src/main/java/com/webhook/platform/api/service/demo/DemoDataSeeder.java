@@ -16,7 +16,6 @@ import com.webhook.platform.api.service.demo.DemoHistory.WorkflowStepRow;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.common.demo.DemoTenant;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,12 +27,14 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.webhook.platform.common.security.SecretEncryption;
 
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import com.webhook.platform.common.security.SecureTokens;
 
 /**
  * Idempotent: fixed ids with ON CONFLICT, traffic regenerated to end now. Plain JDBC because
@@ -138,7 +139,7 @@ public class DemoDataSeeder {
                 PINNED_CREATED_AT, PINNED_CREATED_AT);
 
         for (DemoEndpoint endpoint : DemoCatalog.ENDPOINTS) {
-            CryptoUtils.EncryptedData secret = encryptionKeyRegistry.encrypt("whsec_" + CryptoUtils.generateSecureToken(24));
+            SecretEncryption.EncryptedData secret = encryptionKeyRegistry.encrypt("whsec_" + SecureTokens.generate(24));
             jdbc.update("INSERT INTO endpoints (id, organization_id, project_id, url, description, enabled, "
                             + "secret_encrypted, secret_iv, encryption_key_version, verification_status, "
                             + "verification_completed_at, created_at, updated_at) "
@@ -183,14 +184,14 @@ public class DemoDataSeeder {
                     transformation.id());
         }
         for (DemoSource source : DemoCatalog.SOURCES) {
-            CryptoUtils.EncryptedData secret = encryptionKeyRegistry.encrypt(CryptoUtils.generateSecureToken(24));
+            SecretEncryption.EncryptedData secret = encryptionKeyRegistry.encrypt(SecureTokens.generate(24));
             jdbc.update("INSERT INTO incoming_sources (id, organization_id, project_id, name, slug, provider_type, "
                             + "status, ingress_path_token, verification_mode, hmac_secret_encrypted, hmac_secret_iv, "
                             + "hmac_header_name, hmac_signature_prefix, encryption_key_version, created_at, updated_at) "
                             + "VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, 'PROVIDER', ?, ?, ?, ?, ?, ?, ?) "
                             + "ON CONFLICT (id) DO NOTHING",
                     source.id(), DemoTenant.ORGANIZATION_ID, DemoTenant.PROJECT_ID, source.name(), source.slug(),
-                    source.providerType(), CryptoUtils.generateSecureToken(32), secret.getCiphertext(), secret.getIv(),
+                    source.providerType(), SecureTokens.generate(32), secret.getCiphertext(), secret.getIv(),
                     source.hmacHeaderName(), source.hmacPrefix(), secret.getKeyVersion(),
                     PINNED_CREATED_AT, PINNED_CREATED_AT);
         }

@@ -10,12 +10,12 @@ import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
-import com.webhook.platform.common.util.PayloadCompressionUtil;
+import com.webhook.platform.common.util.PayloadCompression;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Set;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -261,8 +261,8 @@ public class EventIngestService {
                                 + maxPayloadSizeBytes + " bytes)");
             }
 
-            PayloadCompressionUtil.CompressionResult compression = 
-                    PayloadCompressionUtil.compress(payload, compressionThresholdBytes);
+            PayloadCompression.CompressionResult compression = 
+                    PayloadCompression.compress(payload, compressionThresholdBytes);
             
             return Event.builder()
                     .projectId(projectId)

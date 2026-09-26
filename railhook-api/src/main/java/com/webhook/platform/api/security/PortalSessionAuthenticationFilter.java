@@ -5,7 +5,6 @@ import com.webhook.platform.api.domain.repository.PortalSessionRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -65,7 +65,7 @@ public class PortalSessionAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith(BEARER_PREFIX + PortalSessionAuthenticationToken.TOKEN_PREFIX)) {
-            String tokenHash = CryptoUtils.hashApiKey(header.substring(BEARER_PREFIX.length()));
+            String tokenHash = SecureTokens.hash(header.substring(BEARER_PREFIX.length()));
             Optional<PortalSession> session = TenantContext.callAsSystem(
                     () -> portalSessionRepository.findByTokenHash(tokenHash))
                     .filter(s -> s.getExpiresAt().isAfter(clock.instant()))

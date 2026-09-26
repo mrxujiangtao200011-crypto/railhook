@@ -8,7 +8,6 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.ApiKeyResponse;
 import com.webhook.platform.api.dto.ApiKeyRotateRequest;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -70,7 +70,7 @@ class ApiKeyRotationTest {
                 .organizationId(organizationId)
                 .projectId(projectId)
                 .name("production ingest")
-                .keyHash(CryptoUtils.hashApiKey("the-key-the-customer-deployed"))
+                .keyHash(SecureTokens.hash("the-key-the-customer-deployed"))
                 .keyPrefix("the-key-")
                 .scope(ApiKeyScope.READ_ONLY)
                 .build();

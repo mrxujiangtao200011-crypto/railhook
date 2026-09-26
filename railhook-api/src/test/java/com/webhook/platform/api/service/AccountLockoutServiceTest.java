@@ -10,7 +10,7 @@ import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.LoginRequest;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -216,7 +216,7 @@ class AccountLockoutServiceTest {
         @Mock private OrganizationRepository organizationRepository;
         @Mock private MembershipRepository membershipRepository;
         @Mock private PlanRepository planRepository;
-        @Mock private JwtUtil jwtUtil;
+        @Mock private JwtTokenService jwtTokenService;
         @Mock private TokenBlacklistService tokenBlacklistService;
         @Mock private UserSessionService userSessionService;
         @Mock private EmailService emailService;
@@ -230,7 +230,7 @@ class AccountLockoutServiceTest {
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
             lockout = new AccountLockoutService(userRepository, true, 3, 60, 900, 60);
             authService = new AuthService(userRepository, organizationRepository, membershipRepository,
-                    planRepository, jwtUtil, encoder, tokenBlacklistService, userSessionService,
+                    planRepository, jwtTokenService, encoder, tokenBlacklistService, userSessionService,
                     lockout, emailService,
                     mock(VerificationMailBudget.class), mock(OnboardingMailService.class), false);
 
@@ -323,9 +323,9 @@ class AccountLockoutServiceTest {
                             .organizationId(UUID.randomUUID())
                             .role(MembershipRole.OWNER)
                             .build()));
-            when(jwtUtil.generateRefreshToken(any(), any())).thenReturn("refresh");
-            when(jwtUtil.getJtiFromToken("refresh")).thenReturn(UUID.randomUUID().toString());
-            when(jwtUtil.getExpirationFromToken("refresh"))
+            when(jwtTokenService.generateRefreshToken(any(), any())).thenReturn("refresh");
+            when(jwtTokenService.getJtiFromToken("refresh")).thenReturn(UUID.randomUUID().toString());
+            when(jwtTokenService.getExpirationFromToken("refresh"))
                     .thenReturn(new Date(System.currentTimeMillis() + 86_400_000L));
 
             assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN)).isNotNull();

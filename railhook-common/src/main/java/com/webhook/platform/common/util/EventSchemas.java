@@ -11,11 +11,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
-public final class JsonSchemaUtils {
+public final class EventSchemas {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private JsonSchemaUtils() {
+    private EventSchemas() {
     }
 
     public static ObjectNode inferSchema(String payloadJson) throws JsonProcessingException {

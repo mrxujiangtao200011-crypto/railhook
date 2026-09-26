@@ -1,6 +1,6 @@
 package com.webhook.platform.worker.domain.entity;
 
-import com.webhook.platform.common.util.PayloadCompressionUtil;
+import com.webhook.platform.common.util.PayloadCompression;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -52,6 +52,6 @@ public class Event {
 
     /** Use this, not {@link #getPayload()}, for request bodies, signatures and transforms. */
     public String getDecompressedPayload() {
-        return PayloadCompressionUtil.decompress(payload, payloadCompressed);
+        return PayloadCompression.decompress(payload, payloadCompressed);
     }
 }

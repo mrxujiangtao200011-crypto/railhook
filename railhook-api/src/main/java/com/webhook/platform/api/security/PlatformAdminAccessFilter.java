@@ -38,16 +38,16 @@ public class PlatformAdminAccessFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final PlatformAdminAccessService access;
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
     private final AuthRateLimiterService rateLimiter;
     private final AuditLogAspect audit;
     private final TrustedProxyResolver proxyResolver;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public PlatformAdminAccessFilter(PlatformAdminAccessService access, JwtUtil jwtUtil,
+    public PlatformAdminAccessFilter(PlatformAdminAccessService access, JwtTokenService jwtTokenService,
             AuthRateLimiterService rateLimiter, AuditLogAspect audit, TrustedProxyResolver proxyResolver) {
         this.access = access;
-        this.jwtUtil = jwtUtil;
+        this.jwtTokenService = jwtTokenService;
         this.rateLimiter = rateLimiter;
         this.audit = audit;
         this.proxyResolver = proxyResolver;
@@ -148,8 +148,8 @@ public class PlatformAdminAccessFilter extends OncePerRequestFilter {
             return null;
         }
         try {
-            String raw = jwtUtil.parseToken(header.substring(BEARER_PREFIX.length()))
-                    .get(JwtUtil.CLAIM_SESSION_ID, String.class);
+            String raw = jwtTokenService.parseToken(header.substring(BEARER_PREFIX.length()))
+                    .get(JwtTokenService.CLAIM_SESSION_ID, String.class);
             return raw == null ? null : UUID.fromString(raw);
         } catch (Exception e) {
             return null;

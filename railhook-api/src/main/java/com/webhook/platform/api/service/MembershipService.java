@@ -24,8 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.common.security.SecureTokens;
 
-import com.webhook.platform.common.util.CryptoUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -118,8 +118,8 @@ public class MembershipService {
                     + "Ask them to verify their email address, then invite them again.");
         }
 
-        String inviteToken = CryptoUtils.generateSecureToken(32);
-        String inviteTokenHash = CryptoUtils.hashApiKey(inviteToken);
+        String inviteToken = SecureTokens.generate(32);
+        String inviteTokenHash = SecureTokens.hash(inviteToken);
         Instant expiresAt = Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS);
 
         Membership membership = Membership.builder()
@@ -167,8 +167,8 @@ public class MembershipService {
             throw new ConflictException("Membership has no pending invite to re-issue");
         }
 
-        String inviteToken = CryptoUtils.generateSecureToken(32);
-        membership.setInviteTokenHash(CryptoUtils.hashApiKey(inviteToken));
+        String inviteToken = SecureTokens.generate(32);
+        membership.setInviteTokenHash(SecureTokens.hash(inviteToken));
         membership.setInviteExpiresAt(Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS));
         membershipRepository.save(membership);
 
@@ -195,7 +195,7 @@ public class MembershipService {
     @Auditable(action = AuditAction.INVITE_ACCEPTED, resourceType = "Member")
     @Transactional
     public MemberResponse acceptInvite(UUID organizationId, String inviteToken, UUID authenticatedUserId) {
-        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        String tokenHash = SecureTokens.hash(inviteToken);
         Membership membership = membershipRepository.findByInviteTokenHash(tokenHash)
                 .orElseThrow(() -> new NotFoundException("Invalid or expired invite token"));
 

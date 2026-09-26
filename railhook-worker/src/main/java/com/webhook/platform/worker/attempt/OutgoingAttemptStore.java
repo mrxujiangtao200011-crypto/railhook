@@ -15,7 +15,7 @@ import com.webhook.platform.worker.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.domain.repository.EndpointRepository;
 import com.webhook.platform.worker.domain.repository.EventRepository;
-import com.webhook.platform.worker.service.MtlsWebClientFactory;
+import com.webhook.platform.worker.service.MtlsWebClientCache;
 import com.webhook.platform.worker.service.OrderingBufferService;
 import com.webhook.platform.worker.exception.PayloadTransformException;
 import com.webhook.platform.worker.service.PayloadTransformService;
@@ -59,7 +59,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final OrderingGate orderingGate;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
-    private final MtlsWebClientFactory mtlsWebClientFactory;
+    private final MtlsWebClientCache mtlsWebClientCache;
     private final TransformationCacheService transformationCacheService;
     private final PayloadTransformService payloadTransformService;
     private final ObjectMapper objectMapper;
@@ -83,7 +83,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             OrderingBufferService orderingBufferService,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             EncryptionKeyRegistry encryptionKeyRegistry,
-            MtlsWebClientFactory mtlsWebClientFactory,
+            MtlsWebClientCache mtlsWebClientCache,
             TransformationCacheService transformationCacheService,
             PayloadTransformService payloadTransformService,
             ObjectMapper objectMapper,
@@ -104,7 +104,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         this.orderingGate = new OrderingGate(orderingBufferService, deliveryRepository, kafkaTemplate,
                 transactionTemplate, orderingGapTimeoutCounter, orderingRescheduleDelaySeconds);
         this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.mtlsWebClientFactory = mtlsWebClientFactory;
+        this.mtlsWebClientCache = mtlsWebClientCache;
         this.transformationCacheService = transformationCacheService;
         this.payloadTransformService = payloadTransformService;
         this.objectMapper = objectMapper;
@@ -278,7 +278,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 : event.getId() + "-" + delivery.getEndpointId();
 
         WebClient client = Boolean.TRUE.equals(endpoint.getMtlsEnabled())
-                ? mtlsWebClientFactory.getWebClient(endpoint)
+                ? mtlsWebClientCache.getWebClient(endpoint)
                 : defaultWebClient;
 
         // One set of headers feeds both the request and the record, which used to drift apart.

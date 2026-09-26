@@ -12,12 +12,12 @@ import com.webhook.platform.api.dto.SharedDebugLinkResponse;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -51,7 +51,7 @@ public class SharedDebugLinkService {
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
         int expiryHours = request.getExpiryHours() != null ? request.getExpiryHours() : 24;
-        String token = CryptoUtils.generateSecureToken(32);
+        String token = SecureTokens.generate(32);
 
         SharedDebugLink link = SharedDebugLink.builder()
                 .projectId(projectId)

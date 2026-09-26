@@ -9,7 +9,6 @@ import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.dto.TunnelSessionResponse;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -62,7 +62,7 @@ public class TunnelService {
         }
         enforceActiveTunnelLimit(organizationId);
 
-        String tunnelToken = CryptoUtils.generateSecureToken(48);
+        String tunnelToken = SecureTokens.generate(48);
         String publicSlug = slug(SECURE_RANDOM);
 
         TunnelSession session = TunnelSession.builder()

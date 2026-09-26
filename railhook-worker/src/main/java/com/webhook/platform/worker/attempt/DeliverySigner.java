@@ -4,8 +4,8 @@ import com.webhook.platform.common.enums.SignatureScheme;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.security.SecretRotationWindow;
 import com.webhook.platform.common.util.HeaderSanitizer;
+import com.webhook.platform.common.util.RailhookSignature;
 import com.webhook.platform.common.util.StandardWebhookSignature;
-import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,7 +53,7 @@ class DeliverySigner {
                 : SignatureScheme.BOTH;
 
         String legacy = scheme == SignatureScheme.STANDARD ? null
-                : WebhookSignatureUtils.buildSignatureHeader(secret, previousSecret, timestamp, body);
+                : RailhookSignature.buildSignatureHeader(secret, previousSecret, timestamp, body);
 
         // The delivery id, not the event id, which would collide across a fan-out.
         String standard = scheme == SignatureScheme.LEGACY ? null

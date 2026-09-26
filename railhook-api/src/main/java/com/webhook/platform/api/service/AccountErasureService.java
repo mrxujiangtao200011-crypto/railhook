@@ -14,12 +14,12 @@ import com.webhook.platform.api.domain.repository.UserIdentityRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -131,7 +131,7 @@ public class AccountErasureService {
     private void anonymise(User user) {
         user.setEmail(user.getId() + ERASED_EMAIL_DOMAIN);
         user.setFullName(null);
-        user.setPasswordHash(CryptoUtils.generateSecureToken(32));
+        user.setPasswordHash(SecureTokens.generate(32));
         user.setStatus(UserStatus.DISABLED);
         user.setEmailVerified(false);
         user.setVerificationToken(null);

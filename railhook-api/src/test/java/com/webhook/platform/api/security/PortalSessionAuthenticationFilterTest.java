@@ -5,7 +5,6 @@ import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.PortalSessionRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.service.RedisRateLimiterService;
-import com.webhook.platform.common.util.CryptoUtils;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +13,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -46,13 +46,13 @@ class PortalSessionAuthenticationFilterTest {
             .organizationId(UUID.randomUUID())
             .projectId(UUID.randomUUID())
             .consumerId(UUID.randomUUID())
-            .tokenHash(CryptoUtils.hashApiKey(TOKEN))
+            .tokenHash(SecureTokens.hash(TOKEN))
             .expiresAt(NOW.plusSeconds(60))
             .build();
 
     @BeforeEach
     void setUp() {
-        when(sessions.findByTokenHash(CryptoUtils.hashApiKey(TOKEN))).thenReturn(Optional.of(session));
+        when(sessions.findByTokenHash(SecureTokens.hash(TOKEN))).thenReturn(Optional.of(session));
         when(projects.findById(session.getProjectId())).thenReturn(Optional.of(new Project()));
         when(rateLimiter.tryAcquireForPortalSession(any(UUID.class), anyInt())).thenReturn(true);
     }
