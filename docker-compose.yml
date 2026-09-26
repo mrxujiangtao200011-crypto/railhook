@@ -4,7 +4,7 @@ services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: webhook-postgres
-    # A profile, so DB_MODE=external never starts it.
+    # A profile, so an install on a managed database never starts it.
     profiles: [embedded-db]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-webhook_platform}
@@ -399,8 +399,7 @@ services:
       KAFKA_NUM_PARTITIONS: ${KAFKA_NUM_PARTITIONS:-12}
       SCHEDULING_POOL_SIZE: ${SCHEDULING_POOL_SIZE:-8}
       MANAGEMENT_PORT: 8081
-      # Literal, not a knob: the port is never published, and 127.0.0.1 (which reads safer) once
-      # broke Prometheus's scrape and would now break nginx's health proxy too.
+      # Literal, as for api.
       MANAGEMENT_ADDRESS: 0.0.0.0
       WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
       WEBHOOK_ENCRYPTION_KEYS: ${WEBHOOK_ENCRYPTION_KEYS:-}
@@ -477,8 +476,7 @@ services:
       DELIVERY_ESCALATION_INTERVAL_MS: ${DELIVERY_ESCALATION_INTERVAL_MS:-300000}
       JAVA_EXTRA_OPTS: ${WORKER_JAVA_OPTS:-}
     depends_on:
-      # required:false so an external database does not pull in the embedded-db profile; when
-      # postgres is there, waiting for it keeps Flyway from racing its startup.
+      # required:false, as for api.
       postgres:
         condition: service_healthy
         required: false

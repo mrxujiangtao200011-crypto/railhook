@@ -262,12 +262,6 @@ jobs:
           check http://railhook-ui/                               200
           check http://railhook-ui/actuator/health/liveness       200
 
-      - name: Helm Kind Smoke Summary
-        if: always()
-        run: |
-          echo "### Helm Chart Install Smoke Test" >> $GITHUB_STEP_SUMMARY
-          echo "install into kind -> pods Ready -> health 200 -> metrics 200 (not 401)" >> $GITHUB_STEP_SUMMARY
-
       - name: Dump state on failure
         if: failure()
         run: |
@@ -298,18 +292,8 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
-      - name: Compile all modules
-        run: mvn clean compile -B
-        
-      - name: Package artifacts
-        run: mvn package -DskipTests -B
-
-      - name: Upload CLI JAR
-        uses: actions/upload-artifact@v7
-        with:
-          name: railhook-cli
-          path: railhook-cli/target/railhook-cli-*.jar
-          retention-days: 30
+      - name: Compile and package all modules
+        run: mvn clean package -DskipTests -B
 
   backend-test:
     name: Backend Tests
@@ -328,18 +312,12 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
-      # Distinct exec file names so coverage-report's **/jacoco*.exec picks up both jobs.
       - name: Check test routing
         run: scripts/check-test-routing.sh
 
+      # Distinct exec file names so coverage-report's **/jacoco*.exec picks up both jobs.
       - name: Run unit tests
         run: mvn test -B -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest' -Djacoco.destFile=target/jacoco-unit.exec --fail-at-end
-
-      - name: Test Summary
-        if: always()
-        run: |
-          echo "### Backend Unit Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "Unit tests completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
 
       # Uploaded even on failure so the aggregate job still gets the fullest picture.
       - name: Upload unit test coverage data
@@ -390,13 +368,6 @@ jobs:
           TESTS: ${{ steps.pick.outputs.tests }}
           TESTCONTAINERS_RYUK_DISABLED: true
           DOCKER_API_VERSION: "1.44"
-
-      - name: Integration Test Summary
-        if: always()
-        run: |
-          echo "### Backend Integration Test Results (shard ${{ matrix.shard }})" >> $GITHUB_STEP_SUMMARY
-          echo "Integration tests with Testcontainers completed." >> $GITHUB_STEP_SUMMARY
-          echo "- PostgreSQL: Testcontainers" >> $GITHUB_STEP_SUMMARY
 
       # Tarred: upload-artifact drops the railhook-<module>/target/ prefix when all files share it.
       - name: Pack integration test coverage data
@@ -559,12 +530,6 @@ jobs:
             exit 1
           fi
 
-      - name: Restore Drill Summary
-        if: always()
-        run: |
-          echo "### Backup/Restore Drill Results" >> $GITHUB_STEP_SUMMARY
-          echo "backup -> destroy -> restore -> assert data integrity: PASSED" >> $GITHUB_STEP_SUMMARY
-
       - name: Cleanup
         if: always()
         run: docker compose --profile embedded-db down -v
@@ -639,12 +604,6 @@ jobs:
       - name: Run tests with coverage
         working-directory: railhook-ui
         run: npm run test:coverage
-
-      - name: Test Summary
-        if: always()
-        run: |
-          echo "### Frontend Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "Vitest tests + coverage thresholds completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
 
       - name: Upload frontend coverage report
         if: always()
@@ -736,14 +695,6 @@ jobs:
         working-directory: railhook-ui
         run: npm run build
       
-      - name: Build Summary
-        if: always()
-        run: |
-          echo "### Frontend Build Results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ ESLint passed" >> $GITHUB_STEP_SUMMARY
-          echo "✅ TypeScript typecheck passed" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Production build successful" >> $GITHUB_STEP_SUMMARY
-
   # Not a required check: a flaky browser job must not wedge merges into main.
   frontend-e2e:
     name: Frontend E2E (mobile + desktop)
@@ -805,14 +756,6 @@ jobs:
       - name: Run SpotBugs analysis
         run: mvn compile com.github.spotbugs:spotbugs-maven-plugin:4.8.3.1:check -B -DskipTests
         continue-on-error: true
-
-      - name: SAST Summary
-        if: always()
-        run: |
-          echo "### SAST (SpotBugs) Results" >> $GITHUB_STEP_SUMMARY
-          echo "Static analysis completed. Check workflow logs for findings." >> $GITHUB_STEP_SUMMARY
-          echo "_Advisory only — see comment in ci.yml for why this doesn't gate yet._" >> $GITHUB_STEP_SUMMARY
-
 
   docker-build:
     name: Docker Images (${{ matrix.svc }})
@@ -1202,10 +1145,3 @@ jobs:
       - name: Run Trivy on UI image (HIGH - informational)
         if: always()
         run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update railhook-ui:test
-
-      - name: Container Scan Summary
-        if: always()
-        run: |
-          echo "### Container Scan (Trivy) Results" >> $GITHUB_STEP_SUMMARY
-          echo "Container vulnerability scan completed for all images." >> $GITHUB_STEP_SUMMARY
-          echo "CRITICAL findings fail the build; HIGH is informational during the staged rollout." >> $GITHUB_STEP_SUMMARY

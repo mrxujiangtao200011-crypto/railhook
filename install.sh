@@ -97,7 +97,7 @@ resolve_compose() {
     fi
 }
 compose() {
-    resolve_compose || die "Docker Compose v2 is not available (tried 'docker compose' and 'docker-compose')"
+    resolve_compose || die "Docker Compose is not available (tried 'docker compose' and 'docker-compose'): https://docs.docker.com/compose/install/"
     # shellcheck disable=SC2086 # one word or two
     $COMPOSE_CMD "$@"
 }
@@ -113,7 +113,7 @@ check_system() {
     command -v docker >/dev/null 2>&1 || die "Docker is not installed: https://docs.docker.com/engine/install/"
     docker info >/dev/null 2>&1 \
         || die "The Docker daemon is not reachable. Start it, or join the docker group: sudo usermod -aG docker \$USER && newgrp docker"
-    resolve_compose || die "Docker Compose v2 is not available: https://docs.docker.com/compose/install/"
+    resolve_compose || die "Docker Compose is not available (tried 'docker compose' and 'docker-compose'): https://docs.docker.com/compose/install/"
     say "Docker $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo '?'), using '${COMPOSE_CMD}'"
 
     # Two JVMs, Kafka, Postgres and Redis: below 2 GiB they do not all start.
@@ -121,7 +121,7 @@ check_system() {
     mem_gb=$(awk '/MemTotal/ {print int($2 / 1048576)}' /proc/meminfo 2>/dev/null || true)
     while [ ! -d "$target" ]; do target=$(dirname "$target"); done
     disk_gb=$(df -Pk "$target" 2>/dev/null | awk 'NR == 2 {print int($4 / 1048576)}' || true)
-    [ -z "$mem_gb" ] || [ "$mem_gb" -ge 2 ] || die "${mem_gb} GiB of RAM; the stack needs about 4 GiB"
+    [ -z "$mem_gb" ] || [ "$mem_gb" -ge 2 ] || die "${mem_gb} GiB of RAM; the stack needs at least 2 GiB, about 4 GiB to run comfortably"
     if [ "${mem_gb:-4}" -lt 4 ] || [ "${disk_gb:-5}" -lt 5 ]; then
         warn "${mem_gb:-?} GiB RAM and ${disk_gb:-?} GiB free disk; about 4 GiB RAM and 5 GiB disk are recommended"
     fi
@@ -471,9 +471,12 @@ case "${1:-help}" in
             -Fc --no-owner --no-privileges > "$f" || { rm -f "$f"; echo "pg_dump failed." >&2; exit 1; }
         echo "Wrote $f. Keep .env with it: the encrypted columns need WEBHOOK_ENCRYPTION_KEY." ;;
     settings) apply_settings ;;
-    doctor)  curl -fsSL "${RAW}/main/install.sh" | bash -s -- --check --dir "$(pwd)" ;;
+    doctor)
+        tag=$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2- || true)
+        case "$tag" in ''|latest) ref=main ;; *) ref="v${tag#v}" ;; esac
+        curl -fsSL "${RAW}/${ref}/install.sh" | bash -s -- --check --dir "$(pwd)" ;;
     help|-h|--help)
-        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|backup|doctor"
+        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|backup|settings < file|doctor"
         echo "Anything else is passed to docker compose. After editing .env, run ./railhook start." ;;
     *)       compose "$@" ;;
 esac
@@ -543,8 +546,8 @@ start_stack
 say ""
 say "Railhook is running at ${BASE_URL} (API ${BASE_URL}/api/v1, docs ${BASE_URL}/docs)."
 say "Register on the dashboard; without SMTP the first account is active immediately."
-say "In ${INSTALL_DIR}: ./railhook status | logs | stop | start | upgrade | backup | doctor"
-say ".env holds your secrets. Back it up."
+say "In ${INSTALL_DIR}: ./railhook status | logs | stop | start | upgrade | backup | settings | doctor"
+say ".env holds your secrets: back it up with the database."
 if [ "$BEHIND_PROXY" = 1 ]; then
     proxy_hint
 elif [ -z "$DOMAIN" ]; then
