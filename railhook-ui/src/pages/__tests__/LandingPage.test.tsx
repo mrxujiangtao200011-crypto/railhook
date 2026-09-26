@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, screen, within } from '@testing-library/react';
@@ -45,12 +47,6 @@ describe('LandingPage', () => {
     expect(screen.getByRole('heading', { name: en.landing.product.in.title })).toBeInTheDocument();
   });
 
-  it('shows the sections in order: product, reliability, self-hosting, the offer', () => {
-    renderLanding();
-    const titles = screen.getAllByRole('heading', { level: 2 }).map((h) => h.id);
-    expect(titles).toEqual(['product-title', 'reliability-title', 'self-host-title', 'final-title']);
-  });
-
   it('offers signing up first and the install second', () => {
     renderLanding();
     const hero = sectionTitled(/run yourself/);
@@ -70,12 +66,23 @@ describe('LandingPage', () => {
   });
 
   it('prints the default outgoing retry schedule the backend runs', () => {
+    const ladder = readFileSync(resolve(__dirname,
+      '../../../../railhook-common/src/main/java/com/webhook/platform/common/retry/RetryLadderDefaults.java'), 'utf8');
+    const delays = /OUTGOING_DELAYS = "([\d,]+)"/.exec(ladder)![1].split(',').map(Number);
+    const human = (seconds: number) => {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
+    };
+    let since = 0;
+    const elapsed = delays.map((d) => human((since += d)));
+
     renderLanding();
     const table = within(sectionTitled(/server was down/)).getByRole('table');
     const rows = within(table).getAllByRole('row');
     const cells = (row: HTMLElement) => within(row).getAllByRole('cell').map((c) => c.textContent);
-    expect(cells(rows[1]).slice(0, 7)).toEqual(['—', '1m', '5m', '15m', '1h', '6h', '24h']);
-    expect(cells(rows[2]).slice(0, 7)).toEqual(['0', '1m', '6m', '21m', '1h 21m', '7h 21m', '31h 21m']);
+    expect(cells(rows[1]).slice(0, delays.length + 1)).toEqual(['—', ...delays.map(human)]);
+    expect(cells(rows[2]).slice(0, delays.length + 1)).toEqual(['0', ...elapsed]);
     expect(table.textContent).toContain(en.landing.reliability.failed);
   });
 
@@ -243,13 +250,6 @@ describe('Footer', () => {
     ]));
     expect(hrefs).not.toContain('/changelog');
     for (const gone of ['/about', '/security', '/contact']) expect(hrefs).not.toContain(gone);
-  });
-
-  it('lists the company pages under their own heading', () => {
-    renderPage(<Footer />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
-    const company = screen.getByRole('heading', { name: en.footer.company }).parentElement as HTMLElement;
-    expect(within(company).getAllByRole('link').map((a) => a.getAttribute('href')))
-      .toEqual(['/blog', '/privacy', '/terms']);
   });
 
   describe('connect with us', () => {

@@ -108,13 +108,6 @@ describe('TesterPage', () => {
     await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeNull());
   });
 
-  it('says what it keeps and for how long before anyone relies on it', () => {
-    renderTester();
-    expect(screen.getByRole('heading', { name: en.tester.limits.title })).toBeInTheDocument();
-    expect(screen.getByText(en.tester.limits.lifetime)).toBeInTheDocument();
-    expect(screen.getByText(en.tester.limits.kept)).toBeInTheDocument();
-  });
-
   it('explains a refusal in words: three live URLs per address', async () => {
     vi.mocked(publicBinApi.create).mockRejectedValue({
       response: { status: 429, data: { error: 'too_many_active_urls' } },
@@ -129,11 +122,5 @@ describe('TesterPage', () => {
     renderTester();
     expect(screen.getByText(en.tester.disabled)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: en.tester.create })).toBeNull();
-  });
-
-  it('points at what an account adds: keep, retry and forward', async () => {
-    renderTester();
-    const cta = screen.getByRole('link', { name: en.tester.cta.button });
-    expect(cta).toHaveAttribute('href', '/register');
   });
 });

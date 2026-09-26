@@ -182,26 +182,18 @@ describe('MembersPage', () => {
     await screen.findByText('owner@example.com');
     expect(screen.queryByRole('button', { name: /suspend owner@example\.com/i })).toBeNull();
   });
-  it('filters the list by email', async () => {
+  it.each([
+    ['email', 'dev@', 'dev@example.com', 'owner@example.com'],
+    ['role, the other way people look for someone', 'owner', 'owner@example.com', 'dev@example.com'],
+  ])('filters the list by %s', async (_, query, shown, hidden) => {
     vi.mocked(membersApi.list).mockResolvedValue([OWNER, ACTIVE_MEMBER]);
     renderMembers();
 
     await screen.findByText('owner@example.com');
-    await userEvent.type(screen.getByRole('textbox', { name: /search by email or role/i }), 'dev@');
+    await userEvent.type(screen.getByRole('textbox', { name: /search by email or role/i }), query);
 
-    expect(screen.getByText('dev@example.com')).toBeInTheDocument();
-    expect(screen.queryByText('owner@example.com')).toBeNull();
-  });
-
-  it('filters by role too, because that is the other way people look for someone', async () => {
-    vi.mocked(membersApi.list).mockResolvedValue([OWNER, ACTIVE_MEMBER]);
-    renderMembers();
-
-    await screen.findByText('owner@example.com');
-    await userEvent.type(screen.getByRole('textbox', { name: /search by email or role/i }), 'owner');
-
-    expect(screen.getByText('owner@example.com')).toBeInTheDocument();
-    expect(screen.queryByText('dev@example.com')).toBeNull();
+    expect(screen.getByText(shown)).toBeInTheDocument();
+    expect(screen.queryByText(hidden)).toBeNull();
   });
 
   it('says so when nothing matches, rather than showing an empty table', async () => {
