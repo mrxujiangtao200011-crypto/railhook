@@ -67,7 +67,6 @@ class IntakePlannerTest {
     }
 
     @Nested
-    @DisplayName("subscriptions")
     class Subscriptions {
 
         @Test
@@ -103,7 +102,6 @@ class IntakePlannerTest {
     }
 
     @Nested
-    @DisplayName("DROP")
     class Drop {
 
         @Test
@@ -134,7 +132,6 @@ class IntakePlannerTest {
     }
 
     @Nested
-    @DisplayName("ROUTE")
     class Route {
 
         @Test
@@ -179,7 +176,6 @@ class IntakePlannerTest {
     }
 
     @Nested
-    @DisplayName("TRANSFORM")
     class Transform {
 
         @Test

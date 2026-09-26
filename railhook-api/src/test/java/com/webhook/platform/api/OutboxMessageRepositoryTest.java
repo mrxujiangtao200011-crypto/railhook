@@ -9,6 +9,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -18,6 +20,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.IntSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,26 +38,17 @@ public class OutboxMessageRepositoryTest extends AbstractIntegrationTest {
     @Autowired
     private EntityManager entityManager;
 
-    private int inTransaction(java.util.function.IntSupplier update) {
+    private int inTransaction(IntSupplier update) {
         int rows = new TransactionTemplate(transactionManager).execute(tx -> update.getAsInt());
         entityManager.clear();
         return rows;
     }
 
-    @Test
-    void findPendingBatchForUpdate_shouldReturnRowWithProjectId() {
-        OutboxMessage message = outboxMessageRepository.save(pendingMessage(UUID.randomUUID()));
-
-        List<OutboxMessage> batch = outboxMessageRepository.findPendingBatchForUpdate(
-                OutboxStatus.PENDING.name(), 100, 10, 30);
-
-        assertTrue(batch.stream().anyMatch(m -> m.getId().equals(message.getId())));
-    }
-
-    @Test
-    void findPendingBatchForUpdate_shouldReturnRowWithNullProjectId() {
-        // No project_id: the ingress path writes outbox rows keyed only by kafka_key.
-        OutboxMessage message = outboxMessageRepository.save(pendingMessage(null));
+    // No project_id: the ingress path writes outbox rows keyed only by kafka_key.
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void findPendingBatchForUpdate_returnsTheRowWithOrWithoutAProject(boolean hasProject) {
+        OutboxMessage message = outboxMessageRepository.save(pendingMessage(hasProject ? UUID.randomUUID() : null));
 
         List<OutboxMessage> batch = outboxMessageRepository.findPendingBatchForUpdate(
                 OutboxStatus.PENDING.name(), 100, 10, 30);

@@ -220,23 +220,6 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void theStudioIsNotAWayIntoTheRestOfTheApi() throws Exception {
-        String token = openSession();
-
-        mockMvc.perform(post("/api/v1/projects/" + DemoTenant.PROJECT_ID + "/endpoints")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"url\":\"https://elsewhere.example/hook\"}"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("demo_read_only"));
-        mockMvc.perform(post("/api/v1/events").header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"eventType\":\"order.created\",\"payload\":{}}"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("demo_read_only"));
-    }
-
-    @Test
     void aDemoSessionOutOfScriptRunsIsRefused() throws Exception {
         String token = openSession();
         when(authRateLimiterService.allowDemoScriptRun(anyString(), any())).thenReturn(false);

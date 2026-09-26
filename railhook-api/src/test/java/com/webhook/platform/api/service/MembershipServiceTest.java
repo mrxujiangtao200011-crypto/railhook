@@ -414,7 +414,6 @@ class MembershipServiceTest {
         }
 
         @Test
-        @DisplayName("an owner cannot suspend themselves")
         void ownerCannotSuspendThemselves() {
             membership.setRole(MembershipRole.OWNER);
             when(membershipRepository.findByUserIdAndOrganizationId(ownerId, organizationId))

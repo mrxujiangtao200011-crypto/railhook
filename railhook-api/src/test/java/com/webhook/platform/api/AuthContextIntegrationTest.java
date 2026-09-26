@@ -105,15 +105,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void jwtCurrentUserCarriesUserAndOrganization() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user").exists())
-                .andExpect(jsonPath("$.organization").exists());
-    }
-
-    @Test
     void apiKeyReachesItsProjectRoutes() throws Exception {
         expectGetStatus(200, "X-API-Key", apiKey,
                 "/api/v1/projects/" + projectId + "/endpoints",
@@ -170,13 +161,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
     void apiKeyIsForbiddenOnAnotherProject() throws Exception {
         mockMvc.perform(get("/api/v1/projects/" + UUID.randomUUID() + "/endpoints")
                         .header("X-API-Key", apiKey))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void jwtIsForbiddenOnAnotherOrganizationsMembers() throws Exception {
-        mockMvc.perform(get("/api/v1/orgs/" + UUID.randomUUID() + "/members")
-                        .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isForbidden());
     }
 

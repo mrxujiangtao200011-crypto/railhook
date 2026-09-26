@@ -134,7 +134,6 @@ class StaleForwardEscalationServiceTest {
     }
 
     @Test
-    @DisplayName("a Kafka failure does not undo the committed DLQ write")
     void kafkaFailureDoesNotUndoTheWrite() {
         IncomingForwardAttempt attempt = pendingAttempt(UUID.randomUUID(), UUID.randomUUID(), 1);
         when(attemptRepository.findStaleForwardAttemptIds(any(Instant.class), anyInt()))

@@ -105,7 +105,6 @@ class AlertServiceTest {
     class EmailRecipients {
 
         @Nested
-        @DisplayName("the request")
         class RequestValidation {
 
             private final Validator validator = VALIDATORS.getValidator();
@@ -196,7 +195,6 @@ class AlertServiceTest {
     class WebhookUrlValidation {
 
         @Test
-        @DisplayName("the cloud metadata endpoint is refused on create")
         void metadataEndpointRefusedOnCreate() {
             assertThatThrownBy(() -> service.createRule(projectId, request("http://169.254.169.254/latest/meta-data/")))
                     .isInstanceOf(InvalidUrlException.class);

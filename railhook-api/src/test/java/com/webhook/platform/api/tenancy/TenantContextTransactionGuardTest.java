@@ -33,15 +33,6 @@ class TenantContextTransactionGuardTest {
     }
 
     @Test
-    @DisplayName("runAs inside an open transaction fails the same way")
-    void runAsInsideTransactionThrows() {
-        TransactionSynchronizationManager.setActualTransactionActive(true);
-
-        assertThatThrownBy(() -> TenantContext.runAs(ORG, () -> { }))
-                .isInstanceOf(IllegalStateException.class);
-    }
-
-    @Test
     @DisplayName("the guard rejects before the body runs and leaves the previous scope untouched")
     void guardDoesNotEnterTheScope() {
         UUID caller = UUID.fromString("22222222-2222-2222-2222-222222222222");

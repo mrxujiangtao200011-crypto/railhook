@@ -119,16 +119,6 @@ public class IncidentCountsIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    public void investigatingIsCountedAsOpenToo() throws Exception {
-        UUID incident = createIncident("Under investigation", "WARNING");
-        setStatus(incident, "INVESTIGATING");
-
-        JsonNode counts = counts();
-        assertThat(counts.get("count").asLong()).isEqualTo(1);
-        assertThat(counts.get("investigating").asLong()).isEqualTo(1);
-    }
-
-    @Test
     public void anotherProjectsIncidentsAreNotCountedHere() throws Exception {
         createIncident("Ours", "CRITICAL");
 

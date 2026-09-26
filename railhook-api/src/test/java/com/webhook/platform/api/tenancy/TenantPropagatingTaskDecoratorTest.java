@@ -47,35 +47,28 @@ class TenantPropagatingTaskDecoratorTest {
     }
 
     @Test
-    @DisplayName("submit(Callable) propagates too, and the value comes back")
+    @DisplayName("submit(Callable) propagates too, system scope included, and the value comes back")
     void wrapPropagatesOnSubmit() throws Exception {
         pool = TenantPropagatingTaskDecorator.wrap(Executors.newSingleThreadExecutor());
 
         TenantContext.set(ORG);
         Future<UUID> result = pool.submit(TenantContext::current);
-
         assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo(ORG);
-    }
 
-    @Test
-    @DisplayName("system scope propagates like any other, so a scheduler's pool sees root")
-    void wrapPropagatesSystemScope() throws Exception {
-        pool = TenantPropagatingTaskDecorator.wrap(Executors.newSingleThreadExecutor());
-
-        UUID seen = TenantContext.callAsSystem(() -> {
+        // A scheduler's pool must see root.
+        UUID seenBySystem = TenantContext.callAsSystem(() -> {
             try {
                 return pool.submit(TenantContext::current).get(5, TimeUnit.SECONDS);
             } catch (Exception e) {
                 throw new IllegalStateException(e);
             }
         });
-
-        assertThat(seen).isEqualTo(TenantContext.SYSTEM);
+        assertThat(seenBySystem).isEqualTo(TenantContext.SYSTEM);
     }
 
     @Test
-    @DisplayName("an unscoped submission propagates nothing rather than writing null into the ThreadLocal")
-    void wrapLeavesTheWorkerThreadUnscopedWhenTheSubmitterIs() throws Exception {
+    @DisplayName("an unscoped submission propagates nothing: the worker keeps whatever scope it already had")
+    void anUnscopedSubmissionLeavesTheWorkersOwnScopeAlone() throws Exception {
         pool = TenantPropagatingTaskDecorator.wrap(Executors.newSingleThreadExecutor());
 
         pool.submit(() -> TenantContext.set(ORG)).get(5, TimeUnit.SECONDS);
@@ -114,8 +107,8 @@ class TenantPropagatingTaskDecoratorTest {
                 Thread.currentThread().interrupt();
             }
         };
-        pool.execute(block);   // occupies the single thread
-        pool.execute(block);   // fills the single queue slot
+        pool.execute(block);
+        pool.execute(block);
 
         assertThatThrownBy(() -> pool.execute(block)).isInstanceOf(RejectedExecutionException.class);
     }

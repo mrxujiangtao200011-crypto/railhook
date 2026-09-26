@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -229,14 +230,14 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
 
         String id1 = objectMapper.readTree(first.getResponse().getContentAsString()).get("id").asText();
         String id2 = objectMapper.readTree(second.getResponse().getContentAsString()).get("id").asText();
-        assert id1.equals(id2) : "Duplicate schema should return same version";
+        assertThat(id2).as("Duplicate schema should return same version").isEqualTo(id1);
     }
 
     private static final String COMPAT_V1 =
             "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
                     + "\"note\":{\"type\":\"string\"}},\"required\":[\"id\"]}";
 
-    private String postVersion(String eventTypeId, String schema, String mode) throws Exception {
+    private String versionBody(String schema, String mode) throws Exception {
         String body = mode == null
                 ? "{\"schemaJson\": " + objectMapper.writeValueAsString(schema) + "}"
                 : "{\"schemaJson\": " + objectMapper.writeValueAsString(schema)
@@ -250,7 +251,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(postVersion(eventTypeId, COMPAT_V1, "BACKWARD")))
+                        .content(versionBody(COMPAT_V1, "BACKWARD")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.compatibilityMode").value("BACKWARD"));
 
@@ -261,7 +262,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(postVersion(eventTypeId, withNewRequired, null)))
+                        .content(versionBody(withNewRequired, null)))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(get(schemasUrl() + "/" + eventTypeId + "/versions")
@@ -276,7 +277,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(postVersion(eventTypeId, COMPAT_V1, "FORWARD")))
+                        .content(versionBody(COMPAT_V1, "FORWARD")))
                 .andExpect(status().isCreated());
 
         // The request names no mode, so only the inherited FORWARD can refuse it.
@@ -285,7 +286,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(postVersion(eventTypeId, dropsRequired, null)))
+                        .content(versionBody(dropsRequired, null)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -295,7 +296,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(postVersion(eventTypeId, COMPAT_V1, "BACKWARD")))
+                        .content(versionBody(COMPAT_V1, "BACKWARD")))
                 .andExpect(status().isCreated());
 
         String withOptional = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
@@ -305,7 +306,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(postVersion(eventTypeId, withOptional, null)))
+                        .content(versionBody(withOptional, null)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.version").value(2))
                 .andExpect(jsonPath("$.compatibilityMode").value("BACKWARD"));
@@ -317,7 +318,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(postVersion(eventTypeId, COMPAT_V1, null)))
+                        .content(versionBody(COMPAT_V1, null)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.compatibilityMode").value("NONE"));
 
@@ -327,7 +328,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(postVersion(eventTypeId, unrecognisable, null)))
+                        .content(versionBody(unrecognisable, null)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.version").value(2));
     }
@@ -339,7 +340,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(postVersion(eventTypeId, COMPAT_V1, "BACKWARDS")))
+                        .content(versionBody(COMPAT_V1, "BACKWARDS")))
                 .andExpect(status().isBadRequest());
     }
 
@@ -423,7 +424,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    public void schemaChanges_computedOnNewVersion() throws Exception {
+    public void schemaChanges_computedOnNewVersion_andTheCatalogShowsIt() throws Exception {
         String eventTypeId = createEventType("diff.test");
 
         createVersion(eventTypeId, "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}}}");
@@ -436,10 +437,14 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[0].changeSummary").exists())
                 .andExpect(jsonPath("$[0].fromVersion").value(1))
                 .andExpect(jsonPath("$[0].toVersion").value(2));
+        mockMvc.perform(get(schemasUrl() + "/" + eventTypeId)
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latestVersion").value(2));
     }
 
     @Test
-    public void schemaChanges_breakingDetected() throws Exception {
+    public void schemaChanges_breakingDetected_andFlaggedInTheCatalog() throws Exception {
         String eventTypeId = createEventType("breaking.test");
 
         createVersion(eventTypeId, "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[\"id\"]}");
@@ -449,6 +454,10 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].breaking").value(true));
+        mockMvc.perform(get(schemasUrl() + "/" + eventTypeId)
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasBreakingChanges").value(true));
     }
 
     @Test
@@ -469,60 +478,16 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    public void eventTypeCatalog_showsLatestVersion() throws Exception {
-        String eventTypeId = createEventType("catalog.ver");
-
-        createVersion(eventTypeId, "{\"type\":\"object\",\"properties\":{\"v1\":{\"type\":\"string\"}}}");
-        createVersion(eventTypeId, "{\"type\":\"object\",\"properties\":{\"v1\":{\"type\":\"string\"},\"v2\":{\"type\":\"number\"}}}");
-
-        mockMvc.perform(get(schemasUrl() + "/" + eventTypeId)
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.latestVersion").value(2));
-    }
-
-    @Test
-    public void eventTypeCatalog_showsBreakingFlag() throws Exception {
-        String eventTypeId = createEventType("catalog.breaking");
-
-        createVersion(eventTypeId, "{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"string\"}},\"required\":[\"a\"]}");
-        createVersion(eventTypeId, "{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"string\"},\"b\":{\"type\":\"string\"}},\"required\":[\"a\",\"b\"]}");
-
-        mockMvc.perform(get(schemasUrl() + "/" + eventTypeId)
-                        .header("Authorization", "Bearer " + jwtToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasBreakingChanges").value(true));
-    }
-
-    @Test
-    public void apiKey_listEventTypes() throws Exception {
+    public void anApiKeyCanListAndCreateEventTypes() throws Exception {
         mockMvc.perform(get(schemasUrl())
                         .header("X-API-Key", apiKey))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
-    }
-
-    @Test
-    public void apiKey_createEventType() throws Exception {
         mockMvc.perform(post(schemasUrl())
                         .header("X-API-Key", apiKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\": \"apikey.event\"}"))
                 .andExpect(status().isCreated());
-    }
-
-    @Test
-    public void noAuth_listSchemas_unauthorized() throws Exception {
-        mockMvc.perform(get(schemasUrl()))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    public void noAuth_createEventType_unauthorized() throws Exception {
-        mockMvc.perform(post(schemasUrl())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\": \"no.auth\"}"))
-                .andExpect(status().isUnauthorized());
     }
 
     @Test

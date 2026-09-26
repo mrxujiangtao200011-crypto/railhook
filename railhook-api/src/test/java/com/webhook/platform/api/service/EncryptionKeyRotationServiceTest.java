@@ -42,7 +42,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("EncryptionKeyRotationService")
 class EncryptionKeyRotationServiceTest {
 
     private static final String KEY_V1 = "old_master_key_32_chars_long_pad";
@@ -111,7 +110,6 @@ class EncryptionKeyRotationServiceTest {
     }
 
     @Nested
-    @DisplayName("Endpoint rotation")
     class EndpointRotation {
 
         @Test
@@ -312,7 +310,6 @@ class EncryptionKeyRotationServiceTest {
     }
 
     @Nested
-    @DisplayName("Error handling")
     class ErrorHandling {
 
         @Test
@@ -356,7 +353,6 @@ class EncryptionKeyRotationServiceTest {
     }
 
     @Nested
-    @DisplayName("Distributed lock")
     class DistributedLock {
 
         @Test

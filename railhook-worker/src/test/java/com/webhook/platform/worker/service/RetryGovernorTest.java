@@ -62,7 +62,7 @@ class RetryGovernorTest {
         assertEquals(1, gov.getCooldownRemaining());
 
         assertEquals(0, gov.computeEffectiveBatch(0));
-        assertEquals(0, gov.getCooldownRemaining()); // consumed
+        assertEquals(0, gov.getCooldownRemaining());
 
         assertTrue(gov.computeEffectiveBatch(0) > 0);
     }

@@ -5,11 +5,15 @@ import com.webhook.platform.api.service.EmailService;
 import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -66,37 +70,26 @@ public class PublicContactIntegrationTest extends AbstractIntegrationTest {
                 "We send about two million events a month. Can we talk?", "/pricing");
     }
 
-    @Test
-    public void anAddressThatIsNotOneIsRefused() throws Exception {
-        mockMvc.perform(send(VALID.replace("ada@example.com", "not-an-address")))
+    static Stream<Arguments> invalidFields() {
+        String message = "We send about two million events a month. Can we talk?";
+        return Stream.of(
+                Arguments.of("ada@example.com", "not-an-address"),
+                Arguments.of(message, " "),
+                Arguments.of("\"sales\"", "\"<script>\""),
+                Arguments.of(message, "x".repeat(5001)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidFields")
+    public void anInvalidFieldIsRefusedAndNothingIsSent(String valid, String invalid) throws Exception {
+        mockMvc.perform(send(VALID.replace(valid, invalid)))
                 .andExpect(status().isBadRequest());
 
         verify(emailService, never()).sendContactMessage(any(), any(), any(), any(), any());
     }
 
     @Test
-    public void anEmptyMessageIsRefused() throws Exception {
-        mockMvc.perform(send(VALID.replace("We send about two million events a month. Can we talk?", " ")))
-                .andExpect(status().isBadRequest());
-
-        verify(emailService, never()).sendContactMessage(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    public void anUnknownTopicIsRefused() throws Exception {
-        mockMvc.perform(send(VALID.replace("\"sales\"", "\"<script>\"")))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    public void aMessageTooLongIsRefused() throws Exception {
-        String longMessage = "x".repeat(5001);
-        mockMvc.perform(send(VALID.replace("We send about two million events a month. Can we talk?", longMessage)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    public void aFailedChallengeSendsNothing() throws Exception {
+    public void aFailedChallengeSendsNothingAndSpendsNoneOfTheDailyCeiling() throws Exception {
         when(captchaVerifier.verify(any(), anyString())).thenReturn(false);
 
         mockMvc.perform(send(VALID))
@@ -104,6 +97,7 @@ public class PublicContactIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("captcha_failed"));
 
         verify(emailService, never()).sendContactMessage(any(), any(), any(), any(), any());
+        verify(contactMessageBudget, never()).tryAcquire();
     }
 
     @Test
@@ -126,15 +120,6 @@ public class PublicContactIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("contact_busy"));
 
         verify(emailService, never()).sendContactMessage(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    public void aFailedChallengeSpendsNoneOfTheDailyCeiling() throws Exception {
-        when(captchaVerifier.verify(any(), anyString())).thenReturn(false);
-
-        mockMvc.perform(send(VALID)).andExpect(status().isBadRequest());
-
-        verify(contactMessageBudget, never()).tryAcquire();
     }
 
     @Test

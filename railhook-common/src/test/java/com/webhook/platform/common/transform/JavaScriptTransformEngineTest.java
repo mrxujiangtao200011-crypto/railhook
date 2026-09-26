@@ -191,7 +191,6 @@ class JavaScriptTransformEngineTest {
     }
 
     @Nested
-    @DisplayName("console")
     class Console {
 
         @Test

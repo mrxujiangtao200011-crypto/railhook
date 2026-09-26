@@ -2,6 +2,8 @@ package com.webhook.platform.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -31,19 +33,12 @@ public class HttpErrorMappingIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("method_not_allowed"));
     }
 
-    @Test
-    public void malformedJsonIs400() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"{not json", ""})
+    void anUnreadableOrMissingBodyIs400(String body) throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{not json"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("malformed_request"));
-    }
-
-    @Test
-    public void anEmptyBodyWhereOneIsRequiredIs400() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("malformed_request"));
     }

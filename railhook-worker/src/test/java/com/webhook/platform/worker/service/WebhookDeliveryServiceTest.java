@@ -919,7 +919,7 @@ class WebhookDeliveryServiceTest {
 
         localService.processDelivery(message, true);
 
-        verifyNoInteractions(endpointRepository); // never even looked up -- buffered before that
+        verifyNoInteractions(endpointRepository);
         verify(orderingBufferService).bufferDelivery(endpointId, deliveryId, 10L);
 
         ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
@@ -963,7 +963,7 @@ class WebhookDeliveryServiceTest {
 
             service.processDelivery(message, true);
 
-            verify(endpointRepository).findById(endpointId); // proceeded past the ordering check
+            verify(endpointRepository).findById(endpointId);
             verify(orderingBufferService, never()).bufferDelivery(any(), any(), anyLong());
         } finally {
             httpServer.stop(0);
@@ -996,7 +996,7 @@ class WebhookDeliveryServiceTest {
 
         service.processDelivery(message, true);
 
-        verifyNoInteractions(endpointRepository); // nothing was sent
+        verifyNoInteractions(endpointRepository);
         verify(orderingBufferService).bufferDelivery(endpointId, deliveryId, 6L);
         assertEquals(0.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count(),
                 "a gap that is about to close has not timed out");
@@ -1049,7 +1049,7 @@ class WebhookDeliveryServiceTest {
 
             service.processDelivery(message, true);
 
-            verify(endpointRepository).findById(endpointId); // proceeded despite the gap
+            verify(endpointRepository).findById(endpointId);
             assertEquals(1.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count());
         } finally {
             httpServer.stop(0);

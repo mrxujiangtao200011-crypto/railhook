@@ -97,29 +97,16 @@ class StrandedSequenceRepositoryTest extends AbstractIntegrationTest {
         assertThat(stranded()).doesNotContain(justCommitted.getId());
     }
 
+    // Unordered ones never wanted a number, one with its number is done, a resolved one's ordering question is over.
     @Test
-    @DisplayName("unordered deliveries are not stranded — they never wanted a number")
-    void ignoresUnorderedDeliveries() {
-        Delivery unordered = delivery(false, null, DeliveryStatus.PENDING, Instant.now().minus(1, ChronoUnit.HOURS));
+    void ignoresUnorderedNumberedAndResolvedDeliveries() {
+        Instant anHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
+        Delivery unordered = delivery(false, null, DeliveryStatus.PENDING, anHourAgo);
+        Delivery numbered = delivery(true, 42L, DeliveryStatus.PENDING, anHourAgo);
+        Delivery done = delivery(true, null, DeliveryStatus.SUCCESS, anHourAgo);
+        Delivery abandoned = delivery(true, null, DeliveryStatus.DLQ, anHourAgo);
 
-        assertThat(stranded()).doesNotContain(unordered.getId());
-    }
-
-    @Test
-    @DisplayName("one that already has its number is not touched again")
-    void ignoresDeliveriesThatHaveOne() {
-        Delivery fine = delivery(true, 42L, DeliveryStatus.PENDING, Instant.now().minus(1, ChronoUnit.HOURS));
-
-        assertThat(stranded()).doesNotContain(fine.getId());
-    }
-
-    @Test
-    @DisplayName("a resolved delivery is not repaired — its ordering question is already over")
-    void ignoresResolvedDeliveries() {
-        Delivery done = delivery(true, null, DeliveryStatus.SUCCESS, Instant.now().minus(1, ChronoUnit.HOURS));
-        Delivery abandoned = delivery(true, null, DeliveryStatus.DLQ, Instant.now().minus(1, ChronoUnit.HOURS));
-
-        assertThat(stranded()).doesNotContain(done.getId(), abandoned.getId());
+        assertThat(stranded()).doesNotContain(unordered.getId(), numbered.getId(), done.getId(), abandoned.getId());
     }
 
     // Both callers run the backfill with no transaction open.

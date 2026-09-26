@@ -1,5 +1,8 @@
 package com.webhook.platform.api;
 
+import com.webhook.platform.api.audit.AuditLogRetentionJob;
+import com.webhook.platform.api.domain.entity.AuditLog;
+import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import com.webhook.platform.api.service.DataRetentionService;
 import com.webhook.platform.api.service.billing.RetentionCleanupScheduler;
 import jakarta.persistence.EntityManager;
@@ -11,10 +14,13 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @TestPropertySource(properties = "billing.enabled=true")
 class RetentionCleanupIntegrationTest extends AbstractIntegrationTest {
@@ -30,6 +36,12 @@ class RetentionCleanupIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private DataRetentionService dataRetentionService;
+
+    @Autowired
+    private AuditLogRetentionJob auditLogRetentionJob;
+
+    @Autowired
+    private AuditLogRepository auditLogRepository;
 
     private UUID organizationId;
     private UUID projectId;
@@ -149,6 +161,24 @@ class RetentionCleanupIntegrationTest extends AbstractIntegrationTest {
 
     private static Instant daysAgo(int days) {
         return Instant.now().minusSeconds(days * 86400L);
+    }
+
+    @Test
+    void auditLogRetentionPurgesOnlyEntriesOlderThanTheRetention() {
+        Instant now = Instant.now();
+        AuditLog old = auditLogRepository.save(AuditLog.builder()
+                .action("login").resourceType("user").status("SUCCESS")
+                .createdAt(now.minus(200, ChronoUnit.DAYS))
+                .build());
+        AuditLog recent = auditLogRepository.save(AuditLog.builder()
+                .action("login").resourceType("user").status("SUCCESS")
+                .createdAt(now.minus(1, ChronoUnit.DAYS))
+                .build());
+
+        auditLogRetentionJob.purgeOldAuditLogs();
+
+        assertFalse(auditLogRepository.existsById(old.getId()), "older than the 90-day default");
+        assertTrue(auditLogRepository.existsById(recent.getId()));
     }
 
     private void seedEvent(UUID eventId, Instant createdAt) {

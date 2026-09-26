@@ -154,7 +154,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void theDemoCanBeReadInFull() throws Exception {
+    void theDemoCanBeReadInFullWorkflowRunsIncluded() throws Exception {
         String token = openSession();
         String project = DemoTenant.PROJECT_ID.toString();
 
@@ -176,12 +176,6 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/dashboard/projects/" + project + "/analytics").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.overview.totalDeliveries").value(greaterThan(0)));
-    }
-
-    @Test
-    void theDemoWorkflowsCanBeReadWithTheirRuns() throws Exception {
-        String token = openSession();
-        String project = DemoTenant.PROJECT_ID.toString();
 
         MvcResult listed = mockMvc.perform(get("/api/v1/projects/" + project + "/workflows")
                         .header("Authorization", "Bearer " + token))

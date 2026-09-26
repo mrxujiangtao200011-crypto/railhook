@@ -261,7 +261,6 @@ class AttemptRunnerTest {
     }
 
     @Nested
-    @DisplayName("classification")
     class Classification {
 
         @Test
@@ -362,7 +361,7 @@ class AttemptRunnerTest {
             respond(500, "boom");
             FakeStore store = new FakeStore(baseUrl);
             store.attemptNumber = 3;
-            store.ladder = RetryLadder.parse("60", 3); // exhausted at attempt 3
+            store.ladder = RetryLadder.parse("60", 3);
 
             runner.run(store, metrics);
 
@@ -372,7 +371,6 @@ class AttemptRunnerTest {
     }
 
     @Nested
-    @DisplayName("admission")
     class Admission {
 
         @Test
@@ -589,7 +587,6 @@ class AttemptRunnerTest {
     }
 
     @Nested
-    @DisplayName("Retry-After")
     class RetryAfterHeader {
 
         // A first tier of a minute, so an honoured header is unmistakable.
@@ -673,7 +670,6 @@ class AttemptRunnerTest {
         }
 
         @Test
-        @DisplayName("a retryable failure reports the target failing")
         void retryableFailureReportsFailing() {
             respond(503, "unavailable");
             FakeStore store = new FakeStore(baseUrl);

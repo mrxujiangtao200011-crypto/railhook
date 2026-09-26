@@ -12,7 +12,6 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("EncryptionKeyRegistry")
 class EncryptionKeyRegistryTest {
 
     private static final String KEY_V1 = "old_master_key_32_chars_long_pad";
@@ -44,7 +43,6 @@ class EncryptionKeyRegistryTest {
     }
 
     @Nested
-    @DisplayName("Initialization")
     class Init {
 
         @Test
@@ -99,7 +97,6 @@ class EncryptionKeyRegistryTest {
     }
 
     @Nested
-    @DisplayName("Encrypt and Decrypt")
     class EncryptDecrypt {
 
         @Test
@@ -158,7 +155,6 @@ class EncryptionKeyRegistryTest {
     }
 
     @Nested
-    @DisplayName("Decrypt with fallback")
     class DecryptWithFallback {
 
         @Test
