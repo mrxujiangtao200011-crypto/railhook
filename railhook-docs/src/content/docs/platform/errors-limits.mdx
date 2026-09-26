@@ -31,23 +31,40 @@ Every error from the Railhook API has the same shape, so one handler in your cli
 
 | Status | `error` | What to do |
 |---|---|---|
+| `202` | `authorization_pending` | `railhook login` only: the code has not been approved in the browser yet. Poll again. |
 | `400` | `validation_error` | Fix the fields named in `fieldErrors`. |
 | `400` | `malformed_request` | The body is missing or is not valid JSON. |
 | `400` | `missing_parameter`, `invalid_parameter` | A query or path parameter is missing or in the wrong format. |
 | `400` | `invalid_url` | A URL was refused, for example by SSRF protection. |
-| `400` | `invalid_request` | The request was understood but rejected, for example an event that would fan out past the limit. Read `message`. |
+| `400` | `invalid_request` | The request was understood but rejected, for example an event that would fan out past the limit or an expired confirmation link. Read `message`. |
+| `400` | `captcha_failed` | The challenge on a public form was not passed. Solve it again. |
 | `401` | `unauthorized` | Credentials missing, expired or wrong. Refresh the access token, or check the `X-API-Key` header. |
+| `401` | `signature_verification_failed` | Ingress URL only: the provider's signature did not match the source's secret. |
+| `402` | `quota_exceeded` | A plan limit is reached. `fieldErrors` names the quota, the usage, the limit and the plan. |
 | `403` | `forbidden` | Authenticated, but the role or key scope does not allow it. A `READ_ONLY` key cannot write. |
+| `403` | `demo_read_only` | The live demo cannot change anything. Create an account. |
+| `403` | `reauthentication_required` | Platform admin panel only: the last sign-in is too old. Sign in again. |
+| `403` | `suspended`, `tunnel_suspended` | Ingress or tunnel URL of a suspended organization. It accepts nothing until the suspension is lifted. |
 | `404` | `not_found` | Nothing with that id exists in your organization. |
 | `405` | `method_not_allowed` | Wrong HTTP method. The `Allow` header lists the right ones. |
 | `409` | `conflict` | It already exists, or it changed while you were editing. Re-read it and try again. |
+| `410` | `gone` | It existed but can no longer be used: an expired or spent device code or invite, a closed tunnel. Start over. |
+| `410` | `disabled` | Ingress URL only: the source is disabled. |
 | `413` | `payload_too_large` | The body is over the size limit. |
 | `415` | `unsupported_media_type` | Send `Content-Type: application/json`. |
-| `422` | `unprocessable_entity` | The request is valid but cannot be applied in the resource's current state. |
-| `429` | `rate_limit_exceeded`, `organization_rate_limit`, `platform_rate_limit` | Wait for `Retry-After` seconds, then retry. |
+| `423` | `account_locked` | Too many failed sign-ins. Wait the minutes `message` names, or reset the password. |
+| `429` | `rate_limit_exceeded`, `organization_rate_limit`, `platform_rate_limit`, `portal_rate_limit`, `rate_limited` | Wait for `Retry-After` seconds where it is sent, then retry. `rate_limited` is the platform admin panel's limit. |
+| `429` | `too_many_active_urls`, `contact_busy` | Public webhook tester and contact form: this address holds too many live tester URLs, or the form has taken all it can today. |
 | `500` | `internal_error` | Railhook failed. Retry with backoff. |
+| `502` | `tunnel_error` | Tunnel URL only: the CLI could not reach your local app. `message` says why. |
+| `503` | `service_unavailable` | Not ready yet, for example the demo data is still being prepared. Retry in a minute. |
+| `503` | `tunnel_offline` | Tunnel URL only: no CLI is connected for this tunnel. |
+| `503` | `tester_busy`, `contact_unavailable` | The public webhook tester is full, or this deployment has no support address. |
+| `504` | `tunnel_timeout` | Tunnel URL only: your local app did not answer in time, or the CLI disconnected. |
+| `4xx` | `client_error` | A refusal with no specific code, for example the MCP OAuth endpoints on a deployment where they are off. Read `status` and `message`. |
+| `5xx` | `server_error` | A server error with no specific code. Retry with backoff. |
 
-Some errors carry only a generic code, `client_error` for a `4xx` or `server_error` for a `5xx`, in the same envelope: a sign-in rate limit or a blocked change to the last owner, for example. Branch on `status` first and use `error` to refine.
+`client_error` and `server_error` are the fallback for the few errors without a code of their own. Branch on `status` first and use `error` to refine. The MCP OAuth endpoints under `/oauth/` answer in the shape OAuth clients expect instead: `error` and `error_description`, with the OAuth codes such as `invalid_grant`.
 
 <Aside type="tip" title="Which errors to retry">
 Retry `429` and `5xx` with backoff. Never retry other `4xx` errors unchanged: the request will fail the same way. Sending events is safe to retry when you send an `Idempotency-Key` header, because a repeated key does not create a second event.
@@ -63,8 +80,8 @@ These are the defaults of a self-hosted deployment. Railhook Cloud has its own l
 | Organization | All API traffic of one organization | Off (`ORG_RATE_LIMIT_ENABLED=false`); 200 per second when on | `organization_rate_limit`, `Retry-After: 1` |
 | Platform | All traffic, per API instance | 5000 per second (`GLOBAL_RATE_LIMIT_PER_SECOND`) | `platform_rate_limit` |
 | Ingress URL | Webhooks received at `/ingress/…`, per source | 100 per second (`WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND`), unless the source sets its own | `Retry-After: 1` |
-| Sign-in | Per IP and per email | 10 per minute (`AUTH_RATE_LIMIT_LOGIN_PER_MINUTE`) | `429` |
-| Session refresh | Per refresh token, and per IP | 30 per minute per token (`AUTH_RATE_LIMIT_REFRESH_PER_TOKEN_PER_MINUTE`), 600 per minute per IP (`AUTH_RATE_LIMIT_REFRESH_PER_IP_PER_MINUTE`) | `429` |
+| Sign-in | Per IP and per email | 10 per minute (`AUTH_RATE_LIMIT_LOGIN_PER_MINUTE`) | `rate_limit_exceeded` |
+| Session refresh | Per refresh token, and per IP | 30 per minute per token (`AUTH_RATE_LIMIT_REFRESH_PER_TOKEN_PER_MINUTE`), 600 per minute per IP (`AUTH_RATE_LIMIT_REFRESH_PER_IP_PER_MINUTE`) | `rate_limit_exceeded` |
 
 Every response from `POST /api/v1/events` carries the project's current budget:
 

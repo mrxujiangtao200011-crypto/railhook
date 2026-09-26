@@ -1,10 +1,14 @@
 package com.webhook.platform.api.config;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.MediaType;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
@@ -13,18 +17,24 @@ import io.swagger.v3.oas.models.servers.ServerVariables;
 import io.swagger.v3.oas.models.tags.Tag;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.PortalContext;
+import org.springdoc.core.customizers.OperationCustomizer;
 import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.util.MimeTypeUtils;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Configuration
 @ConditionalOnProperty(name = "springdoc.swagger-ui.enabled", havingValue = "true", matchIfMissing = true)
 public class OpenApiConfig {
 
     private static final String DEFAULT_BASE_URL = "http://localhost:8080";
+    private static final String ERROR_RESPONSE_SCHEMA = "#/components/schemas/ErrorResponse";
 
     static {
         // Resolved from the credential, never sent by a caller. Otherwise springdoc documents
@@ -100,6 +110,29 @@ public class OpenApiConfig {
                                 .description("Portal session token, returned once by "
                                         + "POST /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
+    }
+
+    // Without it springdoc documents an error response with the handler's success type.
+    @Bean
+    public OperationCustomizer errorResponsesUseTheEnvelope() {
+        return (operation, handlerMethod) -> {
+            if (operation.getResponses() == null) {
+                return operation;
+            }
+            Set<String> declaredContent = AnnotatedElementUtils
+                    .findMergedRepeatableAnnotations(handlerMethod.getMethod(), ApiResponse.class).stream()
+                    .filter(response -> response.content().length > 0)
+                    .map(ApiResponse::responseCode)
+                    .collect(Collectors.toSet());
+            operation.getResponses().forEach((code, response) -> {
+                if ((code.startsWith("4") || code.startsWith("5")) && !declaredContent.contains(code)) {
+                    response.setContent(new Content().addMediaType(
+                            MimeTypeUtils.APPLICATION_JSON_VALUE,
+                            new MediaType().schema(new Schema<>().$ref(ERROR_RESPONSE_SCHEMA))));
+                }
+            });
+            return operation;
+        };
     }
 
     /**

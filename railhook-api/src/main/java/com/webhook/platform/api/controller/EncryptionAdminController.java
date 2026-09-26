@@ -5,6 +5,8 @@ import com.webhook.platform.api.dto.EncryptionStatusResponse;
 import com.webhook.platform.api.service.EncryptionKeyRotationService;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,7 +40,8 @@ public class EncryptionAdminController {
     @ApiResponse(responseCode = "200", description = "Rotation completed with no errors")
     @ApiResponse(responseCode = "207", description = "Rotation completed but some records failed to re-encrypt — see 'errors'")
     @ApiResponse(responseCode = "403", description = "Forbidden — requires the platform-admin operator credential")
-    @ApiResponse(responseCode = "409", description = "Rotation already in progress on another node")
+    @ApiResponse(responseCode = "409", description = "Rotation already in progress on another node",
+            content = @Content(schema = @Schema(implementation = EncryptionRotationResponse.class)))
     @PostMapping("/rotate")
     public ResponseEntity<EncryptionRotationResponse> rotateEncryptionKeys() {
         log.info("Encryption key rotation triggered by platform-admin operator credential");
