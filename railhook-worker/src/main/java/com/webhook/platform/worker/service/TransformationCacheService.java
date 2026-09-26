@@ -60,11 +60,6 @@ public class TransformationCacheService {
                 .orElse(null);
     }
 
-    public String findEnabledTemplate(UUID id) {
-        Resolved resolved = findEnabled(id);
-        return resolved == null ? null : resolved.source();
-    }
-
     public void evict(UUID id) {
         cache.invalidate(id);
     }

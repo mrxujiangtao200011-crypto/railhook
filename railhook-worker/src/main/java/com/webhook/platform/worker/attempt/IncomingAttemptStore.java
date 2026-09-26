@@ -521,7 +521,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                             .attemptCount(claim.attemptNumber())
                             .replaySessionId(claim.replaySessionId())
                             .build());
-            log.info("Published DLQ event for forward eventId={}, destId={}",
+            log.debug("Published DLQ event for forward eventId={}, destId={}",
                     claim.eventId(), claim.destinationId());
         } catch (Exception e) {
             log.error("Failed to publish DLQ event for forward eventId={}, destId={}: {}",

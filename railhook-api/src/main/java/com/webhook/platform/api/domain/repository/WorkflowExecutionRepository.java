@@ -30,11 +30,6 @@ public interface WorkflowExecutionRepository extends JpaRepository<WorkflowExecu
 
     boolean existsByWorkflowIdAndTriggerEventId(UUID workflowId, UUID triggerEventId);
 
-    @Query("SELECT e FROM WorkflowExecution e WHERE e.status = 'RUNNING' AND e.startedAt < :cutoff")
-    List<WorkflowExecution> findStuckExecutions(@Param("cutoff") Instant cutoff);
-
-    // findStuckExecutions matching RUNNING only is what keeps a suspended execution from being
-    // failed as hung.
     @Query("SELECT e FROM WorkflowExecution e WHERE e.status = 'WAITING' AND e.resumeAt <= :now "
             + "ORDER BY e.resumeAt ASC")
     List<WorkflowExecution> findDueForResume(@Param("now") Instant now, Pageable pageable);

@@ -61,7 +61,7 @@ class OrderingGate {
                 : null;
 
         if (oldestPendingInRange == null) {
-            log.info("No outstanding deliveries in gap [{}, {}] for endpoint {}, proceeding with seq={}",
+            log.debug("No outstanding deliveries in gap [{}, {}] for endpoint {}, proceeding with seq={}",
                     rangeStart, rangeEnd, endpointId, sequenceNumber);
             return null;
         }
@@ -97,7 +97,7 @@ class OrderingGate {
         if (delivery.getOrderingFirstBufferedAt() == null) {
             delivery.setOrderingFirstBufferedAt(Instant.now());
         }
-        log.info("Buffering delivery {} (seq={}) waiting for range [{}, {}]",
+        log.debug("Buffering delivery {} (seq={}) waiting for range [{}, {}]",
                 delivery.getId(), sequenceNumber, rangeStart, rangeEnd);
         orderingBufferService.bufferDelivery(endpointId, delivery.getId(), sequenceNumber);
 
@@ -160,7 +160,7 @@ class OrderingGate {
                             .sequenceNumber(buffered.getSequenceNumber())
                             .orderingEnabled(buffered.getOrderingEnabled())
                             .build());
-            log.info("Triggered buffered delivery {} (seq={}) for endpoint {}",
+            log.debug("Triggered buffered delivery {} (seq={}) for endpoint {}",
                     buffered.getId(), buffered.getSequenceNumber(), endpointId);
         }
     }

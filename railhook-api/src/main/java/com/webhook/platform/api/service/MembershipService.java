@@ -26,10 +26,8 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
 import com.webhook.platform.common.util.CryptoUtils;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -39,7 +37,6 @@ import java.util.stream.Collectors;
 public class MembershipService {
 
     private static final int INVITE_EXPIRATION_HOURS = 48;
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final MembershipRepository membershipRepository;
@@ -107,7 +104,7 @@ public class MembershipService {
                     User saved = userRepository.save(newUser);
                     // Never log the temp password.
                     emailService.sendTemporaryPasswordEmail(request.getEmail(), tempPass);
-                    log.info("Created new user for invite: userId={}, email={}", saved.getId(), request.getEmail());
+                    log.info("Created new user for invite: userId={}, email={}", saved.getId(), EmailService.maskRecipient(request.getEmail()));
                     return saved;
                 });
 
@@ -121,7 +118,7 @@ public class MembershipService {
                     + "Ask them to verify their email address, then invite them again.");
         }
 
-        String inviteToken = generateInviteToken();
+        String inviteToken = CryptoUtils.generateSecureToken(32);
         String inviteTokenHash = CryptoUtils.hashApiKey(inviteToken);
         Instant expiresAt = Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS);
 
@@ -170,7 +167,7 @@ public class MembershipService {
             throw new ConflictException("Membership has no pending invite to re-issue");
         }
 
-        String inviteToken = generateInviteToken();
+        String inviteToken = CryptoUtils.generateSecureToken(32);
         membership.setInviteTokenHash(CryptoUtils.hashApiKey(inviteToken));
         membership.setInviteExpiresAt(Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS));
         membershipRepository.save(membership);
@@ -243,12 +240,6 @@ public class MembershipService {
 
     private String generateTemporaryPassword() {
         return "Temp" + UUID.randomUUID().toString().substring(0, 8) + "!";
-    }
-
-    private String generateInviteToken() {
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     /** OWNER is never granted here, and API_KEY is not a human role. */

@@ -128,7 +128,7 @@ public class EndpointService {
 
         if (endpointVerificationRequired) {
             endpoint.setVerificationStatus(Endpoint.VerificationStatus.PENDING);
-            log.debug("Endpoint verification required, setting status to PENDING for endpoint: {}", endpoint.getUrl());
+            log.debug("Endpoint verification required, setting status to PENDING for endpoint host {}", UrlValidator.hostOf(endpoint.getUrl()));
         }
         
         endpoint = endpointRepository.saveAndFlush(endpoint);
@@ -376,7 +376,7 @@ public class EndpointService {
             return response;
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - startTime;
-            log.error("Endpoint test failed for {}: {}", endpoint.getUrl(), e.getMessage());
+            log.warn("Endpoint test failed for host {}: {}", UrlValidator.hostOf(endpoint.getUrl()), e.getMessage());
             return EndpointTestResponse.builder()
                     .success(false)
                     .errorMessage(e.getMessage())
@@ -438,7 +438,7 @@ public class EndpointService {
         endpoint.setEncryptionKeyVersion(encryptedCert.getKeyVersion());
 
         endpoint = endpointRepository.saveAndFlush(endpoint);
-        log.info("Configured mTLS for endpoint {}", endpointId);
+        log.debug("Configured mTLS for endpoint {}", endpointId);
 
         return mapToResponse(endpoint);
     }
@@ -455,7 +455,7 @@ public class EndpointService {
         endpoint.setCaCert(null);
 
         endpoint = endpointRepository.saveAndFlush(endpoint);
-        log.info("Disabled mTLS for endpoint {}", endpointId);
+        log.debug("Disabled mTLS for endpoint {}", endpointId);
 
         return mapToResponse(endpoint);
     }

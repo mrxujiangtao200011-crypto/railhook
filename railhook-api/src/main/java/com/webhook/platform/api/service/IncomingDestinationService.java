@@ -141,7 +141,7 @@ public class IncomingDestinationService {
 
         retryLadderEscalationCap.requireIncomingFits(destination.getRetryDelays(), destination.getMaxAttempts());
         destination = destinationRepository.saveAndFlush(destination);
-        log.info("Created incoming destination: id={}, sourceId={}, url={}", destination.getId(), sourceId, request.getUrl());
+        log.debug("Created incoming destination: id={}, sourceId={}, host={}", destination.getId(), sourceId, UrlValidator.hostOf(request.getUrl()));
         return mapToResponse(destination);
     }
 
@@ -221,7 +221,7 @@ public class IncomingDestinationService {
 
         retryLadderEscalationCap.requireIncomingFits(destination.getRetryDelays(), destination.getMaxAttempts());
         destination = destinationRepository.saveAndFlush(destination);
-        log.info("Updated incoming destination: id={}", id);
+        log.debug("Updated incoming destination: id={}", id);
         return mapToResponse(destination);
     }
 
@@ -230,7 +230,7 @@ public class IncomingDestinationService {
     public void deleteDestination(UUID projectId, UUID sourceId, UUID id) {
         IncomingDestination destination = requireDestination(projectId, sourceId, id);
         destinationRepository.delete(destination);
-        log.info("Deleted incoming destination: id={}", id);
+        log.debug("Deleted incoming destination: id={}", id);
     }
 
     private IncomingDestinationResponse mapToResponse(IncomingDestination destination) {

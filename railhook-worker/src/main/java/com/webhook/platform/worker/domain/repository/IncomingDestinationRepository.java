@@ -8,13 +8,10 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface IncomingDestinationRepository extends JpaRepository<IncomingDestination, UUID> {
-
-    List<IncomingDestination> findByIncomingSourceIdAndEnabledTrue(UUID incomingSourceId);
 
     @Modifying
     @Query(value = """

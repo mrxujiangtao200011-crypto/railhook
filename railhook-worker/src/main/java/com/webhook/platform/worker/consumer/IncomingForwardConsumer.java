@@ -60,7 +60,7 @@ public class IncomingForwardConsumer {
         MDC.put("incomingEventId", String.valueOf(message.getIncomingEventId()));
         MDC.put("destinationId", String.valueOf(message.getDestinationId()));
 
-        log.info("Received incoming forward message: eventId={}, destId={}, topic={}, replay={}",
+        log.debug("Received incoming forward message: eventId={}, destId={}, topic={}, replay={}",
                 message.getIncomingEventId(), message.getDestinationId(),
                 record.topic(), message.isReplay());
 

@@ -92,7 +92,7 @@ public class EventController {
                     .body(errorBody);
         }
         
-        log.info("Ingesting event type: {} for project: {}", request.getType(), apiKeyAuth.getProjectId());
+        log.debug("Ingesting event type: {} for project: {}", request.getType(), apiKeyAuth.getProjectId());
 
         EventIngestResponse response = eventIngestService.ingestEvent(
                 apiKeyAuth.getProjectId(),

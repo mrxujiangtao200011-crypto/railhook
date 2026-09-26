@@ -9,6 +9,7 @@ import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.dto.TunnelSessionResponse;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +24,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -62,7 +62,7 @@ public class TunnelService {
         }
         enforceActiveTunnelLimit(organizationId);
 
-        String tunnelToken = generateSecureToken();
+        String tunnelToken = CryptoUtils.generateSecureToken(48);
         String publicSlug = slug(SECURE_RANDOM);
 
         TunnelSession session = TunnelSession.builder()
@@ -238,12 +238,6 @@ public class TunnelService {
         if (expired > 0) {
             log.info("Expired {} stale tunnel sessions", expired);
         }
-    }
-
-    private String generateSecureToken() {
-        byte[] bytes = new byte[48];
-        SECURE_RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     // Drawn per character: trimmed base64 threw when it held too many - and _.

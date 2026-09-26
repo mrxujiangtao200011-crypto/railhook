@@ -23,10 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -42,7 +40,6 @@ public class EmailChangeService {
 
     static final Duration CONFIRMATION_LIFETIME = Duration.ofHours(24);
     static final Duration RECENT_SIGN_IN = Duration.ofMinutes(10);
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final EmailChangeRequestRepository changeRepository;
@@ -117,7 +114,7 @@ public class EmailChangeService {
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "No email change is waiting for confirmation"));
         budget.requireSendAllowance(user);
 
-        String token = newToken();
+        String token = CryptoUtils.generateSecureToken(32);
         pending.setTokenHash(CryptoUtils.hashApiKey(token));
         pending.setExpiresAt(Instant.now().plus(CONFIRMATION_LIFETIME));
         changeRepository.save(pending);
@@ -174,7 +171,7 @@ public class EmailChangeService {
 
     private EmailChangeResponse applyToUnverified(User user, String newEmail) {
         String previous = user.getEmail();
-        String token = newToken();
+        String token = CryptoUtils.generateSecureToken(32);
         user.setEmail(newEmail);
         user.setVerificationToken(CryptoUtils.hashApiKey(token));
         user.setVerificationTokenExpiresAt(Instant.now().plus(CONFIRMATION_LIFETIME));
@@ -202,8 +199,8 @@ public class EmailChangeService {
                     changeRepository.flush();
                 });
 
-        String token = newToken();
-        String cancelToken = newToken();
+        String token = CryptoUtils.generateSecureToken(32);
+        String cancelToken = CryptoUtils.generateSecureToken(32);
         EmailChangeRequest pending = changeRepository.save(EmailChangeRequest.builder()
                 .userId(user.getId())
                 .previousEmail(user.getEmail())
@@ -282,11 +279,5 @@ public class EmailChangeService {
             details.put("expiresAt", request.getExpiresAt().toString());
         }
         return details;
-    }
-
-    private static String newToken() {
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

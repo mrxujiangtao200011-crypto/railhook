@@ -170,7 +170,7 @@ public class IngressService {
         if (providerEventId != null) {
             var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(source.getId(), providerEventId);
             if (existing.isPresent()) {
-                log.info("Duplicate incoming webhook detected: sourceId={}, providerEventId={}, existingEventId={}",
+                log.debug("Duplicate incoming webhook detected: sourceId={}, providerEventId={}, existingEventId={}",
                         source.getId(), providerEventId, existing.get().getId());
                 meterRegistry.counter("incoming_events_deduplicated_total").increment();
                 return new IngressOutcome.Accepted(existing.get());
@@ -373,7 +373,7 @@ public class IngressService {
         if (providerEventId != null) {
             var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(source.getId(), providerEventId);
             if (existing.isPresent()) {
-                log.info("Duplicate race resolved for incoming webhook: sourceId={}, providerEventId={}, existingEventId={}",
+                log.debug("Duplicate race resolved for incoming webhook: sourceId={}, providerEventId={}, existingEventId={}",
                         source.getId(), providerEventId, existing.get().getId());
                 meterRegistry.counter("incoming_events_deduplicated_total").increment();
                 return existing.get();
@@ -408,7 +408,7 @@ public class IngressService {
         meterRegistry.counter("incoming_events_received_total",
                 "provider_type", source.getProviderType().name()).increment();
 
-        log.info("Received incoming webhook: eventId={}, sourceId={}, requestId={}, verified={}",
+        log.debug("Received incoming webhook: eventId={}, sourceId={}, requestId={}, verified={}",
                 event.getId(), source.getId(), meta.requestId(), verification.verified());
 
         List<IncomingDestination> destinations = destinationRepository

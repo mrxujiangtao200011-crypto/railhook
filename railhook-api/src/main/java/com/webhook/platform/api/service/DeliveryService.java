@@ -198,7 +198,7 @@ public class DeliveryService {
         deliveryRepository.save(delivery);
 
         deliveryDispatch.announce(delivery, resolveProjectId(delivery), DeliveryDispatch.Reason.REPLAYED);
-        log.info("Replayed delivery: {}", delivery.getId());
+        log.debug("Replayed delivery: {}", delivery.getId());
     }
 
     // A PROCESSING delivery sent back to PENDING went out twice; the stuck sweep recovers lost ones.
@@ -445,7 +445,7 @@ public class DeliveryService {
 
         deliveryDispatch.announce(delivery, resolveProjectId(delivery),
                 DeliveryDispatch.Reason.REPLAYED_FROM_STEP);
-        log.info("Replayed delivery {} from attempt {}", deliveryId, fromAttempt);
+        log.debug("Replayed delivery {} from attempt {}", deliveryId, fromAttempt);
     }
 
 }

@@ -51,7 +51,7 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
 
         try {
             filterChain.doFilter(wrappedRequest, response);
-        } catch (PayloadTooLargeException e) {
+        } catch (RequestBodyTooLargeException e) {
             log.warn("Request rejected mid-stream: body exceeds max payload size {} bytes (URI: {})",
                     effectiveLimit, request.getRequestURI());
             if (!response.isCommitted()) {
@@ -89,7 +89,7 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
     private boolean hasPayloadTooLargeCause(Throwable e) {
         Throwable cause = e;
         while (cause != null) {
-            if (cause instanceof PayloadTooLargeException) {
+            if (cause instanceof RequestBodyTooLargeException) {
                 return true;
             }
             cause = cause.getCause();
@@ -97,8 +97,8 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
         return false;
     }
 
-    public static class PayloadTooLargeException extends IOException {
-        public PayloadTooLargeException(long limit) {
+    public static class RequestBodyTooLargeException extends IOException {
+        public RequestBodyTooLargeException(long limit) {
             super("Request body exceeds maximum allowed size of " + limit + " bytes");
         }
     }
@@ -155,9 +155,9 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
             return count;
         }
 
-        private void checkLimit() throws PayloadTooLargeException {
+        private void checkLimit() throws RequestBodyTooLargeException {
             if (bytesRead > maxBytes) {
-                throw new PayloadTooLargeException(maxBytes);
+                throw new RequestBodyTooLargeException(maxBytes);
             }
         }
 

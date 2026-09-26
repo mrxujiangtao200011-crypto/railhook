@@ -33,7 +33,6 @@ class NativeQueryTenantPredicateTest {
             // Sweeps every organization for sequences an ingest crash never backfilled.
             "DeliveryRepository.findOrderedDeliveriesMissingASequence",
             // Retention deletes by age across the whole table.
-            "DeliveryAttemptRepository.deleteOldAttempts",
             "DeliveryAttemptRepository.deleteOldSuccessfulAttempts",
             "DeliveryAttemptRepository.deleteExcessAttemptsPerDelivery",
             "IncomingEventRepository.deleteOldIncomingEvents",
@@ -61,10 +60,7 @@ class NativeQueryTenantPredicateTest {
             "WorkflowTriggerOutboxRepository.claimBatch",
 
             // Rebuilds the high-water mark for every endpoint on the instance.
-            "DeliveryRepository.findMaxSequenceNumberPerEndpointSince",
-
-            // Unreferenced today; cross-tenant in shape, like the outbox's batch settlement.
-            "OutboxMessageRepository.batchMarkDead"
+            "DeliveryRepository.findMaxSequenceNumberPerEndpointSince"
     ));
 
     @Test

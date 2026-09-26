@@ -21,7 +21,6 @@ import java.util.UUID;
 @Repository
 public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSpecificationExecutor<Delivery> {
     Page<Delivery> findByEventId(UUID eventId, Pageable pageable);
-    Page<Delivery> findByEventIdIn(List<UUID> eventIds, Pageable pageable);
 
     /** Deliveries in those states since then, one organization's excepted: the overview leaves the public demo out. */
     long countByStatusInAndCreatedAtGreaterThanEqualAndOrganizationIdNot(
@@ -129,17 +128,6 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     List<Delivery> findByIdInAndStatus(List<UUID> ids, DeliveryStatus status);
 
     @Query(value = """
-        SELECT CAST(d.status AS text), COUNT(*)
-        FROM deliveries d
-        JOIN events e ON d.event_id = e.id
-        WHERE d.organization_id = :organizationId
-          AND e.project_id = :projectId AND d.created_at >= :since
-        GROUP BY d.status
-        """, nativeQuery = true)
-    List<Object[]> countByProjectIdGroupByStatus(
- @Param("organizationId") UUID organizationId,@Param("projectId") UUID projectId, @Param("since") Instant since);
-
-    @Query(value = """
         SELECT d.endpoint_id, CAST(d.status AS text), COUNT(*)
         FROM deliveries d
         WHERE d.organization_id = :organizationId
@@ -208,5 +196,4 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
         """, nativeQuery = true)
     List<Delivery> findOrderedDeliveriesMissingASequence(@Param("before") Instant before,
             @Param("limit") int limit);
-
 }

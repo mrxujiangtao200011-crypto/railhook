@@ -20,10 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.webhook.platform.api.exception.NotFoundException;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -34,7 +32,6 @@ public class ApiKeyService {
 
     private final ApiKeyRepository apiKeyRepository;
     private final ProjectRepository projectRepository;
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int API_KEY_LENGTH = 32;
 
     private static final int DEFAULT_GRACE_PERIOD_HOURS = 24;
@@ -51,7 +48,7 @@ public class ApiKeyService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        String plainKey = generateApiKey();
+        String plainKey = CryptoUtils.generateSecureToken(API_KEY_LENGTH);
         String keyHash = CryptoUtils.hashApiKey(plainKey);
         String keyPrefix = plainKey.substring(0, Math.min(8, plainKey.length()));
 
@@ -133,7 +130,7 @@ public class ApiKeyService {
                     "API key has already been rotated; rotate its replacement instead");
         }
 
-        String plainKey = generateApiKey();
+        String plainKey = CryptoUtils.generateSecureToken(API_KEY_LENGTH);
         ApiKey replacement = apiKeyRepository.save(ApiKey.builder()
                 .projectId(projectId)
                 .name(retiring.getName())
@@ -164,12 +161,6 @@ public class ApiKeyService {
             return candidate;
         }
         return existing.isBefore(candidate) ? existing : candidate;
-    }
-
-    private String generateApiKey() {
-        byte[] randomBytes = new byte[API_KEY_LENGTH];
-        SECURE_RANDOM.nextBytes(randomBytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
     }
 
     private ApiKeyResponse mapToResponse(ApiKey apiKey, String plainKey) {

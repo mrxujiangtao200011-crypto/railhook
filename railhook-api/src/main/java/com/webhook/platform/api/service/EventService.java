@@ -132,12 +132,12 @@ public class EventService {
 
         Event event = createEvent(projectId, request);
         event = eventRepository.saveAndFlush(event);
-        log.info("Created test event: {} for project: {}", event.getId(), projectId);
+        log.debug("Created test event: {} for project: {}", event.getId(), projectId);
 
         // The real ingest decision; exact type matching made an order.* Subscription look broken.
         EventIntake.Decision decision = eventIntake.decide(event);
         if (decision.dropped()) {
-            log.info("Rule DROP action — no deliveries for test event {}", event.getId());
+            log.debug("Rule DROP action — no deliveries for test event {}", event.getId());
             return testEventResponse(event, 0, schemaWarnings);
         }
 
@@ -156,7 +156,7 @@ public class EventService {
         outboxMessageRepository.saveAll(outboxMessages);
 
         int deliveriesCreated = savedDeliveries.size();
-        log.info("Created {} deliveries for test event: {}", deliveriesCreated, event.getId());
+        log.debug("Created {} deliveries for test event: {}", deliveriesCreated, event.getId());
         return testEventResponse(event, deliveriesCreated, schemaWarnings);
     }
 

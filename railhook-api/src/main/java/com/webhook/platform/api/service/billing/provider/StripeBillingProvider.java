@@ -58,7 +58,6 @@ public class StripeBillingProvider implements BillingProvider {
             log.info("Stripe: created customer {} for org {}", customer.getId(), organizationId);
             return customer.getId();
         } catch (StripeException e) {
-            log.error("Stripe: failed to create customer for org {}", organizationId, e);
             throw new RuntimeException("Stripe customer creation failed: " + e.getMessage(), e);
         }
     }
@@ -93,7 +92,6 @@ public class StripeBillingProvider implements BillingProvider {
             log.info("Stripe: created checkout session {} for plan {}", session.getId(), request.planName());
             return new CreatePaymentResult(session.getUrl(), session.getId());
         } catch (StripeException e) {
-            log.error("Stripe: failed to create checkout session for plan {}", request.planName(), e);
             throw new RuntimeException("Stripe checkout creation failed: " + e.getMessage(), e);
         }
     }
@@ -110,7 +108,6 @@ public class StripeBillingProvider implements BillingProvider {
             log.info("Stripe: created subscription {} for customer {}", sub.getId(), externalCustomerId);
             return sub.getId();
         } catch (StripeException e) {
-            log.error("Stripe: failed to create subscription for customer {}", externalCustomerId, e);
             throw new RuntimeException("Stripe subscription creation failed: " + e.getMessage(), e);
         }
     }
@@ -122,7 +119,6 @@ public class StripeBillingProvider implements BillingProvider {
             sub.cancel();
             log.info("Stripe: cancelled subscription {}", externalSubscriptionId);
         } catch (StripeException e) {
-            log.error("Stripe: failed to cancel subscription {}", externalSubscriptionId, e);
             throw new RuntimeException("Stripe subscription cancellation failed: " + e.getMessage(), e);
         }
     }
@@ -138,7 +134,6 @@ public class StripeBillingProvider implements BillingProvider {
             log.info("Stripe: created portal session for customer {}", externalCustomerId);
             return session.getUrl();
         } catch (StripeException e) {
-            log.error("Stripe: failed to create portal session for customer {}", externalCustomerId, e);
             throw new RuntimeException("Stripe portal session creation failed: " + e.getMessage(), e);
         }
     }

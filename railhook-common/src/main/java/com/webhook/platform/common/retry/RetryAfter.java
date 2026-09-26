@@ -77,8 +77,7 @@ public final class RetryAfter {
         for (DateTimeFormatter format : HTTP_DATES) {
             try {
                 return Instant.from(format.parse(value));
-            } catch (DateTimeException e) {
-                // try the next format
+            } catch (DateTimeException notThisFormat) {
             }
         }
         return null;

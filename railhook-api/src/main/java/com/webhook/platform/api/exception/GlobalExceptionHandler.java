@@ -65,7 +65,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
             IllegalArgumentException ex, WebRequest request) {
-        log.error("Bad request: {}", ex.getMessage());
+        log.warn("Bad request: {}", ex.getMessage());
         ErrorResponse error = new ErrorResponse(
                 "invalid_request",
                 ex.getMessage(),
@@ -257,18 +257,6 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST.value()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-    }
-
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ErrorResponse> handleRuntimeException(
-            RuntimeException ex, WebRequest request) {
-        log.error("Internal server error: {}", ex.getMessage(), ex);
-        ErrorResponse error = new ErrorResponse(
-                "internal_error",
-                "An unexpected error occurred",
-                HttpStatus.INTERNAL_SERVER_ERROR.value()
-        );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 
     @ExceptionHandler(Exception.class)

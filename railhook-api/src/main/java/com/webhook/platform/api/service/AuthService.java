@@ -30,11 +30,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,7 +55,6 @@ public class AuthService {
     private final OnboardingMailService onboardingMailService;
     private final boolean billingEnabled;
 
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int TOKEN_EXPIRY_HOURS = 24;
 
     public AuthService(
@@ -101,7 +98,7 @@ public class AuthService {
         // Without email a token could never arrive, and VerificationGate would block every write.
         boolean verificationIsDeliverable = emailService.isEnabled();
 
-        String verificationToken = verificationIsDeliverable ? generateVerificationToken() : null;
+        String verificationToken = verificationIsDeliverable ? CryptoUtils.generateSecureToken(32) : null;
 
         User user = User.builder()
                 .email(email)
@@ -419,7 +416,7 @@ public class AuthService {
         user.setVerificationTokenExpiresAt(null);
         userRepository.save(user);
         onboardingMailService.welcome(user);
-        log.info("Email verified for user {}", user.getEmail());
+        log.info("Email verified for user {}", EmailService.maskRecipient(user.getEmail()));
     }
 
     @SystemTenant("acts on a User by email address, with no authenticated caller")
@@ -434,20 +431,14 @@ public class AuthService {
         // Daily budget, shared with email change so neither bypasses the other.
         verificationMailBudget.requireSendAllowance(user);
 
-        String newToken = generateVerificationToken();
+        String newToken = CryptoUtils.generateSecureToken(32);
         user.setVerificationToken(CryptoUtils.hashApiKey(newToken));
         user.setVerificationTokenExpiresAt(Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS));
         userRepository.save(user);
 
         verificationMailBudget.recordSend(user.getId(), VerificationEmailSend.RESEND);
         emailService.sendVerificationEmail(user.getEmail(), newToken);
-        log.info("Resent verification email to {}", user.getEmail());
-    }
-
-    private String generateVerificationToken() {
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        log.info("Resent verification email to {}", EmailService.maskRecipient(user.getEmail()));
     }
 
     @Auditable(action = AuditAction.PASSWORD_CHANGED, resourceType = "Auth")
@@ -486,17 +477,17 @@ public class AuthService {
 
         // Always succeeds, to prevent email enumeration.
         if (user == null) {
-            log.info("Password reset requested for non-existent email: {}", email);
+            log.info("Password reset requested for non-existent email: {}", EmailService.maskRecipient(email));
             return;
         }
 
-        String resetToken = generateVerificationToken();
+        String resetToken = CryptoUtils.generateSecureToken(32);
         user.setPasswordResetToken(CryptoUtils.hashApiKey(resetToken));
         user.setPasswordResetTokenExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
         userRepository.save(user);
 
         emailService.sendPasswordResetEmail(user.getEmail(), resetToken);
-        log.info("Password reset token generated for user {}", user.getEmail());
+        log.info("Password reset token generated for user {}", EmailService.maskRecipient(user.getEmail()));
     }
 
     @SystemTenant("acts on a User by emailed token, with no authenticated caller")
@@ -521,7 +512,7 @@ public class AuthService {
         userRepository.save(user);
         // Reset is how a taken-over account is recovered, so the attacker's tokens must die now.
         userSessionService.revokeAllSessions(user.getId());
-        log.info("Password reset completed for user {}, all sessions revoked", user.getEmail());
+        log.info("Password reset completed for user {}, all sessions revoked", EmailService.maskRecipient(user.getEmail()));
     }
 
     @Transactional
@@ -534,7 +525,7 @@ public class AuthService {
         }
 
         user = userRepository.save(user);
-        log.info("Profile updated for user {}", userId);
+        log.debug("Profile updated for user {}", userId);
 
         return UserResponse.builder()
                 .id(user.getId())

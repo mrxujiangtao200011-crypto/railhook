@@ -29,8 +29,6 @@ public interface TunnelSessionRepository extends JpaRepository<TunnelSession, UU
 
     List<TunnelSession> findByOrganizationIdAndProjectIdAndStatus(UUID organizationId, UUID projectId, TunnelStatus status);
 
-    Optional<TunnelSession> findByIdAndOrganizationId(UUID id, UUID organizationId);
-
     long countByOrganizationIdAndStatus(UUID organizationId, TunnelStatus status);
 
     // Statuses are bound, not JPQL string literals, so renaming an enum constant cannot break this.

@@ -27,7 +27,7 @@ public final class SsrfProtectionCustomizer {
     /** {@code metrics(true)} makes Reactor Netty register the pool gauges with Micrometer. */
     public static ConnectionProvider createConnectionProvider(
             int maxConnections, int pendingAcquireTimeoutSeconds, int maxIdleTimeSeconds) {
-        log.info("Creating webhook connection pool: maxConnections={}, pendingAcquireTimeout={}s, maxIdleTime={}s",
+        log.debug("Creating webhook connection pool: maxConnections={}, pendingAcquireTimeout={}s, maxIdleTime={}s",
                 maxConnections, pendingAcquireTimeoutSeconds, maxIdleTimeSeconds);
         return ConnectionProvider.builder("webhook-pool")
                 .maxConnections(maxConnections)

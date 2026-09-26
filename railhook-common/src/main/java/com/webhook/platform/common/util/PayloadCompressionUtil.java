@@ -75,7 +75,6 @@ public class PayloadCompressionUtil {
 
             return byteStream.toString(StandardCharsets.UTF_8);
         } catch (IOException e) {
-            log.error("Decompression failed: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to decompress payload", e);
         }
     }

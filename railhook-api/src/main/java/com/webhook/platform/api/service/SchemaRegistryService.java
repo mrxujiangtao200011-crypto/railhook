@@ -63,7 +63,7 @@ public class SchemaRegistryService {
                 .build();
 
         entity = catalogRepository.saveAndFlush(entity);
-        log.info("Created event type '{}' in project {}", request.getName(), projectId);
+        log.debug("Created event type '{}' in project {}", request.getName(), projectId);
         return mapCatalogResponse(entity);
     }
 
@@ -96,7 +96,7 @@ public class SchemaRegistryService {
     public void deleteEventType(UUID projectId, UUID eventTypeId) {
         EventTypeCatalog entity = requireEventType(projectId, eventTypeId);
         catalogRepository.delete(entity);
-        log.info("Deleted event type '{}'", entity.getName());
+        log.debug("Deleted event type '{}'", entity.getName());
     }
 
     @Auditable(action = AuditAction.CREATE, resourceType = "SchemaVersion")
@@ -120,7 +120,7 @@ public class SchemaRegistryService {
 
         Optional<EventSchemaVersion> existing = versionRepository.findByEventTypeIdAndFingerprint(eventTypeId, fp);
         if (existing.isPresent()) {
-            log.info("Schema with fingerprint {} already exists as version {}", fp, existing.get().getVersion());
+            log.debug("Schema with fingerprint {} already exists as version {}", fp, existing.get().getVersion());
             return mapVersionResponse(existing.get());
         }
 
@@ -149,7 +149,7 @@ public class SchemaRegistryService {
                 .build();
 
         version = versionRepository.saveAndFlush(version);
-        log.info("Created schema version {} for event type '{}'", nextVersion, eventType.getName());
+        log.debug("Created schema version {} for event type '{}'", nextVersion, eventType.getName());
 
         if (nextVersion > 1) {
             computeAndSaveDiff(eventTypeId, nextVersion - 1, version);

@@ -75,7 +75,7 @@ public class CreateEventNodeExecutor implements NodeExecutor {
 
             EventIngestResponse response = eventIngestService.ingestEvent(projectId, request, null);
 
-            log.info("Workflow created event: {} (type={}) with {} deliveries in project {}",
+            log.debug("Workflow created event: {} (type={}) with {} deliveries in project {}",
                     response.getEventId(), eventType, response.getDeliveriesCreated(), projectId);
 
             ObjectNode output = objectMapper.createObjectNode();

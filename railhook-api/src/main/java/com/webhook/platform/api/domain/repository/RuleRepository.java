@@ -21,6 +21,4 @@ public interface RuleRepository extends JpaRepository<Rule, UUID> {
     List<Rule> findEnabledWithActions(@Param("projectId") UUID projectId);
 
     boolean existsByProjectIdAndName(UUID projectId, String name);
-
-    long countByProjectId(UUID projectId);
 }

@@ -59,7 +59,7 @@ public class RetryGovernor {
         int cd = cooldownRemaining.get();
         if (cd > 0) {
             cooldownRemaining.decrementAndGet();
-            log.info("[{}] Governor cooldown: skipping poll ({} remaining)", name, cd - 1);
+            log.debug("[{}] Governor cooldown: skipping poll ({} remaining)", name, cd - 1);
             return 0;
         }
 
@@ -68,7 +68,7 @@ public class RetryGovernor {
         if (pendingCount > highWatermark && highWatermark > 0) {
             int depthCap = Math.max(minBatch, (int) (highWatermark / 10));
             if (batch > depthCap) {
-                log.info("[{}] Queue depth governor: pending={} > highWatermark={}, capping batch {} → {}",
+                log.debug("[{}] Queue depth governor: pending={} > highWatermark={}, capping batch {} → {}",
                         name, pendingCount, highWatermark, batch, depthCap);
                 batch = depthCap;
             }

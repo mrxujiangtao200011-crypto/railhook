@@ -126,7 +126,7 @@ public class IncomingSourceService {
 
         validateVerificationSettings(source);
         source = sourceRepository.saveAndFlush(source);
-        log.info("Created incoming source: id={}, projectId={}, slug={}", source.getId(), projectId, slug);
+        log.debug("Created incoming source: id={}, projectId={}, slug={}", source.getId(), projectId, slug);
         return mapToResponse(source);
     }
 
@@ -189,7 +189,7 @@ public class IncomingSourceService {
 
         validateVerificationSettings(source);
         source = sourceRepository.saveAndFlush(source);
-        log.info("Updated incoming source: id={}", id);
+        log.debug("Updated incoming source: id={}", id);
         return mapToResponse(source);
     }
 
@@ -199,7 +199,7 @@ public class IncomingSourceService {
         IncomingSource source = requireSource(projectId, id);
         source.setStatus(IncomingSourceStatus.DISABLED);
         sourceRepository.save(source);
-        log.info("Disabled incoming source: id={}", id);
+        log.debug("Disabled incoming source: id={}", id);
     }
 
     private IncomingSourceResponse mapToResponse(IncomingSource source) {

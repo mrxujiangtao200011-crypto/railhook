@@ -28,6 +28,4 @@ public interface CapturedRequestRepository extends JpaRepository<CapturedRequest
     @Query("DELETE FROM CapturedRequest c WHERE c.testEndpointId IN " +
            "(SELECT t.id FROM TestEndpoint t WHERE t.expiresAt < :now)")
     int deleteExpiredRequests(@Param("now") Instant now);
-
-    long countByTestEndpointId(UUID testEndpointId);
 }

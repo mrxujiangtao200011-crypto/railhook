@@ -38,7 +38,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,7 +47,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.UUID;
 
-@Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Authentication", description = "User registration and login")
@@ -104,15 +102,10 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "CAPTCHA verification failed. Please try again.");
         }
-        try {
-            AuthResponse response = authService.register(request, originOf(httpRequest));
-            setRefreshTokenCookie(httpResponse, response.getRefreshToken());
-            response.setRefreshToken(null);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (Exception e) {
-            log.error("Registration failed: {}", e.getMessage(), e);
-            throw e;
-        }
+        AuthResponse response = authService.register(request, originOf(httpRequest));
+        setRefreshTokenCookie(httpResponse, response.getRefreshToken());
+        response.setRefreshToken(null);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @Operation(summary = "Login", description = "Authenticates user and returns JWT token")
@@ -128,15 +121,10 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many login attempts. Try again later.");
         }
-        try {
-            AuthResponse response = authService.login(request, originOf(httpRequest));
-            setRefreshTokenCookie(httpResponse, response.getRefreshToken());
-            response.setRefreshToken(null);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Login failed: {}", e.getMessage());
-            throw e;
-        }
+        AuthResponse response = authService.login(request, originOf(httpRequest));
+        setRefreshTokenCookie(httpResponse, response.getRefreshToken());
+        response.setRefreshToken(null);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Exchange a sign-in code",
@@ -182,22 +170,17 @@ public class AuthController {
         if (!authRateLimiterService.allowRefresh(getClientIp(httpRequest), refreshToken)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
-        try {
-            if (refreshToken == null) {
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token missing");
-            }
-            AuthResponse response = authService.refreshToken(refreshToken, originOf(httpRequest));
-            setRefreshTokenCookie(httpResponse, response.getRefreshToken());
-            // The CLI has no cookie jar; without the rotated token in the body it would replay the
-            // old one and trip reuse detection.
-            if (cookieRefreshToken != null) {
-                response.setRefreshToken(null);
-            }
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Token refresh failed: {}", e.getMessage());
-            throw e;
+        if (refreshToken == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token missing");
         }
+        AuthResponse response = authService.refreshToken(refreshToken, originOf(httpRequest));
+        setRefreshTokenCookie(httpResponse, response.getRefreshToken());
+        // The CLI has no cookie jar; without the rotated token in the body it would replay the
+        // old one and trip reuse detection.
+        if (cookieRefreshToken != null) {
+            response.setRefreshToken(null);
+        }
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Logout", description = "Revokes access and refresh tokens")

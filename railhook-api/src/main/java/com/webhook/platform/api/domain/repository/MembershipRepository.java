@@ -21,8 +21,6 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     List<Membership> findByUserIdOrderByCreatedAtAsc(UUID userId);
 
-    List<Membership> findByOrganizationId(UUID organizationId);
-
     Optional<Membership> findByUserIdAndOrganizationId(UUID userId, UUID organizationId);
 
     boolean existsByUserIdAndOrganizationId(UUID userId, UUID organizationId);
