@@ -4,6 +4,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
@@ -43,14 +45,33 @@ class RedisRateLimiterServiceIntegrationTest {
         return new RedisRateLimiterService(redisson, meters, 100);
     }
 
-    @Test
-    void aProjectsDowngradedPlanIsEnforcedWhileItsLimiterIsAlive() {
-        RedisRateLimiterService service = service(new SimpleMeterRegistry());
-        UUID projectId = UUID.randomUUID();
-        assertTrue(service.tryAcquire(projectId, 100));
+    enum EntryPoint {
+        PROJECT((service, key, rate) -> service.tryAcquire(UUID.fromString(key), rate)),
+        SOURCE((service, key, rate) -> service.tryAcquireForSource(UUID.fromString(key), rate)),
+        SOURCE_FAIL_CLOSED((service, key, rate) -> service.tryAcquireForSourceFailClosed(UUID.fromString(key), rate)),
+        ORGANIZATION((service, key, rate) -> service.tryAcquireForOrganization(UUID.fromString(key), rate)),
+        SLUG((service, key, rate) -> service.tryAcquireForSlug("slug-" + key, rate));
 
-        assertTrue(service.tryAcquire(projectId, 1));
-        assertFalse(service.tryAcquire(projectId, 1));
+        private final Acquire acquire;
+
+        EntryPoint(Acquire acquire) {
+            this.acquire = acquire;
+        }
+    }
+
+    interface Acquire {
+        boolean tryAcquire(RedisRateLimiterService service, String key, int rate);
+    }
+
+    @ParameterizedTest
+    @EnumSource(EntryPoint.class)
+    void aChangedRateIsEnforcedWhileTheLimiterIsAlive(EntryPoint entryPoint) {
+        RedisRateLimiterService service = service(new SimpleMeterRegistry());
+        String key = UUID.randomUUID().toString();
+        assertTrue(entryPoint.acquire.tryAcquire(service, key, 100));
+
+        assertTrue(entryPoint.acquire.tryAcquire(service, key, 1));
+        assertFalse(entryPoint.acquire.tryAcquire(service, key, 1));
     }
 
     @Test
@@ -67,35 +88,6 @@ class RedisRateLimiterServiceIntegrationTest {
             }
         }
         assertEquals(3, acquired);
-    }
-
-    @Test
-    void aSourcesChangedRateIsEnforcedWhileItsLimiterIsAlive() {
-        RedisRateLimiterService service = service(new SimpleMeterRegistry());
-        UUID sourceId = UUID.randomUUID();
-        assertTrue(service.tryAcquireForSourceFailClosed(sourceId, 100));
-
-        assertTrue(service.tryAcquireForSourceFailClosed(sourceId, 1));
-        assertFalse(service.tryAcquireForSourceFailClosed(sourceId, 1));
-
-        UUID otherSource = UUID.randomUUID();
-        assertTrue(service.tryAcquireForSource(otherSource, 100));
-        assertTrue(service.tryAcquireForSource(otherSource, 1));
-        assertFalse(service.tryAcquireForSource(otherSource, 1));
-    }
-
-    @Test
-    void anOrganizationsAndASlugsChangedRateIsEnforcedWhileTheLimiterIsAlive() {
-        RedisRateLimiterService service = service(new SimpleMeterRegistry());
-        UUID organizationId = UUID.randomUUID();
-        assertTrue(service.tryAcquireForOrganization(organizationId, 100));
-        assertTrue(service.tryAcquireForOrganization(organizationId, 1));
-        assertFalse(service.tryAcquireForOrganization(organizationId, 1));
-
-        String slug = "slug-" + UUID.randomUUID();
-        assertTrue(service.tryAcquireForSlug(slug, 100));
-        assertTrue(service.tryAcquireForSlug(slug, 1));
-        assertFalse(service.tryAcquireForSlug(slug, 1));
     }
 
     @Test

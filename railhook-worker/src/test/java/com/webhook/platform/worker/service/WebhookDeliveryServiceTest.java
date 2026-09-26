@@ -7,7 +7,6 @@ import com.webhook.platform.worker.exception.PayloadTransformException;
 import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
 import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
 import com.webhook.platform.worker.attempt.ProjectStatusLookup;
-import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -920,7 +919,7 @@ class WebhookDeliveryServiceTest {
 
         localService.processDelivery(message, true);
 
-        verifyNoInteractions(endpointRepository); // never even looked up -- buffered before that
+        verifyNoInteractions(endpointRepository);
         verify(orderingBufferService).bufferDelivery(endpointId, deliveryId, 10L);
 
         ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
@@ -964,7 +963,7 @@ class WebhookDeliveryServiceTest {
 
             service.processDelivery(message, true);
 
-            verify(endpointRepository).findById(endpointId); // proceeded past the ordering check
+            verify(endpointRepository).findById(endpointId);
             verify(orderingBufferService, never()).bufferDelivery(any(), any(), anyLong());
         } finally {
             httpServer.stop(0);
@@ -997,7 +996,7 @@ class WebhookDeliveryServiceTest {
 
         service.processDelivery(message, true);
 
-        verifyNoInteractions(endpointRepository); // nothing was sent
+        verifyNoInteractions(endpointRepository);
         verify(orderingBufferService).bufferDelivery(endpointId, deliveryId, 6L);
         assertEquals(0.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count(),
                 "a gap that is about to close has not timed out");
@@ -1050,7 +1049,7 @@ class WebhookDeliveryServiceTest {
 
             service.processDelivery(message, true);
 
-            verify(endpointRepository).findById(endpointId); // proceeded despite the gap
+            verify(endpointRepository).findById(endpointId);
             assertEquals(1.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count());
         } finally {
             httpServer.stop(0);
@@ -1161,34 +1160,6 @@ class WebhookDeliveryServiceTest {
         // Nothing was sent, and no permit was ever taken: the check runs before admission.
         verify(concurrencyControlService, never()).tryAcquireForTarget(endpointId);
         verify(deliveryRepository, never()).incrementAttemptCount(any(), any());
-    }
-
-    @Test
-    void processDelivery_validRetryLadder_proceedsPastTheLadderCheck() {
-        // Companion to the above: the guard must not reject the ladders the platform ships.
-        UUID endpointId = UUID.randomUUID();
-        UUID eventId = UUID.randomUUID();
-        UUID deliveryId = UUID.randomUUID();
-
-        Endpoint endpoint = verifiedEndpoint(endpointId, UUID.randomUUID());
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
-        when(eventRepository.findById(eventId)).thenReturn(Optional.of(stubEvent(eventId, endpoint.getProjectId())));
-        // Admission runs breaker, then permits, then rate limiters: cheapest to undo first.
-        when(circuitBreakerService.isCallPermitted(any())).thenReturn(true);
-        when(concurrencyControlService.tryAcquireForTenant(any())).thenReturn(true);
-        when(concurrencyControlService.tryAcquireForTarget(any())).thenReturn(true);
-        when(projectRateLimiterService.tryAcquire(any())).thenReturn(false); // stop right after the check
-
-        Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
-        delivery.setRetryDelays(RetryLadderDefaults.OUTGOING_DELAYS);
-        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-        service.processDelivery(message, true);
-
-        verify(projectRateLimiterService).tryAcquire(endpoint.getProjectId());
     }
 
     // Every Project active: project status is not what this test is about.

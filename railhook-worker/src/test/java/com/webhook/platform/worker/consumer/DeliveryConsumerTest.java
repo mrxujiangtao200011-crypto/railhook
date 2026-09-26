@@ -41,15 +41,21 @@ class DeliveryConsumerTest {
         asyncExecutor.shutdown();
     }
 
+    // The flag picks the claim: a retry must swap the scheduler's token, a dispatch must not look for one.
     @Test
-    void consumeDispatch_shouldSubmitNormally_whenNotShuttingDown() throws Exception {
-        DeliveryMessage message = dispatchMessage();
-        Acknowledgment ack = mock(Acknowledgment.class);
+    void aDispatchIsProcessedAsAFirstAttemptAndARetryAsARetry() {
+        DeliveryMessage dispatch = dispatchMessage();
+        Acknowledgment dispatchAck = mock(Acknowledgment.class);
+        DeliveryMessage retry = dispatchMessage();
+        Acknowledgment retryAck = mock(Acknowledgment.class);
 
-        assertDoesNotThrow(() -> consumer.consumeDispatch(message, "key", "deliveries.dispatch", null, ack));
+        consumer.consumeDispatch(dispatch, "key", "deliveries.dispatch", null, dispatchAck);
+        consumer.consumeRetry(retry, "key", "deliveries.retry.1m", null, retryAck);
 
-        verify(webhookDeliveryService, timeout(5000)).processDelivery(message, false);
-        verify(ack, timeout(5000)).acknowledge();
+        verify(webhookDeliveryService, timeout(5000)).processDelivery(dispatch, false);
+        verify(webhookDeliveryService, timeout(5000)).processDelivery(retry, true);
+        verify(dispatchAck, timeout(5000)).acknowledge();
+        verify(retryAck, timeout(5000)).acknowledge();
     }
 
     /** The shutdown flag used to send in-flight records to the unconsumed dead-letter topic. */

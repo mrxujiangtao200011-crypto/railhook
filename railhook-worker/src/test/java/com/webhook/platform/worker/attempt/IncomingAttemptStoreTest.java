@@ -19,11 +19,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -62,26 +64,17 @@ class IncomingAttemptStoreTest {
     }
 
     @Test
-    void deferralKeepsTheRecordedAttempt() {
-        rowIs(processingRow());
-
-        store.recordAttempt(claim(FENCE),
-                new AttemptRecord(null, null, null, null, null, "CIRCUIT_BREAKER_OPEN", 0));
-        boolean applied = store.finalise(claim(FENCE),
-                new Finalization.Deferred(Instant.now().plusSeconds(30), "circuit breaker open"));
-
-        assertThat(applied).isTrue();
-        assertThat(saved().getErrorMessage()).isEqualTo("CIRCUIT_BREAKER_OPEN");
-    }
-
-    @Test
-    void deferralHandsTheRowBackToTheLadder() {
+    void deferralHandsTheRowBackToTheLadderAndKeepsTheRecordedAttempt() {
         rowIs(processingRow());
         Instant until = Instant.now().plusSeconds(30);
 
-        store.finalise(claim(FENCE), new Finalization.Deferred(until, "circuit breaker open"));
+        store.recordAttempt(claim(FENCE),
+                new AttemptRecord(null, null, null, null, null, "CIRCUIT_BREAKER_OPEN", 0));
+        boolean applied = store.finalise(claim(FENCE), new Finalization.Deferred(until, "circuit breaker open"));
 
+        assertThat(applied).isTrue();
         IncomingForwardAttempt row = saved();
+        assertThat(row.getErrorMessage()).isEqualTo("CIRCUIT_BREAKER_OPEN");
         assertThat(row.getStatus()).isEqualTo(ForwardAttemptStatus.PENDING);
         assertThat(row.getClaimToken()).isNull();
         assertThat(row.getStartedAt()).isNull();
@@ -217,7 +210,7 @@ class IncomingAttemptStoreTest {
 
         String body = store.buildBody(claim(FENCE)).body();
 
-        org.junit.jupiter.api.Assertions.assertArrayEquals(arrived, store.wireBody(claim(FENCE), body),
+        assertArrayEquals(arrived, store.wireBody(claim(FENCE), body),
                 "the destination gets what the provider sent, not the decoded copy shown in the dashboard");
     }
 
@@ -230,8 +223,8 @@ class IncomingAttemptStoreTest {
 
         String body = store.buildBody(claim(FENCE)).body();
 
-        org.junit.jupiter.api.Assertions.assertArrayEquals(
-                "{\"name\":\"Zoë\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        assertArrayEquals(
+                "{\"name\":\"Zoë\"}".getBytes(StandardCharsets.UTF_8),
                 store.wireBody(claim(FENCE), body));
     }
 

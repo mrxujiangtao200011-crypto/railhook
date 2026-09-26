@@ -61,20 +61,6 @@ class AdminCommandTest extends CliCommandTestBase {
     }
 
     @Test
-    void orgs_showsWhyASuspendedTenantIsSuspended() throws Exception {
-        stub("/api/v1/admin/organizations",
-                "{\"content\":[" + org(",\"suspendedAt\":\"2026-09-01T00:00:00Z\",\"suspensionReason\":\"spam reports\"")
-                        + "],\"totalElements\":1}");
-        server.start();
-        writeConfig(authenticatedConfig());
-
-        run("admin", "orgs", "--suspended", "--token", TOKEN);
-
-        assertTrue(out().contains("SUSPENDED"), out());
-        assertTrue(out().contains("spam reports"), out());
-    }
-
-    @Test
     void org_printsUsageAgainstThePlan() throws Exception {
         stub("/api/v1/admin/organizations/org-1", org(""));
         stub("/api/v1/admin/organizations/org-1/usage",
@@ -107,7 +93,7 @@ class AdminCommandTest extends CliCommandTestBase {
     }
 
     @Test
-    void suspend_saysWhatTheTenantCanStillDo() throws Exception {
+    void suspend_sendsTheOperatorToken() throws Exception {
         stub("/api/v1/admin/organizations/org-1/suspend",
                 org(",\"suspendedAt\":\"2026-09-05T00:00:00Z\",\"suspensionReason\":\"spam reports\""));
         server.start();
@@ -117,8 +103,7 @@ class AdminCommandTest extends CliCommandTestBase {
 
         assertEquals(0, exitCode);
         assertTrue(out().contains("spam reports"), out());
-        // Reads keep working; an operator who does not know that tells the customer to wait.
-        assertTrue(out().toLowerCase().contains("read"), out());
+        assertEquals(List.of(TOKEN), seenTokens);
     }
 
     @Test

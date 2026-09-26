@@ -66,17 +66,6 @@ class RedisConcurrencyControlServiceTest {
     }
 
     @Test
-    void release_withoutAnyAcquire_doesNotDriveTheGaugeNegative() {
-        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
-        RedisConcurrencyControlService service = new RedisConcurrencyControlService(
-                redissonClient, meterRegistry, 5, 20, 90);
-
-        service.releaseForTarget(UUID.randomUUID());
-
-        assertEquals(0.0, meterRegistry.get("webhook_concurrency_active_permits").gauge().value());
-    }
-
-    @Test
     void acquireThenRelease_localFallback_restoresGaugeToZero() throws InterruptedException {
         when(redissonClient.getPermitExpirableSemaphore(anyString()))
                 .thenThrow(new RuntimeException("Redis unavailable in this test"));

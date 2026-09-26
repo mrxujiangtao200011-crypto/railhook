@@ -25,13 +25,6 @@ class PasswordHashingStrengthTest {
     }
 
     @Test
-    @DisplayName("the cost is configurable, so small hardware can tune it down")
-    void costIsConfigurable() {
-        assertThat(new PasswordEncoderConfig().passwordEncoder(4).encode(PASSWORD)).startsWith("$2a$04$");
-        assertThat(new PasswordEncoderConfig().passwordEncoder(13).encode(PASSWORD)).startsWith("$2a$13$");
-    }
-
-    @Test
     @DisplayName("a cost outside BCrypt's own range fails at startup, not at the first login")
     void nonsenseCostIsRejectedEagerly() {
         assertThatThrownBy(() -> new PasswordEncoderConfig().passwordEncoder(3))

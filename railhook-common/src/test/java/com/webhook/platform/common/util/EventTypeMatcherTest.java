@@ -1,10 +1,9 @@
 package com.webhook.platform.common.util;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class EventTypeMatcherTest {
 
@@ -57,7 +56,7 @@ class EventTypeMatcherTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
+    @CsvSource(nullValues = "NULL", value = {
             "order.completed, true",
             "order.*, true",
             "order.**, true",
@@ -73,15 +72,11 @@ class EventTypeMatcherTest {
             "order., false",
             "123order, false",
             "order.CREATED, false",
+            "NULL, false",
+            "'', false",
+            "'   ', false",
     })
     void isValidPattern(String pattern, boolean expected) {
         assertEquals(expected, EventTypeMatcher.isValidPattern(pattern));
-    }
-
-    @Test
-    void nullAndBlankAreNotValidPatterns() {
-        assertFalse(EventTypeMatcher.isValidPattern(null));
-        assertFalse(EventTypeMatcher.isValidPattern(""));
-        assertFalse(EventTypeMatcher.isValidPattern("   "));
     }
 }

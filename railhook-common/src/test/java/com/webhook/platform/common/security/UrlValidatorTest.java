@@ -127,11 +127,6 @@ class UrlValidatorTest {
                 "internal.example.com", InetAddress.getByName("10.1.2.3"), true, Collections.emptyList()));
     }
 
-    @Test
-    void postConnectRejectsTheUnspecifiedIpv6Address() throws Exception {
-        assertTrue(UrlValidator.isBlockedTarget("[::]", InetAddress.getByName("::"), false, Collections.emptyList()));
-    }
-
     // A translation prefix reaches the IPv4 address it carries, so it is judged by that address.
     @Test
     void unspecifiedAndIpv4CompatibleAddressesAreBlockedPostConnect() throws Exception {

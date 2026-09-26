@@ -22,17 +22,6 @@ class SeededPlanIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("free grants one tunnel, with the feature flag that gates it")
-    void freePlanGrantsOneTunnel() {
-        Plan free = plan("free");
-
-        // checkTunnelLimit rejects on the feature flag before reading the count.
-        assertThat(free.getMaxActiveTunnels()).isEqualTo(1);
-        assertThat(free.hasFeature("tunnels")).isTrue();
-    }
-
-    @Test
-    @DisplayName("the seeded limits match what the pricing page prints")
     void seededLimitsMatchThePricingPage() {
         Plan free = plan("free");
         assertThat(free.getMaxEventsPerMonth()).isEqualTo(10_000);
@@ -41,6 +30,7 @@ class SeededPlanIntegrationTest extends AbstractIntegrationTest {
         assertThat(free.getMaxMembers()).isEqualTo(5);
         assertThat(free.getRateLimitPerSecond()).isEqualTo(10);
         assertThat(free.getMaxRetentionDays()).isEqualTo(7);
+        assertThat(free.getMaxActiveTunnels()).isEqualTo(1);
         assertThat(free.getPriceMonthlyCents()).isZero();
 
         Plan starter = plan("starter");

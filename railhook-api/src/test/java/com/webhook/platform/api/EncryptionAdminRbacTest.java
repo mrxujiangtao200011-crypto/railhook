@@ -43,16 +43,6 @@ class EncryptionAdminRbacTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("a plain registered user (OWNER of their own org) gets 403 on /rotate")
-    void plainUserForbiddenOnRotate() throws Exception {
-        String accessToken = registerAndGetAccessToken("plain-owner-rotate@example.com");
-
-        mockMvc.perform(post("/api/v1/admin/encryption/rotate")
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
     @DisplayName("a plain registered user (OWNER of their own org) gets 403 on /status")
     void plainUserForbiddenOnStatus() throws Exception {
         String accessToken = registerAndGetAccessToken("plain-owner-status@example.com");

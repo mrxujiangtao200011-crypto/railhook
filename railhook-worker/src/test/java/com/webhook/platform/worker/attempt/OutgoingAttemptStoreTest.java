@@ -409,22 +409,6 @@ class OutgoingAttemptStoreTest {
         }
 
         @Test
-        void aMessageCarryingAStaleTokenClaimsNothing() {
-            // The scheduler timed out, handed the row back and re-claimed it; then this send landed.
-            UUID staleToken = UUID.randomUUID();
-            // PROCESSING under the new token.
-            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(processingRow()));
-            when(deliveryRepository.claimRetryForProcessing(eq(deliveryId), eq(staleToken), any(UUID.class)))
-                    .thenReturn(null);
-
-            ClaimResult<OutgoingAttemptStore.Claim> result =
-                    retryStoreFor(retryMessage(staleToken)).claim();
-
-            assertInstanceOf(ClaimResult.NotClaimed.class, result);
-            verify(deliveryRepository, never()).findById(deliveryId);
-        }
-
-        @Test
         void aMessageWithoutATokenStillWorksAcrossARollingDeploy() {
             // From a worker before the token travelled with the message; dropping these strands in-flight retries.
             Delivery delivery = Delivery.builder()

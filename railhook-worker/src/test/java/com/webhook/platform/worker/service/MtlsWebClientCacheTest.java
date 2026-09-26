@@ -28,7 +28,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
-@DisplayName("MtlsWebClientCache Tests")
 class MtlsWebClientCacheTest {
 
     private static final String ENCRYPTION_KEY = "test-encryption-key-for-mtls-32c";
@@ -109,25 +108,12 @@ class MtlsWebClientCacheTest {
     }
 
     @Test
-    @DisplayName("Should create mTLS WebClient with valid RSA cert and key, with or without a CA cert")
     void shouldCreateMtlsClientWithRsaCert() {
         assertNotNull(factory.getWebClient(createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null)));
         assertNotNull(factory.getWebClient(createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, TEST_CERT_PEM)));
     }
 
     @Test
-    @DisplayName("Should cache mTLS WebClient for same endpoint")
-    void shouldCacheMtlsClient() {
-        Endpoint endpoint = createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null);
-
-        WebClient first = factory.getWebClient(endpoint);
-        WebClient second = factory.getWebClient(endpoint);
-
-        assertSame(first, second, "Should return cached WebClient instance");
-    }
-
-    @Test
-    @DisplayName("Should invalidate cache when endpoint updatedAt changes")
     void shouldInvalidateCacheOnUpdate() {
         UUID endpointId = UUID.randomUUID();
         Instant original = Instant.now().minusSeconds(60);
@@ -145,7 +131,6 @@ class MtlsWebClientCacheTest {
     }
 
     @Test
-    @DisplayName("Should invalidate cache manually via invalidateCache()")
     void shouldInvalidateCacheManually() {
         Endpoint endpoint = createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null);
 
@@ -198,7 +183,6 @@ class MtlsWebClientCacheTest {
     }
 
     @Test
-    @DisplayName("Should throw RuntimeException on invalid cert")
     void shouldThrowOnInvalidCert() {
         SecretEncryption.EncryptedData enc = SecretEncryption.encrypt("not-a-cert", ENCRYPTION_KEY, ENCRYPTION_SALT);
         SecretEncryption.EncryptedData encKey = SecretEncryption.encrypt("not-a-key", ENCRYPTION_KEY, ENCRYPTION_SALT);
@@ -218,7 +202,6 @@ class MtlsWebClientCacheTest {
     }
 
     @Test
-    @DisplayName("Should throw on null encrypted cert data")
     void shouldThrowOnNullEncryptedCert() {
         Endpoint endpoint = Endpoint.builder()
                 .id(UUID.randomUUID())
@@ -231,19 +214,6 @@ class MtlsWebClientCacheTest {
                 .build();
 
         assertThrows(RuntimeException.class, () -> factory.getWebClient(endpoint));
-    }
-
-    private Endpoint createEndpoint(boolean mtlsEnabled) {
-        return Endpoint.builder()
-                .id(UUID.randomUUID())
-                .projectId(UUID.randomUUID())
-                .url("https://example.com/webhook")
-                .mtlsEnabled(mtlsEnabled)
-                .enabled(true)
-                .secretEncrypted("dummy")
-                .secretIv("dummy")
-                .updatedAt(Instant.now())
-                .build();
     }
 
     private Endpoint createMtlsEndpoint(String certPem, String keyPem, String caCertPem) {

@@ -106,8 +106,10 @@ class HttpNodeExecutorTest {
     @Test
     void customHeaders_areForwarded_exceptDangerousOnes() throws Exception {
         AtomicReference<String> customHeader = new AtomicReference<>();
+        AtomicReference<String> hostHeader = new AtomicReference<>();
         server.createContext("/hook", exchange -> {
             customHeader.set(exchange.getRequestHeaders().getFirst("X-Custom"));
+            hostHeader.set(exchange.getRequestHeaders().getFirst("Host"));
             exchange.sendResponseHeaders(200, -1);
         });
         server.start();
@@ -118,6 +120,7 @@ class HttpNodeExecutorTest {
 
         assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
         assertThat(customHeader.get()).isEqualTo("value1");
+        assertThat(hostHeader.get()).isEqualTo("127.0.0.1:" + server.getAddress().getPort());
     }
 
     @Test

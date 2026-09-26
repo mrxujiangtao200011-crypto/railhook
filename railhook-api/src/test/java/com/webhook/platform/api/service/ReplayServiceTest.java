@@ -22,6 +22,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -117,21 +119,14 @@ class ReplayServiceTest {
                 .isInstanceOf(NotFoundException.class);
     }
 
-    @Test
-    void estimate_fromAfterTo_throwsIllegalArgument() {
+    @ParameterizedTest
+    @CsvSource({"0, -1", "-120, 0"})
+    void estimate_backwardsOrOver90DayRange_throwsIllegalArgument(int fromDays, int toDays) {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         ReplayRequest request = ReplayRequest.builder()
-                .fromDate(Instant.now()).toDate(Instant.now().minus(1, ChronoUnit.DAYS)).build();
-
-        assertThatThrownBy(() -> replayService.estimate(projectId, request))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void estimate_rangeOver90Days_throwsIllegalArgument() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
-        ReplayRequest request = ReplayRequest.builder()
-                .fromDate(Instant.now().minus(120, ChronoUnit.DAYS)).toDate(Instant.now()).build();
+                .fromDate(Instant.now().plus(fromDays, ChronoUnit.DAYS))
+                .toDate(Instant.now().plus(toDays, ChronoUnit.DAYS))
+                .build();
 
         assertThatThrownBy(() -> replayService.estimate(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -437,7 +432,7 @@ class ReplayServiceTest {
     }
 
     @Test
-    void run_sessionDeletedMidRun_stopsAndMarksCancelled() {
+    void run_sessionDeletedMidRun_stopsWithoutWritingTheSessionBack() {
         UUID sessionId = UUID.randomUUID();
         ReplaySession initial = ReplaySession.builder().id(sessionId).projectId(projectId)
                 .status(ReplaySessionStatus.PENDING)
@@ -452,6 +447,8 @@ class ReplayServiceTest {
         replayService.run(sessionId);
 
         verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
+        verify(replaySessionRepository, never()).saveAndFlush(any());
+        assertThat(initial.getStatus()).isEqualTo(ReplaySessionStatus.PENDING);
     }
 
     @Test
@@ -475,7 +472,6 @@ class ReplayServiceTest {
 
         replayService.run(sessionId);
 
-        // A failed batch is counted as errors and skipped, so the session still completes.
         assertThat(session.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);
         assertThat(session.getErrors()).isEqualTo(1);
         assertThat(session.getProcessedEvents()).isZero();
@@ -507,7 +503,10 @@ class ReplayServiceTest {
 
         replayService.run(sessionId);
 
-        verify(eventRepository).findById(lastProcessedId);
+        verify(eventRepository).findByCursorForReplay(any(), eq(projectId), any(), any(),
+                eq(lastEventCreatedAt), eq(lastProcessedId), anyInt());
         assertThat(session.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);
+        assertThat(session.getProcessedEvents()).isEqualTo(1);
+        assertThat(session.getDeliveriesCreated()).isEqualTo(1);
     }
 }

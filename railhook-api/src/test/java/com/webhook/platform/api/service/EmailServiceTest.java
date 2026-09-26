@@ -86,20 +86,10 @@ class EmailServiceTest {
         return out.toString(StandardCharsets.UTF_8);
     }
 
+    // Development keeps the link, or there would be no way to reset a password there.
     @Nested
     @DisplayName("with no SMTP configured")
     class WithoutSmtp {
-
-        @Test
-        @DisplayName("development still gets the link, because otherwise there is no way to reset a password")
-        void developmentKeepsTheLink() {
-            emailEnabled(false);
-            environment("development");
-
-            service.sendPasswordResetEmail("dev@railhook.test", "tok-dev");
-
-            assertThat(loggedText()).contains("tok-dev");
-        }
 
         @Test
         @DisplayName("production does not, and says where the link went instead")
@@ -113,24 +103,6 @@ class EmailServiceTest {
         }
     }
 
-    @Test
-    @DisplayName("with SMTP configured, a failed send never logs its link as a consolation prize")
-    void failedSendLogsNoLink() {
-        emailEnabled(true);
-        environment("production");
-        smtpFails();
-
-        service.sendPasswordResetEmail("real@railhook.test", "tok-fallback");
-        service.sendVerificationEmail("real@railhook.test", "tok-verify");
-        service.sendInviteEmail("real@railhook.test", "org-1", "tok-invite");
-
-        assertThat(loggedText())
-                .doesNotContain("tok-fallback")
-                .doesNotContain("tok-verify")
-                .doesNotContain("tok-invite")
-                .contains("Mail password-reset to r***l@railhook.test failed");
-    }
-
     // A real bounce could not be tied to a template or outcome; sends now log a masked recipient.
     @Nested
     @DisplayName("mail outcomes in the log")
@@ -141,56 +113,52 @@ class EmailServiceTest {
         }
 
         @Test
-        @DisplayName("a delivered mail logs its template, a masked recipient and success")
-        void successIsLogged() {
+        @DisplayName("every delivered mail logs its template, a masked recipient and success")
+        void everyTemplateIsLogged() {
             emailEnabled(true);
             environment("production");
             when(mailSender.createMimeMessage()).thenReturn(mock(MimeMessage.class));
 
             service.sendVerificationEmail("wheelet1228@gmail.con", "tok-secret-verify");
-
-            assertThat(infoAndAbove()).extracting(ILoggingEvent::getFormattedMessage)
-                    .contains("Sending mail verification to w***8@gmail.con",
-                            "Mail verification to w***8@gmail.con sent");
-            assertThat(loggedText()).doesNotContain("wheelet1228").doesNotContain("tok-secret-verify");
-        }
-
-        @Test
-        @DisplayName("a refused mail logs the provider's error, still without the address or the token")
-        void failureIsLoggedWithTheProviderError() {
-            emailEnabled(true);
-            environment("production");
-            smtpFails();
-
-            service.sendInviteEmail("teammate@acme.io", "org-1", "tok-secret-invite");
-
-            assertThat(loggedText())
-                    .contains("Mail invite to t***e@acme.io failed: relay refused")
-                    .doesNotContain("teammate@acme.io")
-                    .doesNotContain("tok-secret-invite");
-        }
-
-        @Test
-        @DisplayName("every template goes through the same record")
-        void everyTemplateIsNamed() {
-            emailEnabled(true);
-            environment("production");
-            when(mailSender.createMimeMessage()).thenReturn(mock(MimeMessage.class));
-
             service.sendPasswordResetEmail("a@x.io", "t1");
             service.sendTemporaryPasswordEmail("a@x.io", "Pw!1");
             service.sendAlertEmail("a@x.io", "Endpoint down", "<p>body-marker</p>");
             service.sendEmailChangeConfirmation("new@x.io", "t2");
             service.sendEmailChangeNotice("old@x.io", "new@x.io", "t3");
 
+            assertThat(infoAndAbove()).extracting(ILoggingEvent::getFormattedMessage)
+                    .contains("Sending mail verification to w***8@gmail.con",
+                            "Mail verification to w***8@gmail.con sent");
             assertThat(loggedText())
                     .contains("Mail password-reset to a***@x.io sent")
                     .contains("Mail temporary-password to a***@x.io sent")
                     .contains("Mail alert to a***@x.io sent")
                     .contains("Mail email-change-confirmation to n***w@x.io sent")
                     .contains("Mail email-change-notice to o***d@x.io sent")
+                    .doesNotContain("wheelet1228")
+                    .doesNotContain("tok-secret-verify")
                     .doesNotContain("body-marker")
                     .doesNotContain("Pw!1");
+        }
+
+        @Test
+        @DisplayName("a refused mail logs the provider's error, never the address or its link")
+        void failureIsLoggedWithTheProviderError() {
+            emailEnabled(true);
+            environment("production");
+            smtpFails();
+
+            service.sendPasswordResetEmail("real@railhook.test", "tok-fallback");
+            service.sendVerificationEmail("real@railhook.test", "tok-verify");
+            service.sendInviteEmail("teammate@acme.io", "org-1", "tok-secret-invite");
+
+            assertThat(loggedText())
+                    .contains("Mail password-reset to r***l@railhook.test failed")
+                    .contains("Mail invite to t***e@acme.io failed: relay refused")
+                    .doesNotContain("teammate@acme.io")
+                    .doesNotContain("tok-fallback")
+                    .doesNotContain("tok-verify")
+                    .doesNotContain("tok-secret-invite");
         }
 
         @Test

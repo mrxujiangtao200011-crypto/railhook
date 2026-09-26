@@ -103,52 +103,24 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void endpointOfAnotherProjectIsNotFound() throws Exception {
+    void endpointOfAnotherProjectIsNotFoundForEveryOperation() throws Exception {
         UUID endpointB = createEndpoint(projectB, B_URL);
+        String verificationBefore = verificationStatusOf(endpointB);
+
         expectNotFound(get(a("/endpoints/" + endpointB)));
-    }
-
-    @Test
-    void rotatingAnotherProjectsEndpointSecretReturnsNoSecret() throws Exception {
-        UUID endpointB = createEndpoint(projectB, B_URL);
-        MvcResult result = asKey(post(a("/endpoints/" + endpointB + "/rotate-secret")), null);
-        assertEquals(404, result.getResponse().getStatus());
-        assertFalse(result.getResponse().getContentAsString().contains("\"secret\""),
+        MvcResult rotated = asKey(post(a("/endpoints/" + endpointB + "/rotate-secret")), null);
+        assertEquals(404, rotated.getResponse().getStatus());
+        assertFalse(rotated.getResponse().getContentAsString().contains("\"secret\""),
                 "A 404 must not carry a signing secret");
-    }
-
-    @Test
-    void updatingAnotherProjectsEndpointLeavesItsUrlAlone() throws Exception {
-        UUID endpointB = createEndpoint(projectB, B_URL);
         expectNotFound(put(a("/endpoints/" + endpointB)), "{\"url\":\"https://attacker.example.com/steal\"}");
-        assertEquals(B_URL, json(asJwt(get(b("/endpoints/" + endpointB)), null)).get("url").asText());
-    }
-
-    @Test
-    void deletingAnotherProjectsEndpointLeavesItInPlace() throws Exception {
-        UUID endpointB = createEndpoint(projectB, B_URL);
-        expectNotFound(delete(a("/endpoints/" + endpointB)));
-        asJwt(get(b("/endpoints/" + endpointB)), null);
-    }
-
-    @Test
-    void testingAnotherProjectsEndpointIsNotFound() throws Exception {
-        UUID endpointB = createEndpoint(projectB, B_URL);
         expectNotFound(post(a("/endpoints/" + endpointB + "/test")));
-    }
-
-    @Test
-    void verifyingAnotherProjectsEndpointIsNotFound() throws Exception {
-        UUID endpointB = createEndpoint(projectB, B_URL);
         expectNotFound(post(a("/endpoints/" + endpointB + "/verify")));
-    }
-
-    @Test
-    void skippingVerificationOfAnotherProjectsEndpointIsNotFound() throws Exception {
-        UUID endpointB = createEndpoint(projectB, B_URL);
-        String before = verificationStatusOf(endpointB);
         expectNotFound(post(a("/endpoints/" + endpointB + "/skip-verification")), "{\"reason\":\"x\"}");
-        assertEquals(before, verificationStatusOf(endpointB));
+        expectNotFound(delete(a("/endpoints/" + endpointB)));
+
+        JsonNode endpoint = json(asJwt(get(b("/endpoints/" + endpointB)), null));
+        assertEquals(B_URL, endpoint.get("url").asText());
+        assertEquals(verificationBefore, endpoint.get("verificationStatus").asText());
     }
 
     private String verificationStatusOf(UUID endpointB) throws Exception {
@@ -156,25 +128,14 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void subscriptionOfAnotherProjectIsNotFound() throws Exception {
+    void subscriptionOfAnotherProjectIsNotFoundForEveryOperation() throws Exception {
         UUID subscriptionB = createSubscription();
         expectNotFound(get(a("/subscriptions/" + subscriptionB)));
-    }
-
-    @Test
-    void updatingAnotherProjectsSubscriptionIsNotFound() throws Exception {
-        UUID subscriptionB = createSubscription();
         expectNotFound(put(a("/subscriptions/" + subscriptionB)), "{\"enabled\":false,\"eventType\":\"x.y\","
                 + "\"endpointId\":\"" + createEndpoint(projectA, "https://staging.example.com/a") + "\"}");
         expectNotFound(patch(a("/subscriptions/" + subscriptionB)), "{\"enabled\":false}");
-        assertTrue(json(asJwt(get(b("/subscriptions/" + subscriptionB)), null)).get("enabled").asBoolean());
-    }
-
-    @Test
-    void deletingAnotherProjectsSubscriptionLeavesItInPlace() throws Exception {
-        UUID subscriptionB = createSubscription();
         expectNotFound(delete(a("/subscriptions/" + subscriptionB)));
-        asJwt(get(b("/subscriptions/" + subscriptionB)), null);
+        assertTrue(json(asJwt(get(b("/subscriptions/" + subscriptionB)), null)).get("enabled").asBoolean());
     }
 
     @Test

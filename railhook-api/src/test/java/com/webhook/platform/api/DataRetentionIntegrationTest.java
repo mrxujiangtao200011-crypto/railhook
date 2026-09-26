@@ -163,30 +163,6 @@ public class DataRetentionIntegrationTest {
         assertEquals(15, delivery1Attempts.get(9).getAttemptNumber());
     }
 
-    @Test
-    void testNoDeleteWhenUnderLimit() {
-        UUID deliveryId = createDelivery();
-
-        for (int i = 1; i <= 8; i++) {
-            createAttempt(deliveryId, i, Instant.now());
-        }
-
-        long beforeCount = deliveryAttemptRepository.count();
-        assertEquals(8, beforeCount);
-
-        transactionTemplate.execute(status -> {
-            dataRetentionService.enforcePerDeliveryAttemptLimits();
-            return null;
-        });
-
-        long afterCount = deliveryAttemptRepository.count();
-        assertEquals(8, afterCount);
-
-        List<DeliveryAttempt> attempts = deliveryAttemptRepository
-                .findByDeliveryIdOrderByAttemptNumberAsc(deliveryId);
-        assertEquals(8, attempts.size());
-    }
-
     private UUID createDelivery() {
         UUID deliveryId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();

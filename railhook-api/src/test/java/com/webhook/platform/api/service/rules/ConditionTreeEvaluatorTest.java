@@ -8,10 +8,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,176 +33,72 @@ class ConditionTreeEvaluatorTest {
     }
 
     @Test
-    void nullConditions_matchAll() throws Exception {
+    void noConditionsOrAnEmptyGroupMatchesEverything() throws Exception {
         assertThat(ConditionTreeEvaluator.evaluate(null, json("{}"), fieldCache)).isTrue();
-    }
-
-    @Test
-    void emptyGroup_matchAll() throws Exception {
         Group group = Group.builder().op(GroupOperator.AND).children(List.of()).build();
         assertThat(ConditionTreeEvaluator.evaluate(group, json("{}"), fieldCache)).isTrue();
     }
 
-    @Nested
-    class PredicateTests {
+    static Stream<Arguments> predicates() {
+        Predicate eqString = typed("type", PredicateOperator.EQ, "order.created", ValueType.STRING);
+        Predicate eqNumber = typed("data.amount", PredicateOperator.EQ, 100, ValueType.NUMBER);
+        Predicate neq = typed("status", PredicateOperator.NEQ, "cancelled", ValueType.STRING);
+        Predicate between = typed("amount", PredicateOperator.BETWEEN, List.of(10, 100), ValueType.NUMBER);
+        Predicate in = typed("currency", PredicateOperator.IN, List.of("USD", "EUR"), ValueType.ARRAY_STRING);
+        Predicate notIn = typed("currency", PredicateOperator.NOT_IN, List.of("USD", "EUR"), ValueType.ARRAY_STRING);
+        Predicate regex = typed("type", PredicateOperator.REGEX, "^order\\..*", ValueType.STRING);
+        Predicate exists = Predicate.builder().field("data.email").operator(PredicateOperator.EXISTS).build();
+        Predicate notExists = Predicate.builder().field("data.email").operator(PredicateOperator.NOT_EXISTS).build();
+        Predicate isNull = Predicate.builder().field("data.ref").operator(PredicateOperator.IS_NULL).build();
+        Predicate notNull = Predicate.builder().field("data.ref").operator(PredicateOperator.NOT_NULL).build();
+        Predicate caseInsensitive = Predicate.builder()
+                .field("status").operator(PredicateOperator.EQ).value("active").valueType(ValueType.STRING)
+                .caseInsensitive(true).build();
+        String email = "{\"email\":\"user@example.com\"}";
+        return Stream.of(
+                Arguments.of(eqString, "{\"type\":\"order.created\"}", true),
+                Arguments.of(eqString, "{\"type\":\"other\"}", false),
+                Arguments.of(eqNumber, "{\"data\":{\"amount\":100}}", true),
+                Arguments.of(eqNumber, "{\"data\":{\"amount\":200}}", false),
+                Arguments.of(neq, "{\"status\":\"active\"}", true),
+                Arguments.of(neq, "{\"status\":\"cancelled\"}", false),
+                Arguments.of(pred("amount", PredicateOperator.GT, 40), "{\"amount\":50}", true),
+                Arguments.of(pred("amount", PredicateOperator.GT, 50), "{\"amount\":50}", false),
+                Arguments.of(pred("amount", PredicateOperator.GTE, 50), "{\"amount\":50}", true),
+                Arguments.of(pred("amount", PredicateOperator.LT, 60), "{\"amount\":50}", true),
+                Arguments.of(pred("amount", PredicateOperator.LTE, 50), "{\"amount\":50}", true),
+                Arguments.of(pred("amount", PredicateOperator.LTE, 49), "{\"amount\":50}", false),
+                Arguments.of(between, "{\"amount\":50}", true),
+                Arguments.of(between, "{\"amount\":10}", true),
+                Arguments.of(between, "{\"amount\":100}", true),
+                Arguments.of(between, "{\"amount\":101}", false),
+                Arguments.of(pred("email", PredicateOperator.CONTAINS, "example"), email, true),
+                Arguments.of(pred("email", PredicateOperator.STARTS_WITH, "user@"), email, true),
+                Arguments.of(pred("email", PredicateOperator.ENDS_WITH, ".com"), email, true),
+                Arguments.of(pred("email", PredicateOperator.NOT_CONTAINS, "foo"), email, true),
+                Arguments.of(in, "{\"currency\":\"USD\"}", true),
+                Arguments.of(in, "{\"currency\":\"GBP\"}", false),
+                Arguments.of(notIn, "{\"currency\":\"GBP\"}", true),
+                Arguments.of(regex, "{\"type\":\"order.created\"}", true),
+                Arguments.of(regex, "{\"type\":\"payment.done\"}", false),
+                Arguments.of(exists, "{\"data\":{\"email\":\"a@b.com\"}}", true),
+                Arguments.of(exists, "{\"data\":{}}", false),
+                Arguments.of(notExists, "{\"data\":{}}", true),
+                Arguments.of(isNull, "{\"data\":{\"ref\":null}}", true),
+                Arguments.of(isNull, "{\"data\":{}}", true),
+                Arguments.of(notNull, "{\"data\":{\"ref\":\"abc\"}}", true),
+                Arguments.of(notNull, "{\"data\":{\"ref\":null}}", false),
+                Arguments.of(caseInsensitive, "{\"status\":\"ACTIVE\"}", true),
+                Arguments.of(caseInsensitive, "{\"status\":\"Active\"}", true),
+                Arguments.of(pred("nonexistent", PredicateOperator.EQ, "something"), "{\"other\":1}", false),
+                Arguments.of(pred("items[0].name", PredicateOperator.EQ, "widget"),
+                        "{\"items\":[{\"name\":\"widget\"},{\"name\":\"gadget\"}]}", true));
+    }
 
-        @Test
-        void eq_string() throws Exception {
-            Predicate p = Predicate.builder()
-                    .field("type").operator(PredicateOperator.EQ).value("order.created").valueType(ValueType.STRING)
-                    .build();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"type\":\"order.created\"}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"type\":\"other\"}"), fieldCache)).isFalse();
-        }
-
-        @Test
-        void eq_number() throws Exception {
-            Predicate p = Predicate.builder()
-                    .field("data.amount").operator(PredicateOperator.EQ).value(100).valueType(ValueType.NUMBER)
-                    .build();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"data\":{\"amount\":100}}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"data\":{\"amount\":200}}"), fieldCache)).isFalse();
-        }
-
-        @Test
-        void neq() throws Exception {
-            Predicate p = Predicate.builder()
-                    .field("status").operator(PredicateOperator.NEQ).value("cancelled").valueType(ValueType.STRING)
-                    .build();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"status\":\"active\"}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"status\":\"cancelled\"}"), fieldCache)).isFalse();
-        }
-
-        @Test
-        void gt_gte_lt_lte() throws Exception {
-            JsonNode event = json("{\"amount\":50}");
-
-            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.GT, 40), event, fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.GT, 50), event, fieldCache)).isFalse();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.GTE, 50), event, fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.LT, 60), event, fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.LTE, 50), event, fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.LTE, 49), event, fieldCache)).isFalse();
-        }
-
-        @Test
-        void between() throws Exception {
-            Predicate p = Predicate.builder()
-                    .field("amount").operator(PredicateOperator.BETWEEN).value(List.of(10, 100)).valueType(ValueType.NUMBER)
-                    .build();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"amount\":50}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"amount\":10}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"amount\":100}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"amount\":101}"), fieldCache)).isFalse();
-        }
-
-        @Test
-        void contains_startsWith_endsWith() throws Exception {
-            JsonNode event = json("{\"email\":\"user@example.com\"}");
-
-            assertThat(ConditionTreeEvaluator.evaluate(
-                    pred("email", PredicateOperator.CONTAINS, "example"), event, fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(
-                    pred("email", PredicateOperator.STARTS_WITH, "user@"), event, fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(
-                    pred("email", PredicateOperator.ENDS_WITH, ".com"), event, fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(
-                    pred("email", PredicateOperator.NOT_CONTAINS, "foo"), event, fieldCache)).isTrue();
-        }
-
-        @Test
-        void in_notIn() throws Exception {
-            Predicate inPred = Predicate.builder()
-                    .field("currency").operator(PredicateOperator.IN).value(List.of("USD", "EUR")).valueType(ValueType.ARRAY_STRING)
-                    .build();
-            assertThat(ConditionTreeEvaluator.evaluate(inPred, json("{\"currency\":\"USD\"}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(inPred, json("{\"currency\":\"GBP\"}"), fieldCache)).isFalse();
-
-            fieldCache.clear();
-            Predicate notInPred = Predicate.builder()
-                    .field("currency").operator(PredicateOperator.NOT_IN).value(List.of("USD", "EUR")).valueType(ValueType.ARRAY_STRING)
-                    .build();
-            assertThat(ConditionTreeEvaluator.evaluate(notInPred, json("{\"currency\":\"GBP\"}"), fieldCache)).isTrue();
-        }
-
-        @Test
-        void regex() throws Exception {
-            Predicate p = Predicate.builder()
-                    .field("type").operator(PredicateOperator.REGEX).value("^order\\..*").valueType(ValueType.STRING)
-                    .build();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"type\":\"order.created\"}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"type\":\"payment.done\"}"), fieldCache)).isFalse();
-        }
-
-        @Test
-        void exists_notExists() throws Exception {
-            Predicate exists = Predicate.builder()
-                    .field("data.email").operator(PredicateOperator.EXISTS).build();
-            Predicate notExists = Predicate.builder()
-                    .field("data.email").operator(PredicateOperator.NOT_EXISTS).build();
-
-            assertThat(ConditionTreeEvaluator.evaluate(exists, json("{\"data\":{\"email\":\"a@b.com\"}}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(exists, json("{\"data\":{}}"), fieldCache)).isFalse();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(notExists, json("{\"data\":{}}"), fieldCache)).isTrue();
-        }
-
-        @Test
-        void isNull_notNull() throws Exception {
-            Predicate isNull = Predicate.builder()
-                    .field("data.ref").operator(PredicateOperator.IS_NULL).build();
-            Predicate notNull = Predicate.builder()
-                    .field("data.ref").operator(PredicateOperator.NOT_NULL).build();
-
-            assertThat(ConditionTreeEvaluator.evaluate(isNull, json("{\"data\":{\"ref\":null}}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(isNull, json("{\"data\":{}}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(notNull, json("{\"data\":{\"ref\":\"abc\"}}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(notNull, json("{\"data\":{\"ref\":null}}"), fieldCache)).isFalse();
-        }
-
-        @Test
-        void caseInsensitive() throws Exception {
-            Predicate p = Predicate.builder()
-                    .field("status").operator(PredicateOperator.EQ).value("active").valueType(ValueType.STRING)
-                    .caseInsensitive(true)
-                    .build();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"status\":\"ACTIVE\"}"), fieldCache)).isTrue();
-            fieldCache.clear();
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"status\":\"Active\"}"), fieldCache)).isTrue();
-        }
-
-        @Test
-        void missingField_returnsFalse() throws Exception {
-            Predicate p = pred("nonexistent", PredicateOperator.EQ, "something");
-            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"other\":1}"), fieldCache)).isFalse();
-        }
-
-        @Test
-        void arrayIndex_field() throws Exception {
-            Predicate p = pred("items[0].name", PredicateOperator.EQ, "widget");
-            assertThat(ConditionTreeEvaluator.evaluate(p,
-                    json("{\"items\":[{\"name\":\"widget\"},{\"name\":\"gadget\"}]}"), fieldCache)).isTrue();
-        }
+    @ParameterizedTest
+    @MethodSource("predicates")
+    void predicate(Predicate predicate, String event, boolean matches) throws Exception {
+        assertThat(ConditionTreeEvaluator.evaluate(predicate, json(event), fieldCache)).isEqualTo(matches);
     }
 
     @Nested
@@ -366,5 +265,9 @@ class ConditionTreeEvaluatorTest {
 
     private static Predicate pred(String field, PredicateOperator op, Object value) {
         return Predicate.builder().field(field).operator(op).value(value).build();
+    }
+
+    private static Predicate typed(String field, PredicateOperator op, Object value, ValueType type) {
+        return Predicate.builder().field(field).operator(op).value(value).valueType(type).build();
     }
 }

@@ -12,6 +12,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -84,23 +88,6 @@ class AlertEvaluatorServiceTest {
         evaluator.evaluate();
 
         verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
-    }
-
-    @Test
-    @DisplayName("while an alert for the rule is unresolved and the condition still holds, the rule stays quiet")
-    void firesOnTheCrossingNotEveryTick() {
-        AlertRule rule = rule(AlertType.FAILURE_RATE, 50.0);
-        given(rule);
-        when(eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId())).thenReturn(true);
-        when(deliveryRepository.countByProjectIdAndCreatedAtBetween(eq(projectId), any(), any()))
-                .thenReturn(10L);
-        when(deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
-                eq(projectId), eq(DeliveryStatus.FAILED), any(), any())).thenReturn(8L);
-
-        evaluator.evaluate();
-
-        verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
-        verify(alertService, never()).resolveRecovered(any());
     }
 
     @Test
@@ -169,46 +156,30 @@ class AlertEvaluatorServiceTest {
         assertThat(tenantAtFire.get()).isEqualTo(organizationId);
     }
 
-    @Test
-    @DisplayName("consecutive failures need a streak, not just a bad ratio")
-    void consecutiveFailuresNeedsAnUnbrokenRun() {
-        AlertRule rule = rule(AlertType.CONSECUTIVE_FAILURES, 3.0);
-        rule.setEndpointId(endpointId);
-        given(rule);
-        when(deliveryRepository.findRecentOutcomesByEndpointId(eq(endpointId), any(Pageable.class)))
-                .thenReturn(List.of(DeliveryStatus.FAILED, DeliveryStatus.SUCCESS, DeliveryStatus.FAILED));
-
-        evaluator.evaluate();
-
-        verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
+    static Stream<Arguments> recentOutcomes() {
+        return Stream.of(
+                Arguments.of(List.of(DeliveryStatus.FAILED, DeliveryStatus.DLQ, DeliveryStatus.FAILED), true),
+                Arguments.of(List.of(DeliveryStatus.FAILED, DeliveryStatus.SUCCESS, DeliveryStatus.FAILED), false),
+                Arguments.of(List.of(DeliveryStatus.FAILED), false));
     }
 
-    @Test
-    @DisplayName("an unbroken run of failures fires")
-    void consecutiveFailuresFiresOnAnUnbrokenRun() {
+    // A streak, not a bad ratio; and a new endpoint's first failure is not a streak.
+    @ParameterizedTest
+    @MethodSource("recentOutcomes")
+    void consecutiveFailuresFireOnlyOnAnUnbrokenRunAsLongAsTheThreshold(List<DeliveryStatus> outcomes, boolean fires) {
         AlertRule rule = rule(AlertType.CONSECUTIVE_FAILURES, 3.0);
         rule.setEndpointId(endpointId);
         given(rule);
         when(deliveryRepository.findRecentOutcomesByEndpointId(eq(endpointId), any(Pageable.class)))
-                .thenReturn(List.of(DeliveryStatus.FAILED, DeliveryStatus.DLQ, DeliveryStatus.FAILED));
+                .thenReturn(outcomes);
 
         evaluator.evaluate();
 
-        verify(alertService).fireAlert(eq(rule), eq(3.0), anyString());
-    }
-
-    @Test
-    @DisplayName("a new endpoint's first failure is not a streak")
-    void tooFewOutcomesIsNotAStreak() {
-        AlertRule rule = rule(AlertType.CONSECUTIVE_FAILURES, 3.0);
-        rule.setEndpointId(endpointId);
-        given(rule);
-        when(deliveryRepository.findRecentOutcomesByEndpointId(eq(endpointId), any(Pageable.class)))
-                .thenReturn(List.of(DeliveryStatus.FAILED));
-
-        evaluator.evaluate();
-
-        verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
+        if (fires) {
+            verify(alertService).fireAlert(eq(rule), eq(3.0), anyString());
+        } else {
+            verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
+        }
     }
 
     @Test

@@ -32,16 +32,10 @@ public class PublicEndpointIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    public void thePlanCatalogAnswersWithoutCredentials() throws Exception {
+    public void thePlanCatalogAnswersWithoutCredentialsAndWithoutTheSelfHostedRow() throws Exception {
         mockMvc.perform(get("/api/v1/billing/plans"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").exists());
-    }
-
-    @Test
-    public void thePlanCatalogDoesNotOfferTheSelfHostedRow() throws Exception {
-        mockMvc.perform(get("/api/v1/billing/plans"))
-                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").exists())
                 .andExpect(jsonPath("$[?(@.name == 'self_hosted')]").isEmpty());
     }
 

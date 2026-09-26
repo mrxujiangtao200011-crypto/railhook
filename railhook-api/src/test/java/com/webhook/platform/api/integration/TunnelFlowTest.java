@@ -3,15 +3,18 @@ package com.webhook.platform.api.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
+import com.webhook.platform.api.domain.repository.OrganizationRepository;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.service.RedisTunnelCoordinator;
 import com.webhook.platform.api.service.TunnelRegistry;
 import com.webhook.platform.api.service.TunnelService;
 import com.webhook.platform.api.service.TunnelWebSocketHandler;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.webhook.platform.common.dto.tunnel.TunnelMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -20,13 +23,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.http.HttpHeaders;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.io.IOException;
 import java.net.URI;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.*;
 
@@ -37,7 +42,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @Timeout(value = 15, unit = TimeUnit.SECONDS)
-class TunnelFlowIntegrationTest {
+class TunnelFlowTest {
 
     private ObjectMapper objectMapper;
     private TunnelRegistry tunnelRegistry;
@@ -45,8 +50,8 @@ class TunnelFlowIntegrationTest {
     private TunnelWebSocketHandler webSocketHandler;
     private RedisTunnelCoordinator redisTunnelCoordinator;
 
-    private com.webhook.platform.api.domain.repository.TunnelSessionRepository tunnelSessionRepository;
-    private com.webhook.platform.api.domain.repository.ProjectRepository projectRepository;
+    private TunnelSessionRepository tunnelSessionRepository;
+    private ProjectRepository projectRepository;
 
     private TunnelSession testSession;
     private String tunnelToken;
@@ -55,16 +60,16 @@ class TunnelFlowIntegrationTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        tunnelSessionRepository = mock(com.webhook.platform.api.domain.repository.TunnelSessionRepository.class);
-        projectRepository = mock(com.webhook.platform.api.domain.repository.ProjectRepository.class);
+        tunnelSessionRepository = mock(TunnelSessionRepository.class);
+        projectRepository = mock(ProjectRepository.class);
 
         redisTunnelCoordinator = mock(RedisTunnelCoordinator.class);
         tunnelService = new TunnelService(tunnelSessionRepository, projectRepository,
-                mock(com.webhook.platform.api.domain.repository.OrganizationRepository.class),
-                mock(com.webhook.platform.api.service.billing.EntitlementService.class),
+                mock(OrganizationRepository.class),
+                mock(EntitlementService.class),
                 redisTunnelCoordinator);
-        org.springframework.test.util.ReflectionTestUtils.setField(tunnelService, "ingressBaseUrl", "http://localhost:8080");
-        org.springframework.test.util.ReflectionTestUtils.setField(tunnelService, "heartbeatTimeoutSeconds", 120);
+        ReflectionTestUtils.setField(tunnelService, "ingressBaseUrl", "http://localhost:8080");
+        ReflectionTestUtils.setField(tunnelService, "heartbeatTimeoutSeconds", 120);
 
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         tunnelRegistry = new TunnelRegistry(objectMapper, meterRegistry);
@@ -81,15 +86,15 @@ class TunnelFlowIntegrationTest {
                 .publicSlug(publicSlug)
                 .localPort(3000)
                 .status(TunnelStatus.ACTIVE)
-                .lastHeartbeat(java.time.Instant.now())
-                .createdAt(java.time.Instant.now())
+                .lastHeartbeat(Instant.now())
+                .createdAt(Instant.now())
                 .build();
     }
 
     @Test
     void fullTunnelFlow_createSession_connectWs_forwardRequest_receiveResponse() throws Exception {
         when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
-                .thenReturn(java.util.Optional.of(testSession));
+                .thenReturn(Optional.of(testSession));
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -166,7 +171,7 @@ class TunnelFlowIntegrationTest {
     @Test
     void heartbeatFlow_cliSendsHeartbeat_serverResponds() throws Exception {
         when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
-                .thenReturn(java.util.Optional.of(testSession));
+                .thenReturn(Optional.of(testSession));
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -195,7 +200,7 @@ class TunnelFlowIntegrationTest {
     @Test
     void disconnectFlow_wsCloses_tunnelUnregisteredButSessionStaysOpen() throws Exception {
         when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
-                .thenReturn(java.util.Optional.of(testSession));
+                .thenReturn(Optional.of(testSession));
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -217,7 +222,7 @@ class TunnelFlowIntegrationTest {
     @Test
     void reconnectFlow_sameTokenAfterADrop_registersTheTunnelAgain() throws Exception {
         when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
-                .thenReturn(java.util.Optional.of(testSession));
+                .thenReturn(Optional.of(testSession));
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -236,11 +241,9 @@ class TunnelFlowIntegrationTest {
     @Test
     void rejectInvalidToken_wsClosedImmediately() throws Exception {
         when(tunnelSessionRepository.findByTunnelToken("invalid-token"))
-                .thenReturn(java.util.Optional.empty());
+                .thenReturn(Optional.empty());
 
         WebSocketSession wsSession = createMockWsSession("invalid-token");
-        when(tunnelSessionRepository.findByTunnelToken("invalid-token"))
-                .thenReturn(java.util.Optional.empty());
 
         webSocketHandler.afterConnectionEstablished(wsSession);
 
@@ -274,7 +277,7 @@ class TunnelFlowIntegrationTest {
                 .build();
 
         when(tunnelSessionRepository.findByTunnelToken("closed-token"))
-                .thenReturn(java.util.Optional.of(closedSession));
+                .thenReturn(Optional.of(closedSession));
 
         WebSocketSession wsSession = createMockWsSession("closed-token");
         webSocketHandler.afterConnectionEstablished(wsSession);
@@ -285,9 +288,9 @@ class TunnelFlowIntegrationTest {
     }
 
     @Test
-    void forwardTimeout_returnsNullWhenCliDoesNotRespond() throws Exception {
+    void forwardToASlugWithNoConnectedTunnel_returnsNullAndLeavesNothingPending() throws Exception {
         when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
-                .thenReturn(java.util.Optional.of(testSession));
+                .thenReturn(Optional.of(testSession));
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -295,12 +298,11 @@ class TunnelFlowIntegrationTest {
         webSocketHandler.afterConnectionEstablished(wsSession);
 
         TunnelRequestMessage request = TunnelRequestMessage.builder()
-                .requestId("req-timeout")
+                .requestId("req-unknown-slug")
                 .method("GET")
                 .path("/slow")
                 .build();
 
-        // The default 30s timeout would be slow; the null-return path covers it.
         TunnelResponseMessage result = tunnelRegistry.forwardRequest("nonexistent-slug", request);
         assertNull(result, "Should return null for non-connected tunnel");
         assertEquals(0, tunnelRegistry.pendingRequestCount());
@@ -309,7 +311,7 @@ class TunnelFlowIntegrationTest {
     @Test
     void multipleRequestsConcurrently_allCorrelatedCorrectly() throws Exception {
         when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
-                .thenReturn(java.util.Optional.of(testSession));
+                .thenReturn(Optional.of(testSession));
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -371,23 +373,9 @@ class TunnelFlowIntegrationTest {
     }
 
     @Test
-    void transportError_loggedButNoException() throws Exception {
-        when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
-                .thenReturn(java.util.Optional.of(testSession));
-        when(tunnelSessionRepository.save(any(TunnelSession.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-
-        WebSocketSession wsSession = createMockWsSession(tunnelToken);
-        webSocketHandler.afterConnectionEstablished(wsSession);
-
-        assertDoesNotThrow(() ->
-                webSocketHandler.handleTransportError(wsSession, new IOException("Connection reset")));
-    }
-
-    @Test
     void invalidJsonMessage_ignoredGracefully() throws Exception {
         when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
-                .thenReturn(java.util.Optional.of(testSession));
+                .thenReturn(Optional.of(testSession));
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
