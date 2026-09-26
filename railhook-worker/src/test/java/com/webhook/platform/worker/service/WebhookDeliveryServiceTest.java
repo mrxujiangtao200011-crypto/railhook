@@ -3,7 +3,7 @@ package com.webhook.platform.worker.service;
 import com.webhook.platform.common.retry.RetryAfter;
 import com.webhook.platform.worker.attempt.TargetFailureRecorder;
 import com.webhook.platform.worker.attempt.AttemptRunner;
-import java.time.Clock;
+import com.webhook.platform.worker.exception.PayloadTransformException;
 import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
 import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
 import com.webhook.platform.worker.attempt.ProjectStatusLookup;
@@ -13,7 +13,7 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
-import com.webhook.platform.common.util.PayloadCompressionUtil;
+import com.webhook.platform.common.util.PayloadCompression;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.attempt.TransformedBody;
 import com.webhook.platform.worker.domain.entity.Delivery;
@@ -40,6 +40,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
+import java.time.Clock;
 
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -78,7 +79,7 @@ class WebhookDeliveryServiceTest {
     @Mock
     private DeliveryAttemptRepository deliveryAttemptRepository;
     @Mock
-    private MtlsWebClientFactory mtlsWebClientFactory;
+    private MtlsWebClientCache mtlsWebClientCache;
     @Mock
     private EncryptionKeyRegistry encryptionKeyRegistry;
     @Mock
@@ -125,7 +126,7 @@ class WebhookDeliveryServiceTest {
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
-                mtlsWebClientFactory, transformationCacheService, payloadTransformService,
+                mtlsWebClientCache, transformationCacheService, payloadTransformService,
                 new ObjectMapper(), webClient, mock(TargetFailureRecorder.class), registry, Clock.systemUTC(),
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
         return new WebhookDeliveryService(runner, storeFactory, new DeliveryAttemptMetrics(registry),
@@ -1065,7 +1066,7 @@ class WebhookDeliveryServiceTest {
         UUID projectId = UUID.randomUUID();
 
         String realJson = "{\"order\":\"" + "x".repeat(2000) + "\"}";
-        PayloadCompressionUtil.CompressionResult compressed = PayloadCompressionUtil.compress(realJson, 1024);
+        PayloadCompression.CompressionResult compressed = PayloadCompression.compress(realJson, 1024);
         assertTrue(compressed.compressed(),
                 "fixture must actually be compressed, otherwise the test proves nothing");
 

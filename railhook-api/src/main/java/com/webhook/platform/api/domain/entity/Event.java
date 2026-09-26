@@ -1,6 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
-import com.webhook.platform.common.util.PayloadCompressionUtil;
+import com.webhook.platform.common.util.PayloadCompression;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -58,6 +58,6 @@ public class Event {
 
     /** Use this rather than getPayload(), which may be compressed. */
     public String getDecompressedPayload() {
-        return PayloadCompressionUtil.decompress(payload, payloadCompressed);
+        return PayloadCompression.decompress(payload, payloadCompressed);
     }
 }

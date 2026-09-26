@@ -6,17 +6,17 @@ import com.webhook.platform.api.domain.repository.ApiKeyRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.mcp.McpServerConfig;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.time.Instant;
+import com.webhook.platform.common.security.SecureTokens;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import org.slf4j.MDC;
+import java.time.Instant;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -42,7 +42,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         String apiKeyValue = apiKeyOf(request);
 
         if (apiKeyValue != null && !apiKeyValue.isEmpty()) {
-            String keyHash = CryptoUtils.hashApiKey(apiKeyValue);
+            String keyHash = SecureTokens.hash(apiKeyValue);
 
             // System scope: these reads are how the tenant is found in the first place.
             Optional<ApiKey> apiKeyOpt = TenantContext.callAsSystem(() -> apiKeyRepository.findByKeyHash(keyHash));

@@ -3,6 +3,7 @@ package com.webhook.platform.api.service.workflow.executors;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.http.SsrfProtectionCustomizer;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.api.service.workflow.NodeExecutor;
@@ -15,12 +16,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
+import org.springframework.http.HttpMethod;
 
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.springframework.http.HttpMethod;
 
 /** SSRF is checked on the URL and again on the dialled address, since DNS can change in between. */
 @Component
@@ -132,7 +133,7 @@ public class HttpNodeExecutor implements NodeExecutor {
             } else {
                 return StepResult.failed("HTTP " + statusCode + ": " + (responseBody != null ? responseBody.substring(0, Math.min(500, responseBody.length())) : ""));
             }
-        } catch (UrlValidator.InvalidUrlException e) {
+        } catch (InvalidUrlException e) {
             return StepResult.failed("SSRF blocked: " + e.getMessage());
         } catch (Exception e) {
             log.error("HTTP node execution failed: {}", e.getMessage(), e);

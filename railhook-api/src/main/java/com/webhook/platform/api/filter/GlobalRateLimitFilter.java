@@ -1,5 +1,7 @@
 package com.webhook.platform.api.filter;
 
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ErrorResponseWriter;
 import com.webhook.platform.api.service.ConvergingRateLimiter;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
@@ -12,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -80,11 +81,8 @@ public class GlobalRateLimitFilter implements Filter {
         } else {
             globalRateLimitExceeded.increment();
             log.warn("Global platform rate limit exceeded for {} {}", httpRequest.getMethod(), path);
-            HttpServletResponse httpResponse = (HttpServletResponse) response;
-            httpResponse.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            httpResponse.setContentType("application/json");
-            httpResponse.getWriter().write(
-                    "{\"error\":\"platform_rate_limit\",\"message\":\"Platform rate limit exceeded. Please retry later.\",\"status\":429}");
+            ErrorResponseWriter.write((HttpServletResponse) response, ErrorCode.PLATFORM_RATE_LIMIT,
+                    "Platform rate limit exceeded. Please retry later.");
         }
     }
 

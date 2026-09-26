@@ -16,11 +16,11 @@ public record AuthContext(
 ) {
 
     public void requireWriteAccess() {
-        RbacUtil.requireWriteAccess(role, apiKeyScope);
+        AccessLevel.WRITE.require(role, apiKeyScope);
     }
 
     public void requireOwnerAccess() {
-        RbacUtil.requireOwnerAccess(role);
+        AccessLevel.OWNER.require(role, apiKeyScope);
     }
 
     /** A no-op for a JWT, which is scoped by organization membership instead. */

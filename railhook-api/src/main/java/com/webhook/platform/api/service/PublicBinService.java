@@ -7,6 +7,8 @@ import com.webhook.platform.api.domain.entity.PublicBinRequest;
 import com.webhook.platform.api.domain.repository.PublicBinRepository;
 import com.webhook.platform.api.domain.repository.PublicBinRequestRepository;
 import com.webhook.platform.api.dto.PublicBinResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
@@ -74,29 +76,16 @@ public class PublicBinService {
         this.maxActive = maxActive;
     }
 
-    public static class LimitReached extends RuntimeException {
-        private final boolean overall;
-
-        LimitReached(boolean overall, String message) {
-            super(message);
-            this.overall = overall;
-        }
-
-        public boolean isOverall() {
-            return overall;
-        }
-    }
-
     @SystemTenant("a public tester URL belongs to no organization")
     @Transactional
     public PublicBinResponse create(String creatorIp) {
         requireEnabled();
         Instant now = Instant.now(clock);
         if (binRepository.countByExpiresAtAfter(now) >= maxActive) {
-            throw new LimitReached(true, "The webhook tester is busy. Try again later.");
+            throw new DomainException(ErrorCode.TESTER_BUSY, "The webhook tester is busy. Try again later.");
         }
         if (creatorIp != null && binRepository.countByCreatorIpAndExpiresAtAfter(creatorIp, now) >= perAddress) {
-            throw new LimitReached(false,
+            throw new DomainException(ErrorCode.TOO_MANY_ACTIVE_URLS,
                     "Your address already has " + perAddress + " live tester URLs. Use one of them or wait for one to expire.");
         }
         PublicBin bin = binRepository.save(PublicBin.builder()

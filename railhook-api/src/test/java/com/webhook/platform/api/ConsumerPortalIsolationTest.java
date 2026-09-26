@@ -17,7 +17,6 @@ import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ProjectRequest;
 import com.webhook.platform.api.dto.RegisterRequest;
-import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +28,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -144,7 +144,7 @@ public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
         assertTrue(token.startsWith("rhp_"), token);
         assertTrue(url.endsWith("/portal#" + token), url);
 
-        PortalSession stored = portalSessionRepository.findByTokenHash(CryptoUtils.hashApiKey(token)).orElseThrow();
+        PortalSession stored = portalSessionRepository.findByTokenHash(SecureTokens.hash(token)).orElseThrow();
         assertEquals(consumerOne, stored.getConsumerId());
         assertEquals(projectA, stored.getProjectId());
         assertNotEquals(token, stored.getTokenHash());
@@ -185,7 +185,7 @@ public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
     @Test
     void anExpiredSessionIsUnauthorized() throws Exception {
         String token = portalToken(projectA, consumerOne);
-        PortalSession stored = portalSessionRepository.findByTokenHash(CryptoUtils.hashApiKey(token)).orElseThrow();
+        PortalSession stored = portalSessionRepository.findByTokenHash(SecureTokens.hash(token)).orElseThrow();
         stored.setExpiresAt(Instant.now().minusSeconds(1));
         portalSessionRepository.saveAndFlush(stored);
 

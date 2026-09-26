@@ -7,7 +7,7 @@ import com.webhook.platform.worker.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.domain.repository.EndpointRepository;
 import com.webhook.platform.worker.domain.repository.EventRepository;
-import com.webhook.platform.worker.service.MtlsWebClientFactory;
+import com.webhook.platform.worker.service.MtlsWebClientCache;
 import com.webhook.platform.worker.service.OrderingBufferService;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
@@ -34,7 +34,7 @@ public class OutgoingAttemptStoreFactory {
     private final OrderingBufferService orderingBufferService;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
-    private final MtlsWebClientFactory mtlsWebClientFactory;
+    private final MtlsWebClientCache mtlsWebClientCache;
     private final TransformationCacheService transformationCacheService;
     private final PayloadTransformService payloadTransformService;
     private final ObjectMapper objectMapper;
@@ -59,7 +59,7 @@ public class OutgoingAttemptStoreFactory {
             OrderingBufferService orderingBufferService,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             EncryptionKeyRegistry encryptionKeyRegistry,
-            MtlsWebClientFactory mtlsWebClientFactory,
+            MtlsWebClientCache mtlsWebClientCache,
             TransformationCacheService transformationCacheService,
             PayloadTransformService payloadTransformService,
             ObjectMapper objectMapper,
@@ -77,7 +77,7 @@ public class OutgoingAttemptStoreFactory {
         this.orderingBufferService = orderingBufferService;
         this.kafkaTemplate = kafkaTemplate;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.mtlsWebClientFactory = mtlsWebClientFactory;
+        this.mtlsWebClientCache = mtlsWebClientCache;
         this.transformationCacheService = transformationCacheService;
         this.payloadTransformService = payloadTransformService;
         this.objectMapper = objectMapper;
@@ -93,7 +93,7 @@ public class OutgoingAttemptStoreFactory {
         return new OutgoingAttemptStore(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 projectStatusLookup, transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
-                mtlsWebClientFactory, transformationCacheService, payloadTransformService,
+                mtlsWebClientCache, transformationCacheService, payloadTransformService,
                 objectMapper, outgoingWebClient, targetFailureRecorder, orderingGapTimeoutCounter, clock,
                 orderingBufferRescheduleDelaySeconds, message, isRetry);
     }

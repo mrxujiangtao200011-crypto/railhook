@@ -1,10 +1,10 @@
 package com.webhook.platform.api.service.verification;
 
-import com.webhook.platform.common.util.WebhookSignatureUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import com.webhook.platform.common.util.RailhookSignature;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -103,9 +103,9 @@ class RawBodyVerificationTest {
     @DisplayName("the platform's own format verifies over bytes too")
     void platformFormat() {
         long ts = System.currentTimeMillis();
-        String header = "t=" + ts + ",v1=" + WebhookSignatureUtils.generateSignature(SECRET, ts, BODY);
+        String header = "t=" + ts + ",v1=" + RailhookSignature.sign(SECRET, ts, BODY);
 
-        assertThat(WebhookSignatureUtils.verifySignature(SECRET, header, BODY)).isTrue();
+        assertThat(RailhookSignature.verify(SECRET, header, BODY)).isTrue();
     }
 
     @Test
@@ -114,8 +114,8 @@ class RawBodyVerificationTest {
         long ts = System.currentTimeMillis();
         String body = "{\"note\":\"café\"}";
 
-        assertThat(WebhookSignatureUtils.generateSignature(SECRET, ts, body))
-                .isEqualTo(WebhookSignatureUtils.generateSignature(
+        assertThat(RailhookSignature.sign(SECRET, ts, body))
+                .isEqualTo(RailhookSignature.sign(
                         SECRET, ts, body.getBytes(StandardCharsets.UTF_8)));
     }
 

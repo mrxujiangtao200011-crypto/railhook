@@ -13,7 +13,7 @@ import com.webhook.platform.worker.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.domain.repository.EndpointRepository;
 import com.webhook.platform.worker.domain.repository.EventRepository;
-import com.webhook.platform.worker.service.MtlsWebClientFactory;
+import com.webhook.platform.worker.service.MtlsWebClientCache;
 import com.webhook.platform.worker.service.OrderingBufferService;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
@@ -67,7 +67,7 @@ class OutgoingAttemptStoreTest {
     @Mock private OrderingBufferService orderingBufferService;
     @Mock private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     @Mock private EncryptionKeyRegistry encryptionKeyRegistry;
-    @Mock private MtlsWebClientFactory mtlsWebClientFactory;
+    @Mock private MtlsWebClientCache mtlsWebClientCache;
     @Mock private TransformationCacheService transformationCacheService;
     @Mock private PayloadTransformService payloadTransformService;
     @Mock private TransactionTemplate transactionTemplate;
@@ -91,7 +91,7 @@ class OutgoingAttemptStoreTest {
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
-                mtlsWebClientFactory, transformationCacheService, payloadTransformService,
+                mtlsWebClientCache, transformationCacheService, payloadTransformService,
                 objectMapper, WebClient.builder().build(), null,
                 Counter.builder("test").register(new SimpleMeterRegistry()),
                 Clock.systemUTC(), 5, message, retry);

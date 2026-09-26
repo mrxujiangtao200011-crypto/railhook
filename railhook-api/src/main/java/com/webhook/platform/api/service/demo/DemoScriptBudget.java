@@ -1,14 +1,14 @@
 package com.webhook.platform.api.service.demo;
 
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.DemoSessions;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 /** The sandbox bounds one run, not how many; a loop of demo scripts would hold Tomcat's threads. */
 @Slf4j
@@ -29,7 +29,7 @@ public class DemoScriptBudget {
         String ip = trustedProxyResolver.resolve(request);
         if (!authRateLimiterService.allowDemoScriptRun(ip, bearerToken(request))) {
             log.debug("Demo script run refused: {} is out of runs", ip);
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED,
                     "Too many transformation runs in this demo session. Try again in a minute.");
         }
         return true;

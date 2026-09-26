@@ -9,11 +9,11 @@ import com.webhook.platform.api.domain.entity.VerificationEmailSend;
 import com.webhook.platform.api.domain.repository.EmailChangeRequestRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.VerificationEmailSendRepository;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -89,7 +89,7 @@ public class VerificationMailBudget {
     private void refuse(UUID userId, String limit, String message) {
         log.warn("Refused {} for user {}: daily cap reached", limit, userId);
         audit(userId, AuditAction.EMAIL_RATE_LIMITED, "FAILURE", message, Map.of("limit", limit));
-        throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, message);
+        throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, message);
     }
 
     private void audit(UUID userId, AuditAction action, String status, String error, Map<String, Object> details) {

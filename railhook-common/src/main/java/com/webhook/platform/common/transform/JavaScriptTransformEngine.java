@@ -14,6 +14,7 @@ import org.graalvm.polyglot.SourceSection;
 import org.graalvm.polyglot.Value;
 
 import com.sun.management.ThreadMXBean;
+import com.webhook.platform.common.exception.ScriptTransformException;
 
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;

@@ -1,5 +1,7 @@
 package com.webhook.platform.api.security;
 
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ErrorResponseWriter;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.util.LogSanitizer;
@@ -7,7 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -63,12 +64,9 @@ public class OrganizationRateLimitInterceptor implements HandlerInterceptor {
                 requestsPerSecond,
                 LogSanitizer.forLog(request.getMethod()),
                 LogSanitizer.forLog(request.getRequestURI()));
-        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        response.setContentType("application/json");
         response.setHeader("Retry-After", "1");
-        response.getWriter().write("{\"error\":\"organization_rate_limit\","
-                + "\"message\":\"Your organization has exceeded its API rate limit. Please retry shortly.\","
-                + "\"status\":429}");
+        ErrorResponseWriter.write(response, ErrorCode.ORGANIZATION_RATE_LIMIT,
+                "Your organization has exceeded its API rate limit. Please retry shortly.");
         return false;
     }
 }

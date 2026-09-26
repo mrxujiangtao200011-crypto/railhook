@@ -7,7 +7,7 @@ import com.webhook.platform.api.domain.enums.CompatibilityMode;
 import com.webhook.platform.api.domain.enums.SchemaStatus;
 import com.webhook.platform.api.domain.repository.EventSchemaVersionRepository;
 import com.webhook.platform.api.domain.repository.EventTypeCatalogRepository;
-import com.webhook.platform.common.util.JsonSchemaUtils;
+import com.webhook.platform.common.util.EventSchemas;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,12 +45,12 @@ public class PayloadSchemaValidator {
                 return;
             }
 
-            String inferredSchema = objectMapper.writeValueAsString(JsonSchemaUtils.inferSchema(payloadJson));
+            String inferredSchema = objectMapper.writeValueAsString(EventSchemas.inferSchema(payloadJson));
             versionRepository.saveAndFlush(EventSchemaVersion.builder()
                     .eventTypeId(eventType.getId())
                     .version(1)
                     .schemaJson(inferredSchema)
-                    .fingerprint(JsonSchemaUtils.fingerprint(inferredSchema))
+                    .fingerprint(EventSchemas.fingerprint(inferredSchema))
                     .status(SchemaStatus.DRAFT)
                     .compatibilityMode(CompatibilityMode.NONE)
                     .description("Auto-inferred from first event payload")
@@ -71,7 +71,7 @@ public class PayloadSchemaValidator {
             return List.of();
         }
 
-        List<String> errors = JsonSchemaUtils.validate(payloadJson, activeSchema.get().getSchemaJson());
+        List<String> errors = EventSchemas.validate(payloadJson, activeSchema.get().getSchemaJson());
         if (!errors.isEmpty()) {
             meterRegistry.counter("schema_validation_failures_total", "event_type", eventTypeName).increment();
         }

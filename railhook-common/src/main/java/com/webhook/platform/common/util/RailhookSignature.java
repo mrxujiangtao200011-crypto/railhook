@@ -16,21 +16,24 @@ import java.util.List;
  * and a receiver accepts if any matches. The new secret's signature comes first so a verifier
  * that reads only the first value keeps working.
  */
-public class WebhookSignatureUtils {
+public final class RailhookSignature {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final long DEFAULT_TIMESTAMP_TOLERANCE_SECONDS = 300;
+
+    private RailhookSignature() {
+    }
 
     /**
      * For bodies we produced. A received body must be re-signed over its original bytes via the
      * {@code byte[]} overload: decoding and re-encoding is lossy when the sender was not UTF-8.
      */
-    public static String generateSignature(String secret, long timestamp, String body) {
-        return generateSignature(secret, timestamp,
+    public static String sign(String secret, long timestamp, String body) {
+        return sign(secret, timestamp,
                 body != null ? body.getBytes(StandardCharsets.UTF_8) : new byte[0]);
     }
 
-    public static String generateSignature(String secret, long timestamp, byte[] body) {
+    public static String sign(String secret, long timestamp, byte[] body) {
         try {
             byte[] prefix = (timestamp + ".").getBytes(StandardCharsets.UTF_8);
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
@@ -53,27 +56,27 @@ public class WebhookSignatureUtils {
 
     public static String buildSignatureHeader(String secret, String previousSecret, long timestamp, String body) {
         StringBuilder header = new StringBuilder("t=").append(timestamp)
-                .append(",v1=").append(generateSignature(secret, timestamp, body));
+                .append(",v1=").append(sign(secret, timestamp, body));
         if (previousSecret != null && !previousSecret.isBlank() && !previousSecret.equals(secret)) {
-            header.append(",v1=").append(generateSignature(previousSecret, timestamp, body));
+            header.append(",v1=").append(sign(previousSecret, timestamp, body));
         }
         return header.toString();
     }
 
-    public static boolean verifySignature(String secret, String signatureHeader, String body) {
-        return verifySignature(secret, signatureHeader, body, DEFAULT_TIMESTAMP_TOLERANCE_SECONDS);
+    public static boolean verify(String secret, String signatureHeader, String body) {
+        return verify(secret, signatureHeader, body, DEFAULT_TIMESTAMP_TOLERANCE_SECONDS);
     }
 
-    public static boolean verifySignature(String secret, String signatureHeader, byte[] body) {
-        return verifySignature(secret, signatureHeader, body, DEFAULT_TIMESTAMP_TOLERANCE_SECONDS);
+    public static boolean verify(String secret, String signatureHeader, byte[] body) {
+        return verify(secret, signatureHeader, body, DEFAULT_TIMESTAMP_TOLERANCE_SECONDS);
     }
 
-    public static boolean verifySignature(String secret, String signatureHeader, String body, long toleranceSeconds) {
-        return verifySignature(secret, signatureHeader,
+    public static boolean verify(String secret, String signatureHeader, String body, long toleranceSeconds) {
+        return verify(secret, signatureHeader,
                 body != null ? body.getBytes(StandardCharsets.UTF_8) : new byte[0], toleranceSeconds);
     }
 
-    public static boolean verifySignature(String secret, String signatureHeader, byte[] body, long toleranceSeconds) {
+    public static boolean verify(String secret, String signatureHeader, byte[] body, long toleranceSeconds) {
         try {
             String[] parts = signatureHeader.split(",");
             long timestamp = 0;
@@ -101,7 +104,7 @@ public class WebhookSignatureUtils {
                 return false;
             }
 
-            String expectedSignature = generateSignature(secret, timestamp, body);
+            String expectedSignature = sign(secret, timestamp, body);
             // No short-circuit, so timing does not reveal which one matched.
             boolean matched = false;
             for (String provided : providedSignatures) {

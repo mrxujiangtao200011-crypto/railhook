@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.service.EmailService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +38,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private JwtTokenService jwtTokenService;
 
     // Mocked to capture the plaintext token; the DB holds only its hash.
     @MockitoBean
@@ -202,10 +202,10 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
 
         AuthResponse tokens = registerAndCaptureTokens("jwt-token-type-reuse-detection@example.com");
         String rotatedAwayRefreshToken = tokens.getRefreshToken();
-        var userId = jwtUtil.getUserIdFromToken(rotatedAwayRefreshToken);
+        var userId = jwtTokenService.getUserIdFromToken(rotatedAwayRefreshToken);
 
         // The Redis blacklist is mocked, so drive it directly.
-        String rotatedJti = jwtUtil.getJtiFromToken(rotatedAwayRefreshToken);
+        String rotatedJti = jwtTokenService.getJtiFromToken(rotatedAwayRefreshToken);
         when(tokenBlacklistService.isBlacklisted(eq(rotatedJti))).thenReturn(true);
 
         mockMvc.perform(post("/api/v1/auth/refresh")
@@ -229,7 +229,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
         String successor = rotated.getResponse().getCookie("refresh_token").getValue();
 
         // The Redis blacklist is mocked; mark the rotated-away jti as refresh just did.
-        when(tokenBlacklistService.isBlacklisted(eq(jwtUtil.getJtiFromToken(original)))).thenReturn(true);
+        when(tokenBlacklistService.isBlacklisted(eq(jwtTokenService.getJtiFromToken(original)))).thenReturn(true);
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refresh_token", original)))

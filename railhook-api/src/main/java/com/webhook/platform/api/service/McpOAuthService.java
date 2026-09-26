@@ -26,7 +26,7 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.mcp.oauth.McpOAuthAuthenticationToken;
 import com.webhook.platform.api.mcp.oauth.McpOAuthSettings;
-import com.webhook.platform.api.mcp.oauth.OAuthProtocolException;
+import com.webhook.platform.api.exception.OAuthProtocolException;
 import com.webhook.platform.api.mcp.oauth.OAuthSecrets;
 import com.webhook.platform.api.mcp.oauth.RedirectUris;
 import com.webhook.platform.api.tenancy.SystemTenant;

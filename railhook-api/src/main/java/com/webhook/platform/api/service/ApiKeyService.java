@@ -11,7 +11,6 @@ import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ApiKeyResponse;
 import com.webhook.platform.api.dto.ApiKeyRotateRequest;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -48,8 +48,8 @@ public class ApiKeyService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        String plainKey = CryptoUtils.generateSecureToken(API_KEY_LENGTH);
-        String keyHash = CryptoUtils.hashApiKey(plainKey);
+        String plainKey = SecureTokens.generate(API_KEY_LENGTH);
+        String keyHash = SecureTokens.hash(plainKey);
         String keyPrefix = plainKey.substring(0, Math.min(8, plainKey.length()));
 
         ApiKey apiKey = ApiKey.builder()
@@ -130,11 +130,11 @@ public class ApiKeyService {
                     "API key has already been rotated; rotate its replacement instead");
         }
 
-        String plainKey = CryptoUtils.generateSecureToken(API_KEY_LENGTH);
+        String plainKey = SecureTokens.generate(API_KEY_LENGTH);
         ApiKey replacement = apiKeyRepository.save(ApiKey.builder()
                 .projectId(projectId)
                 .name(retiring.getName())
-                .keyHash(CryptoUtils.hashApiKey(plainKey))
+                .keyHash(SecureTokens.hash(plainKey))
                 .keyPrefix(plainKey.substring(0, Math.min(8, plainKey.length())))
                 .scope(retiring.getScope())
                 .expiresAt(request != null ? request.getExpiresAt() : null)

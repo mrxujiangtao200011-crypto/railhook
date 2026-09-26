@@ -74,12 +74,8 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
                             + "belong on /api/v1/admin/**.");
         }
 
-        // Same RbacUtil the handlers call, so there is one definition of write access.
-        if (required.value() == AccessLevel.OWNER) {
-            RbacUtil.requireOwnerAccess(role);
-        } else {
-            RbacUtil.requireWriteAccess(role, scope);
-        }
+        // Same check the handlers call through AuthContext, so there is one definition of write access.
+        required.value().require(role, scope);
     }
 
     /**

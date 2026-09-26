@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import com.webhook.platform.worker.exception.PayloadTransformException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

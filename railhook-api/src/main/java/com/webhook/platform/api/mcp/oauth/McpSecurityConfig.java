@@ -1,5 +1,7 @@
 package com.webhook.platform.api.mcp.oauth;
 
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ErrorResponseWriter;
 import com.webhook.platform.api.mcp.McpServerConfig;
 import com.webhook.platform.api.security.ApiKeyAuthenticationFilter;
 import com.webhook.platform.api.service.McpOAuthService;
@@ -81,11 +83,9 @@ public class McpSecurityConfig {
         } else if (!sentCredentials) {
             header.append("realm=\"railhook\"");
         }
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, header.toString());
-        response.setContentType("application/json");
-        response.getWriter().write("{\"error\":\"unauthorized\",\"message\":\"Authentication required: sign in "
-                + "with OAuth or send a project API key as 'Authorization: Bearer <key>'\",\"status\":401}");
+        ErrorResponseWriter.write(response, ErrorCode.UNAUTHORIZED, "Authentication required: sign in "
+                + "with OAuth or send a project API key as 'Authorization: Bearer <key>'");
     }
 
     private static UrlBasedCorsConfigurationSource corsConfiguration() {

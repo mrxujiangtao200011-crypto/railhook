@@ -1,6 +1,6 @@
 package com.webhook.platform.api.dto;
 
-import com.webhook.platform.common.transform.ScriptTransformException;
+import com.webhook.platform.common.exception.ScriptTransformException;
 import com.webhook.platform.common.transform.TransformationKind;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;

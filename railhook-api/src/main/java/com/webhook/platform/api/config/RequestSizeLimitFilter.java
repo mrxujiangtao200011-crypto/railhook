@@ -11,9 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ErrorResponseWriter;
+import com.webhook.platform.api.exception.RequestBodyTooLargeException;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -79,11 +81,8 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
     }
 
     private void rejectRequest(HttpServletResponse response, long limit) throws IOException {
-        response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
-        response.setContentType("application/json");
-        response.getWriter().write(
-                "{\"error\":\"payload_too_large\",\"message\":\"Request body exceeds maximum allowed size of "
-                        + limit + " bytes\",\"status\":413}");
+        ErrorResponseWriter.write(response, ErrorCode.PAYLOAD_TOO_LARGE,
+                "Request body exceeds maximum allowed size of " + limit + " bytes");
     }
 
     private boolean hasPayloadTooLargeCause(Throwable e) {
@@ -95,12 +94,6 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
             cause = cause.getCause();
         }
         return false;
-    }
-
-    public static class RequestBodyTooLargeException extends IOException {
-        public RequestBodyTooLargeException(long limit) {
-            super("Request body exceeds maximum allowed size of " + limit + " bytes");
-        }
     }
 
     private static class ContentLimitedRequestWrapper extends HttpServletRequestWrapper {

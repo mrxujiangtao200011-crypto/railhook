@@ -1,34 +1,35 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.DeviceAuthCode;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.UserSession;
 import com.webhook.platform.api.domain.enums.DeviceAuthStatus;
-import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.domain.repository.DeviceAuthCodeRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.api.domain.repository.UserRepository;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
-import com.webhook.platform.api.domain.repository.UserRepository;
 
 @Slf4j
 @Service
@@ -39,7 +40,7 @@ public class DeviceAuthService {
     private final MembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final UserSessionService userSessionService;
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
 
     @Value("${app.base-url:http://localhost:5173}")
     private String appBaseUrl;
@@ -51,7 +52,7 @@ public class DeviceAuthService {
     @SystemTenant("issues a device code before any user or organization is known -- device_auth_codes is deliberately not tenant-scoped for the same reason")
     @Transactional
     public DeviceCodeResponse initiateDeviceAuth() {
-        String deviceCode = CryptoUtils.generateSecureToken(32);
+        String deviceCode = SecureTokens.generate(32);
         String userCode = generateUserCode();
         Instant expiresAt = Instant.now().plus(CODE_EXPIRY_MINUTES, ChronoUnit.MINUTES);
 
@@ -79,13 +80,13 @@ public class DeviceAuthService {
     public void approveDeviceCode(String userCode, UUID userId) {
         UUID organizationId = TenantContext.require();
         DeviceAuthCode code = deviceAuthCodeRepository.findByUserCodeAndStatus(userCode, DeviceAuthStatus.PENDING)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                .orElseThrow(() -> new NotFoundException(
                         "Device code not found or already used"));
 
         if (code.getExpiresAt().isBefore(Instant.now())) {
             code.setStatus(DeviceAuthStatus.EXPIRED);
             deviceAuthCodeRepository.save(code);
-            throw new ResponseStatusException(HttpStatus.GONE, "Device code has expired");
+            throw new DomainException(ErrorCode.GONE, "Device code has expired");
         }
 
         code.setStatus(DeviceAuthStatus.APPROVED);
@@ -101,7 +102,7 @@ public class DeviceAuthService {
     @Transactional
     public void denyDeviceCode(String userCode, UUID userId) {
         DeviceAuthCode code = deviceAuthCodeRepository.findByUserCodeAndStatus(userCode, DeviceAuthStatus.PENDING)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                .orElseThrow(() -> new NotFoundException(
                         "Device code not found or already used"));
 
         code.setStatus(DeviceAuthStatus.DENIED);
@@ -114,22 +115,22 @@ public class DeviceAuthService {
     @Transactional
     public AuthResponse pollDeviceToken(String deviceCode, SessionOrigin origin) {
         DeviceAuthCode code = deviceAuthCodeRepository.findByDeviceCode(deviceCode)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device code not found"));
+                .orElseThrow(() -> new NotFoundException("Device code not found"));
 
         if (code.getExpiresAt().isBefore(Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.GONE, "Device code has expired");
+            throw new DomainException(ErrorCode.GONE, "Device code has expired");
         }
 
         switch (code.getStatus()) {
             case PENDING:
-                throw new ResponseStatusException(HttpStatus.ACCEPTED, "authorization_pending");
+                throw new DomainException(ErrorCode.AUTHORIZATION_PENDING, "authorization_pending");
             case DENIED:
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Device authorization was denied");
+                throw new ForbiddenException("Device authorization was denied");
             case EXPIRED:
-                throw new ResponseStatusException(HttpStatus.GONE, "Device code has expired");
+                throw new DomainException(ErrorCode.GONE, "Device code has expired");
             case CONSUMED:
                 // Already exchanged by an earlier or racing poll. Fail closed rather than mint a second pair.
-                throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");
+                throw new DomainException(ErrorCode.GONE, "Device code has already been used");
             case APPROVED:
                 break;
         }
@@ -138,42 +139,42 @@ public class DeviceAuthService {
         // mint an OWNER token from another org.
         Membership membership = membershipRepository
                 .findByUserIdAndOrganizationId(code.getUserId(), code.getOrganizationId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                .orElseThrow(() -> new ForbiddenException(
                         "User is not a member of the approved organization"));
 
         // A code approved just before a suspension would otherwise still hand out fresh access.
         if (membership.getStatus() == MembershipStatus.DISABLED) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+            throw new ForbiddenException(
                     "Your membership in this organization has been suspended");
         }
 
         // Only the caller that flips APPROVED to CONSUMED mints tokens.
         int consumed = deviceAuthCodeRepository.markConsumedIfApproved(code.getId());
         if (consumed == 0) {
-            throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");
+            throw new DomainException(ErrorCode.GONE, "Device code has already been used");
         }
 
         // A session named CLI, so the user can see and end the credential most likely to outlive its machine.
         UUID sessionId = UUID.randomUUID();
-        String refreshToken = jwtUtil.generateRefreshToken(code.getUserId(), sessionId);
+        String refreshToken = jwtTokenService.generateRefreshToken(code.getUserId(), sessionId);
 
         userSessionService.open(UserSession.builder()
                 .id(sessionId)
                 .userId(code.getUserId())
                 .organizationId(code.getOrganizationId())
-                .refreshTokenJti(jwtUtil.getJtiFromToken(refreshToken))
+                .refreshTokenJti(jwtTokenService.getJtiFromToken(refreshToken))
                 .client(SessionClient.CLI)
                 .userAgent(origin.userAgent())
                 .ipAddress(origin.ipAddress())
                 .lastSeenAt(Instant.now())
-                .expiresAt(jwtUtil.getExpirationFromToken(refreshToken).toInstant())
+                .expiresAt(jwtTokenService.getExpirationFromToken(refreshToken).toInstant())
                 .build());
 
         boolean emailVerified = userRepository.findById(code.getUserId())
                 .map(u -> Boolean.TRUE.equals(u.getEmailVerified()))
                 .orElse(false);
 
-        String accessToken = jwtUtil.generateAccessToken(
+        String accessToken = jwtTokenService.generateAccessToken(
                 code.getUserId(), code.getOrganizationId(), membership.getRole(), sessionId, emailVerified);
 
         return AuthResponse.builder()

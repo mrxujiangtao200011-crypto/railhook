@@ -1,12 +1,13 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,13 +31,13 @@ class TunnelIngressServiceTest {
         when(coordinator.isActiveInCluster("tun-deleted")).thenReturn(true);
         when(rateLimiter.tryAcquireForSlug(anyString(), anyInt())).thenReturn(true);
         when(tunnelService.getActiveBySlug("tun-deleted"))
-                .thenThrow(new ResponseStatusException(HttpStatus.GONE, "Tunnel is no longer active"));
+                .thenThrow(new DomainException(ErrorCode.GONE, "Tunnel is no longer active"));
 
         TunnelIngressService.Outcome outcome = ingress.forward("tun-deleted",
                 TunnelRequestMessage.builder().requestId("r1").method("POST").path("/").build(), "{}".getBytes(StandardCharsets.UTF_8));
 
         assertThat(outcome).isInstanceOf(TunnelIngressService.Outcome.Refused.class);
-        assertThat(((TunnelIngressService.Outcome.Refused) outcome).error()).isEqualTo("tunnel_offline");
+        assertThat(((TunnelIngressService.Outcome.Refused) outcome).error()).isEqualTo(ErrorCode.TUNNEL_OFFLINE);
         verify(coordinator, never()).forwardRequest(anyString(), any());
     }
 }

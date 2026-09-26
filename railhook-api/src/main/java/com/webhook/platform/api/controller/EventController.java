@@ -5,6 +5,7 @@ import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.dto.RateLimitInfo;
 import com.webhook.platform.api.dto.RateLimitResult;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.EventIngestService;
@@ -79,11 +80,8 @@ public class EventController {
         
         if (!rateLimitResult.isAcquired()) {
             log.warn("Rate limit exceeded for project: {}", apiKeyAuth.getProjectId());
-            ErrorResponse errorBody = new ErrorResponse(
-                    "rate_limit_exceeded",
-                    "Too many requests. Please retry after " + rateLimitResult.getRetryAfterSeconds() + " seconds.",
-                    HttpStatus.TOO_MANY_REQUESTS.value()
-            );
+            ErrorResponse errorBody = ErrorResponse.of(ErrorCode.RATE_LIMIT_EXCEEDED,
+                    "Too many requests. Please retry after " + rateLimitResult.getRetryAfterSeconds() + " seconds.");
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .header("X-RateLimit-Limit", String.valueOf(info.getLimit()))
                     .header("X-RateLimit-Remaining", "0")

@@ -11,7 +11,9 @@ import com.webhook.platform.api.domain.repository.IncidentTimelineRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertRuleRequest;
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.security.UrlValidator;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
@@ -30,7 +32,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -164,7 +165,7 @@ class AlertServiceTest {
             @Test
             void refusesAnAddressThatIsNotAVerifiedMemberOnCreate() {
                 assertThatThrownBy(() -> service.createRule(projectId, request("ops@company.com, victim@elsewhere.com")))
-                        .isInstanceOfSatisfying(ResponseStatusException.class,
+                        .isInstanceOfSatisfying(DomainException.class,
                                 e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
 
                 verify(ruleRepository, never()).save(any());
@@ -173,7 +174,7 @@ class AlertServiceTest {
             @Test
             void refusesAnAddressThatIsNotAVerifiedMemberOnUpdate() {
                 assertThatThrownBy(() -> service.updateRule(projectId, ruleId, request("victim@elsewhere.com")))
-                        .isInstanceOfSatisfying(ResponseStatusException.class,
+                        .isInstanceOfSatisfying(DomainException.class,
                                 e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
 
                 verify(ruleRepository, never()).save(any());
@@ -212,7 +213,7 @@ class AlertServiceTest {
         @DisplayName("the cloud metadata endpoint is refused on create")
         void metadataEndpointRefusedOnCreate() {
             assertThatThrownBy(() -> service.createRule(projectId, request("http://169.254.169.254/latest/meta-data/")))
-                    .isInstanceOf(UrlValidator.InvalidUrlException.class);
+                    .isInstanceOf(InvalidUrlException.class);
 
             verify(ruleRepository, never()).save(any());
         }
@@ -221,7 +222,7 @@ class AlertServiceTest {
         @DisplayName("a private address is refused on update too — the hole is not only on create")
         void privateAddressRefusedOnUpdate() {
             assertThatThrownBy(() -> service.updateRule(projectId, ruleId, request("http://127.0.0.1:8080/admin")))
-                    .isInstanceOf(UrlValidator.InvalidUrlException.class);
+                    .isInstanceOf(InvalidUrlException.class);
 
             verify(ruleRepository, never()).save(any());
         }

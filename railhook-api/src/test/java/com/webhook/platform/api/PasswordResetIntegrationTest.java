@@ -5,7 +5,6 @@ import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.service.EmailService;
-import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -14,6 +13,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import com.webhook.platform.common.security.SecureTokens;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -82,7 +82,7 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
         User user = userRepository.findByEmail(EMAIL).orElseThrow();
         assertThat(user.getPasswordResetToken()).isNotNull();
         assertThat(user.getPasswordResetToken()).isNotEqualTo(resetToken);
-        assertThat(user.getPasswordResetToken()).isEqualTo(CryptoUtils.hashApiKey(resetToken));
+        assertThat(user.getPasswordResetToken()).isEqualTo(SecureTokens.hash(resetToken));
         assertThat(user.getPasswordResetTokenExpiresAt()).isNotNull();
         assertThat(user.getPasswordResetTokenExpiresAt()).isAfter(java.time.Instant.now());
 

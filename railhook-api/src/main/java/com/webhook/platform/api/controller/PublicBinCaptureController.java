@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.ProjectScopeExempt;
 import com.webhook.platform.api.service.PublicBinService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
@@ -43,7 +44,9 @@ public class PublicBinCaptureController {
             content = @Content(mediaType = "application/json", schema = @Schema(type = "string")))
     @ApiResponse(responseCode = "200", description = "Recorded")
     @ApiResponse(responseCode = "404", description = "No such URL, or it has expired")
-    @ApiResponse(responseCode = "429", description = "Too many requests to this URL")
+    @ApiResponse(responseCode = "429", description = "Too many requests to this URL",
+            content = @Content(mediaType = "application/json", schema = @Schema(type = "object",
+                    additionalProperties = Schema.AdditionalPropertiesValue.TRUE)))
     @RequestMapping(value = "/{slug}", method = { RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
             RequestMethod.PATCH, RequestMethod.DELETE })
     public ResponseEntity<Map<String, Object>> capture(@PathVariable("slug") String slug, HttpServletRequest request)
@@ -51,7 +54,7 @@ public class PublicBinCaptureController {
         byte[] body = rawBody(request);
         if (!rateLimiterService.tryAcquireForSlug(RATE_KEY_PREFIX + slug, RATE_LIMIT_PER_SECOND)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(Map.of("ok", false, "error", "rate_limit_exceeded"));
+                    .body(Map.of("ok", false, "error", ErrorCode.RATE_LIMIT_EXCEEDED.getValue()));
         }
         long id = publicBinService.capture(slug, body, request);
         return ResponseEntity.ok(Map.of("ok", true, "requestId", id));

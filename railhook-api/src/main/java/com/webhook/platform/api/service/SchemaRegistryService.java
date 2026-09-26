@@ -10,7 +10,7 @@ import com.webhook.platform.api.domain.enums.SchemaStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.exception.NotFoundException;
-import com.webhook.platform.common.util.JsonSchemaUtils;
+import com.webhook.platform.common.util.EventSchemas;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -113,7 +113,7 @@ public class SchemaRegistryService {
 
         String fp;
         try {
-            fp = JsonSchemaUtils.fingerprint(request.getSchemaJson());
+            fp = EventSchemas.fingerprint(request.getSchemaJson());
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Failed to compute schema fingerprint: " + e.getMessage());
         }
@@ -235,7 +235,7 @@ public class SchemaRegistryService {
 
         List<String> violations;
         try {
-            violations = mode.violations(JsonSchemaUtils.diff(previous.getSchemaJson(), schemaJson));
+            violations = mode.violations(EventSchemas.diff(previous.getSchemaJson(), schemaJson));
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Could not compare this schema with version "
                     + previous.getVersion() + ": " + e.getMessage());
@@ -256,13 +256,13 @@ public class SchemaRegistryService {
             if (prevOpt.isEmpty()) return;
 
             EventSchemaVersion prev = prevOpt.get();
-            JsonSchemaUtils.SchemaDiff schemaDiff = JsonSchemaUtils.diff(prev.getSchemaJson(), newVersion.getSchemaJson());
+            EventSchemas.SchemaDiff schemaDiff = EventSchemas.diff(prev.getSchemaJson(), newVersion.getSchemaJson());
 
             SchemaChange change = SchemaChange.builder()
                     .eventTypeId(eventTypeId)
                     .fromVersionId(prev.getId())
                     .toVersionId(newVersion.getId())
-                    .changeSummary(JsonSchemaUtils.diffToJson(schemaDiff))
+                    .changeSummary(EventSchemas.diffToJson(schemaDiff))
                     .breaking(schemaDiff.breaking())
                     .build();
             changeRepository.save(change);

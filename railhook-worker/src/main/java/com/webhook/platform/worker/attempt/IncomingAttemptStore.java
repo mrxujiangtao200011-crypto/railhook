@@ -13,7 +13,7 @@ import com.webhook.platform.worker.domain.entity.IncomingDestination;
 import com.webhook.platform.worker.domain.entity.IncomingEvent;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
-import com.webhook.platform.worker.service.PayloadTransformException;
+import com.webhook.platform.worker.exception.PayloadTransformException;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
 import com.webhook.platform.common.transform.TransformRequest;

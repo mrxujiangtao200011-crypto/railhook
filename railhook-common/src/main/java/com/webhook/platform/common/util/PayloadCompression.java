@@ -12,7 +12,7 @@ import java.util.zip.GZIPOutputStream;
 
 /** Gzip then Base64, so the result fits a text column. */
 @Slf4j
-public class PayloadCompressionUtil {
+public class PayloadCompression {
 
     private static final int DEFAULT_COMPRESSION_THRESHOLD_BYTES = 1024;
 

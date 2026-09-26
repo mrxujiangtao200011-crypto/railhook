@@ -12,12 +12,12 @@ import com.webhook.platform.api.dto.TransformPreviewResponse;
 import com.webhook.platform.api.service.transform.TransformationRunner;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.transform.ScriptConsoleLine;
-import com.webhook.platform.common.transform.ScriptTransformException;
+import com.webhook.platform.common.exception.ScriptTransformException;
 import com.webhook.platform.common.transform.TransformRequest;
 import com.webhook.platform.common.transform.TransformationKind;
-import com.webhook.platform.common.util.WebhookSignatureUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import com.webhook.platform.common.util.RailhookSignature;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -185,7 +185,7 @@ public class DeliveryDryRunService {
                         endpoint.getSecretIv(),
                         endpoint.getEncryptionKeyVersion());
                 String body = transformedPayload != null ? transformedPayload : request.getPayload();
-                signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
+                signature = RailhookSignature.buildSignatureHeader(secret, timestamp, body);
                 requestHeaders.put("X-Signature", signature);
             } catch (Exception e) {
                 errors.add("Failed to compute signature: " + e.getMessage());

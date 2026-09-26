@@ -11,7 +11,7 @@ import com.webhook.platform.api.dto.DeviceApproveRequest;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
 import com.webhook.platform.api.dto.DeviceTokenRequest;
 import com.webhook.platform.api.dto.RegisterRequest;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,7 +53,7 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
     private MembershipRepository membershipRepository;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private JwtTokenService jwtTokenService;
 
     private AuthResponse register(String email, String orgName) throws Exception {
         RegisterRequest request = RegisterRequest.builder()
@@ -108,7 +108,7 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
                 .build();
         membershipRepository.save(viewerMembership);
 
-        String clientOrgToken = jwtUtil.generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER, null, true);
+        String clientOrgToken = jwtTokenService.generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER, null, true);
 
         DeviceCodeResponse deviceCode = initiate();
         mockMvc.perform(post("/api/v1/auth/device/approve")
@@ -127,8 +127,8 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
 
         AuthResponse minted = objectMapper.readValue(pollResult.getResponse().getContentAsString(), AuthResponse.class);
 
-        assertEquals(clientOrgId, jwtUtil.getOrganizationIdFromToken(minted.getAccessToken()));
-        assertEquals(MembershipRole.VIEWER, jwtUtil.getRoleFromToken(minted.getAccessToken()),
+        assertEquals(clientOrgId, jwtTokenService.getOrganizationIdFromToken(minted.getAccessToken()));
+        assertEquals(MembershipRole.VIEWER, jwtTokenService.getRoleFromToken(minted.getAccessToken()),
                 "token minted for the client org must carry VIEWER, not the user's OWNER role from their own org");
         assertTrue(!ownOrgId.equals(clientOrgId), "own org and client org must be distinct for this to be a real test");
     }
@@ -145,7 +145,7 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
         UUID otherOrgId = me(otherOwnerAuth.getAccessToken()).getOrganization().getId();
 
         // Stands in for a membership revoked between JWT issuance and the poll.
-        String bogusOrgToken = jwtUtil.generateAccessToken(userId, otherOrgId, MembershipRole.OWNER, null, true);
+        String bogusOrgToken = jwtTokenService.generateAccessToken(userId, otherOrgId, MembershipRole.OWNER, null, true);
 
         DeviceCodeResponse deviceCode = initiate();
         mockMvc.perform(post("/api/v1/auth/device/approve")

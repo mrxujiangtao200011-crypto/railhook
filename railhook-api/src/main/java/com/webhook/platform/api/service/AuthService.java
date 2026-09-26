@@ -12,23 +12,26 @@ import com.webhook.platform.api.domain.entity.VerificationEmailSend;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.UserStatus;
+import com.webhook.platform.api.exception.ConflictException;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.exception.UnauthorizedException;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -45,7 +48,7 @@ public class AuthService {
     private final OrganizationRepository organizationRepository;
     private final MembershipRepository membershipRepository;
     private final PlanRepository planRepository;
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final TokenBlacklistService tokenBlacklistService;
     private final UserSessionService userSessionService;
@@ -62,7 +65,7 @@ public class AuthService {
             OrganizationRepository organizationRepository,
             MembershipRepository membershipRepository,
             PlanRepository planRepository,
-            JwtUtil jwtUtil,
+            JwtTokenService jwtTokenService,
             BCryptPasswordEncoder passwordEncoder,
             TokenBlacklistService tokenBlacklistService,
             UserSessionService userSessionService,
@@ -75,7 +78,7 @@ public class AuthService {
         this.organizationRepository = organizationRepository;
         this.membershipRepository = membershipRepository;
         this.planRepository = planRepository;
-        this.jwtUtil = jwtUtil;
+        this.jwtTokenService = jwtTokenService;
         this.passwordEncoder = passwordEncoder;
         this.tokenBlacklistService = tokenBlacklistService;
         this.userSessionService = userSessionService;
@@ -92,13 +95,13 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request, SessionOrigin origin) {
         String email = EmailAddresses.normalize(request.getEmail());
         if (userRepository.existsByEmail(email)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+            throw new ConflictException("Email already exists");
         }
 
         // Without email a token could never arrive, and VerificationGate would block every write.
         boolean verificationIsDeliverable = emailService.isEnabled();
 
-        String verificationToken = verificationIsDeliverable ? CryptoUtils.generateSecureToken(32) : null;
+        String verificationToken = verificationIsDeliverable ? SecureTokens.generate(32) : null;
 
         User user = User.builder()
                 .email(email)
@@ -106,7 +109,7 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .status(verificationIsDeliverable ? UserStatus.PENDING_VERIFICATION : UserStatus.ACTIVE)
                 .emailVerified(!verificationIsDeliverable)
-                .verificationToken(verificationIsDeliverable ? CryptoUtils.hashApiKey(verificationToken) : null)
+                .verificationToken(verificationIsDeliverable ? SecureTokens.hash(verificationToken) : null)
                 .verificationTokenExpiresAt(verificationIsDeliverable
                         ? Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS)
                         : null)
@@ -130,12 +133,12 @@ public class AuthService {
     @Auditable(action = AuditAction.LOGIN, resourceType = "Auth")
     public AuthResponse login(LoginRequest request, SessionOrigin origin) {
         User user = userRepository.findByEmail(EmailAddresses.normalize(request.getEmail()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
+                .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
         // Checked before the password so a locked account does not cost a BCrypt hash per attempt.
         Duration lockedFor = accountLockoutService.remainingLockout(user);
         if (!lockedFor.isZero()) {
-            throw new ResponseStatusException(HttpStatus.LOCKED,
+            throw new DomainException(ErrorCode.ACCOUNT_LOCKED,
                     "Too many failed sign-in attempts. Try again in "
                             + Math.max(1, lockedFor.toMinutes() + (lockedFor.toSecondsPart() > 0 ? 1 : 0))
                             + " minute(s), or reset your password to unlock the account now.");
@@ -144,11 +147,11 @@ public class AuthService {
         // No password (Google account) fails like a wrong one, so sign-in method is not revealed.
         if (user.getPasswordHash() == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             accountLockoutService.recordFailure(user);
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+            throw new UnauthorizedException("Invalid credentials");
         }
 
         if (user.getStatus() == UserStatus.DISABLED) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
+            throw new ForbiddenException("User account is disabled");
         }
 
         accountLockoutService.clearFailures(user);
@@ -163,7 +166,7 @@ public class AuthService {
     public Organization createOrganizationOwnedBy(User owner, String organizationName) {
         String defaultPlanName = billingEnabled ? "free" : "self_hosted";
         Plan defaultPlan = planRepository.findByName(defaultPlanName)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                .orElseThrow(() -> new DomainException(ErrorCode.INTERNAL_ERROR,
                         "Default plan '" + defaultPlanName + "' not found. Run database migrations."));
 
         Organization organization = organizationRepository.save(Organization.builder()
@@ -181,7 +184,7 @@ public class AuthService {
 
     public AuthResponse issueSessionFor(User user, SessionOrigin origin) {
         if (user.getStatus() == UserStatus.DISABLED) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
+            throw new ForbiddenException("User account is disabled");
         }
         Membership membership = membershipToSignInWith(user);
         return issueSession(user, membership.getOrganizationId(), membership.getRole(), origin,
@@ -192,22 +195,22 @@ public class AuthService {
     private AuthResponse issueSession(User user, UUID organizationId, MembershipRole role,
                                       SessionOrigin origin, boolean emailVerified) {
         UUID sessionId = UUID.randomUUID();
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), sessionId);
+        String refreshToken = jwtTokenService.generateRefreshToken(user.getId(), sessionId);
 
         userSessionService.open(UserSession.builder()
                 .id(sessionId)
                 .userId(user.getId())
                 .organizationId(organizationId)
-                .refreshTokenJti(jwtUtil.getJtiFromToken(refreshToken))
+                .refreshTokenJti(jwtTokenService.getJtiFromToken(refreshToken))
                 .client(origin.client())
                 .userAgent(origin.userAgent())
                 .ipAddress(origin.ipAddress())
                 .lastSeenAt(Instant.now())
-                .expiresAt(jwtUtil.getExpirationFromToken(refreshToken).toInstant())
+                .expiresAt(jwtTokenService.getExpirationFromToken(refreshToken).toInstant())
                 .build());
 
         return AuthResponse.builder()
-                .accessToken(jwtUtil.generateAccessToken(user.getId(), organizationId, role, sessionId, emailVerified))
+                .accessToken(jwtTokenService.generateAccessToken(user.getId(), organizationId, role, sessionId, emailVerified))
                 .refreshToken(refreshToken)
                 .emailVerified(emailVerified)
                 .build();
@@ -229,13 +232,13 @@ public class AuthService {
         userSessionService.save(session);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
 
         log.info("User {} switched session {} to organization {}",
                 userId, session.getId(), membership.getOrganizationId());
 
         return AuthResponse.builder()
-                .accessToken(jwtUtil.generateAccessToken(
+                .accessToken(jwtTokenService.generateAccessToken(
                         userId, membership.getOrganizationId(), membership.getRole(), session.getId(),
                         Boolean.TRUE.equals(user.getEmailVerified())))
                 .emailVerified(Boolean.TRUE.equals(user.getEmailVerified()))
@@ -244,62 +247,62 @@ public class AuthService {
 
     // Looked up by jti, not sid: the jti rotates on every refresh, so a replayed token finds nothing.
     private UserSession requireOwnLiveSession(UUID userId, String refreshToken) {
-        if (refreshToken == null || !jwtUtil.validateToken(refreshToken)
-                || !JwtUtil.TOKEN_TYPE_REFRESH.equals(jwtUtil.getTokenType(refreshToken))) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token missing or invalid");
+        if (refreshToken == null || !jwtTokenService.validateToken(refreshToken)
+                || !JwtTokenService.TOKEN_TYPE_REFRESH.equals(jwtTokenService.getTokenType(refreshToken))) {
+            throw new UnauthorizedException("Refresh token missing or invalid");
         }
-        UserSession session = userSessionService.findByRefreshJti(jwtUtil.getJtiFromToken(refreshToken))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session not found"));
+        UserSession session = userSessionService.findByRefreshJti(jwtTokenService.getJtiFromToken(refreshToken))
+                .orElseThrow(() -> new UnauthorizedException("Session not found"));
 
         if (!session.getUserId().equals(userId) || !session.isActive(Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session is no longer valid");
+            throw new UnauthorizedException("Session is no longer valid");
         }
         return session;
     }
 
     @SystemTenant("same as login: the membership read decides the organization the new token names")
     public AuthResponse refreshToken(String refreshToken, SessionOrigin origin) {
-        if (!jwtUtil.validateToken(refreshToken)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
+        if (!jwtTokenService.validateToken(refreshToken)) {
+            throw new UnauthorizedException("Invalid or expired refresh token");
         }
 
         // Access tokens and legacy tokens without a typ claim are refused.
-        if (!JwtUtil.TOKEN_TYPE_REFRESH.equals(jwtUtil.getTokenType(refreshToken))) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
+        if (!JwtTokenService.TOKEN_TYPE_REFRESH.equals(jwtTokenService.getTokenType(refreshToken))) {
+            throw new UnauthorizedException("Invalid or expired refresh token");
         }
 
-        String oldJti = jwtUtil.getJtiFromToken(refreshToken);
-        UUID userId = jwtUtil.getUserIdFromToken(refreshToken);
+        String oldJti = jwtTokenService.getJtiFromToken(refreshToken);
+        UUID userId = jwtTokenService.getUserIdFromToken(refreshToken);
 
         if (tokenBlacklistService.isBlacklisted(oldJti)) {
             // A replayed consumed token means theft: revoke every session, not just this token.
             userSessionService.revokeAllSessions(userId);
             log.warn("Rejected reuse of already-rotated/revoked refresh token for user {}; revoked all sessions", userId);
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token has been revoked");
+            throw new UnauthorizedException("Refresh token has been revoked");
         }
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
 
         if (user.getStatus() == UserStatus.DISABLED) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
+            throw new ForbiddenException("User account is disabled");
         }
 
         UserSession session = userSessionService.findByRefreshJti(oldJti).orElse(null);
 
-        if (session == null && jwtUtil.getSessionIdFromToken(refreshToken) != null) {
+        if (session == null && jwtTokenService.getSessionIdFromToken(refreshToken) != null) {
             // Rotated away or signed out; the session row decides, since Redis may have lost the blacklist.
             log.warn("Refresh token names session {} but is not its current token; refusing",
-                    jwtUtil.getSessionIdFromToken(refreshToken));
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session is no longer valid");
+                    jwtTokenService.getSessionIdFromToken(refreshToken));
+            throw new UnauthorizedException("Session is no longer valid");
         }
         if (session != null && !session.isActive(Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session has been signed out");
+            throw new UnauthorizedException("Session has been signed out");
         }
 
         Membership membership = membershipForRefresh(user, session);
 
-        tokenBlacklistService.blacklist(oldJti, jwtUtil.getExpirationFromToken(refreshToken));
+        tokenBlacklistService.blacklist(oldJti, jwtTokenService.getExpirationFromToken(refreshToken));
 
         if (session == null) {
             // Minted before sessions existed. Give it one rather than sign everybody out on upgrade.
@@ -307,12 +310,12 @@ public class AuthService {
                     Boolean.TRUE.equals(user.getEmailVerified()));
         }
 
-        String newRefreshToken = jwtUtil.generateRefreshToken(user.getId(), session.getId());
-        userSessionService.rotate(session, jwtUtil.getJtiFromToken(newRefreshToken),
-                jwtUtil.getExpirationFromToken(newRefreshToken).toInstant(), origin.ipAddress());
+        String newRefreshToken = jwtTokenService.generateRefreshToken(user.getId(), session.getId());
+        userSessionService.rotate(session, jwtTokenService.getJtiFromToken(newRefreshToken),
+                jwtTokenService.getExpirationFromToken(newRefreshToken).toInstant(), origin.ipAddress());
 
         return AuthResponse.builder()
-                .accessToken(jwtUtil.generateAccessToken(
+                .accessToken(jwtTokenService.generateAccessToken(
                         user.getId(), membership.getOrganizationId(), membership.getRole(), session.getId(),
                         Boolean.TRUE.equals(user.getEmailVerified())))
                 .refreshToken(newRefreshToken)
@@ -368,31 +371,31 @@ public class AuthService {
                 .filter(m -> m.getStatus() != MembershipStatus.DISABLED)
                 .findFirst()
                 .orElseThrow(() -> memberships.isEmpty()
-                        ? new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found")
-                        : new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        ? new NotFoundException("No organization membership found")
+                        : new ForbiddenException(
                                 "Your membership in this organization has been suspended"));
     }
 
     @Auditable(action = AuditAction.LOGOUT, resourceType = "Auth")
     public void logout(String accessToken, String refreshToken) {
-        if (accessToken != null && jwtUtil.validateToken(accessToken)) {
+        if (accessToken != null && jwtTokenService.validateToken(accessToken)) {
             tokenBlacklistService.blacklist(
-                    jwtUtil.getJtiFromToken(accessToken),
-                    jwtUtil.getExpirationFromToken(accessToken));
+                    jwtTokenService.getJtiFromToken(accessToken),
+                    jwtTokenService.getExpirationFromToken(accessToken));
         }
-        if (refreshToken != null && jwtUtil.validateToken(refreshToken)) {
+        if (refreshToken != null && jwtTokenService.validateToken(refreshToken)) {
             tokenBlacklistService.blacklist(
-                    jwtUtil.getJtiFromToken(refreshToken),
-                    jwtUtil.getExpirationFromToken(refreshToken));
-            userSessionService.findByRefreshJti(jwtUtil.getJtiFromToken(refreshToken))
+                    jwtTokenService.getJtiFromToken(refreshToken),
+                    jwtTokenService.getExpirationFromToken(refreshToken));
+            userSessionService.findByRefreshJti(jwtTokenService.getJtiFromToken(refreshToken))
                     .ifPresent(session -> userSessionService.revokeSession(session.getUserId(), session.getId()));
         }
     }
 
     public List<SessionResponse> listSessions(UUID userId, String refreshToken) {
         UUID currentSessionId = null;
-        if (refreshToken != null && jwtUtil.validateToken(refreshToken)) {
-            currentSessionId = userSessionService.findByRefreshJti(jwtUtil.getJtiFromToken(refreshToken))
+        if (refreshToken != null && jwtTokenService.validateToken(refreshToken)) {
+            currentSessionId = userSessionService.findByRefreshJti(jwtTokenService.getJtiFromToken(refreshToken))
                     .map(UserSession::getId)
                     .orElse(null);
         }
@@ -402,12 +405,12 @@ public class AuthService {
     @SystemTenant("acts on a User by emailed token, before any organization is established")
     @Transactional
     public void verifyEmail(String token) {
-        User user = userRepository.findByVerificationToken(CryptoUtils.hashApiKey(token))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid verification token"));
+        User user = userRepository.findByVerificationToken(SecureTokens.hash(token))
+                .orElseThrow(() -> new DomainException(ErrorCode.INVALID_REQUEST, "Invalid verification token"));
 
         if (user.getVerificationTokenExpiresAt() != null
                 && user.getVerificationTokenExpiresAt().isBefore(Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Verification token has expired. Please request a new one.");
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "Verification token has expired. Please request a new one.");
         }
 
         user.setEmailVerified(true);
@@ -423,16 +426,16 @@ public class AuthService {
     @Transactional
     public void resendVerification(String email) {
         User user = userRepository.findByEmail(EmailAddresses.normalize(email))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already verified");
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "Email is already verified");
         }
         // Daily budget, shared with email change so neither bypasses the other.
         verificationMailBudget.requireSendAllowance(user);
 
-        String newToken = CryptoUtils.generateSecureToken(32);
-        user.setVerificationToken(CryptoUtils.hashApiKey(newToken));
+        String newToken = SecureTokens.generate(32);
+        user.setVerificationToken(SecureTokens.hash(newToken));
         user.setVerificationTokenExpiresAt(Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS));
         userRepository.save(user);
 
@@ -445,18 +448,18 @@ public class AuthService {
     @Transactional
     public void changePassword(UUID userId, String currentPassword, String newPassword) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (user.getPasswordHash() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new DomainException(ErrorCode.INVALID_REQUEST,
                     "This account has no password yet. Use \"Forgot password\" to set one.");
         }
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "Current password is incorrect");
         }
 
         if (currentPassword.equals(newPassword)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be different from current password");
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "New password must be different from current password");
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
@@ -481,8 +484,8 @@ public class AuthService {
             return;
         }
 
-        String resetToken = CryptoUtils.generateSecureToken(32);
-        user.setPasswordResetToken(CryptoUtils.hashApiKey(resetToken));
+        String resetToken = SecureTokens.generate(32);
+        user.setPasswordResetToken(SecureTokens.hash(resetToken));
         user.setPasswordResetTokenExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
         userRepository.save(user);
 
@@ -494,12 +497,12 @@ public class AuthService {
     @Auditable(action = AuditAction.PASSWORD_RESET, resourceType = "Auth")
     @Transactional
     public void resetPassword(String token, String newPassword) {
-        User user = userRepository.findByPasswordResetToken(CryptoUtils.hashApiKey(token))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired reset token"));
+        User user = userRepository.findByPasswordResetToken(SecureTokens.hash(token))
+                .orElseThrow(() -> new DomainException(ErrorCode.INVALID_REQUEST, "Invalid or expired reset token"));
 
         if (user.getPasswordResetTokenExpiresAt() != null
                 && user.getPasswordResetTokenExpiresAt().isBefore(Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reset token has expired. Please request a new one.");
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "Reset token has expired. Please request a new one.");
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
@@ -518,7 +521,7 @@ public class AuthService {
     @Transactional
     public UserResponse updateProfile(UUID userId, UpdateProfileRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (request.getFullName() != null) {
             user.setFullName(request.getFullName().isBlank() ? null : request.getFullName().trim());
@@ -538,10 +541,10 @@ public class AuthService {
     public CurrentUserResponse getCurrentUser(UUID userId, MembershipRole role) {
         UUID organizationId = TenantContext.require();
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         Organization organization = organizationRepository.findById(organizationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found"));
+                .orElseThrow(() -> new NotFoundException("Organization not found"));
 
         UserResponse userResponse = UserResponse.builder()
                 .id(user.getId())

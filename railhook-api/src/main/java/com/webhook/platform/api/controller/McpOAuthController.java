@@ -1,7 +1,7 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.mcp.oauth.McpOAuthSettings;
-import com.webhook.platform.api.mcp.oauth.OAuthProtocolException;
+import com.webhook.platform.api.exception.OAuthProtocolException;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.McpOAuthService;

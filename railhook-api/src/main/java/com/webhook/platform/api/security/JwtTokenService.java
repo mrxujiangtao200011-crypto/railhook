@@ -17,7 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-public class JwtUtil {
+public class JwtTokenService {
 
     private final SecretKey secretKey;
     private final long accessTokenExpiration;
@@ -31,7 +31,7 @@ public class JwtUtil {
     private static final ThreadLocal<Map<String, Claims>> REQUEST_CACHE =
             ThreadLocal.withInitial(ConcurrentHashMap::new);
 
-    public JwtUtil(
+    public JwtTokenService(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.access-token-expiration:900000}") long accessTokenExpiration,
             @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpiration) {

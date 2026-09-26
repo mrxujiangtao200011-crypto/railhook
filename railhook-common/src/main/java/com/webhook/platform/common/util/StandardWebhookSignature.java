@@ -11,7 +11,7 @@ import java.util.Base64;
 import java.util.List;
 
 /**
- * Standard Webhooks signatures, alongside {@link WebhookSignatureUtils} so receivers can verify
+ * Standard Webhooks signatures, alongside {@link RailhookSignature} so receivers can verify
  * with an off-the-shelf library. HMAC-SHA256 over {@code {id}.{timestamp}.{body}}, base64, with
  * several {@code v1,<sig>} entries space-separated. The key is the secret's raw UTF-8 bytes, so a
  * customer-supplied secret need not be base64.

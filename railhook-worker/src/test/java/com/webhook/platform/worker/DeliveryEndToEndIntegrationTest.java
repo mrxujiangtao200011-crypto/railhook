@@ -6,7 +6,7 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.WebhookSignatureUtils;
+import com.webhook.platform.common.util.RailhookSignature;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import com.webhook.platform.worker.domain.entity.Event;
@@ -252,7 +252,7 @@ class DeliveryEndToEndIntegrationTest {
                 new com.fasterxml.jackson.databind.ObjectMapper().readTree(served.getBodyAsString()));
         String signatureHeader = served.getHeader("X-Signature");
         assertNotNull(signatureHeader, "X-Signature header must be present on the wire");
-        assertTrue(WebhookSignatureUtils.verifySignature(secret, signatureHeader, served.getBodyAsString()),
+        assertTrue(RailhookSignature.verify(secret, signatureHeader, served.getBodyAsString()),
                 "signature must verify against the endpoint's own secret");
         assertEquals(eventId.toString(), served.getHeader("X-Event-Id"));
         assertEquals(deliveryId.toString(), served.getHeader("X-Delivery-Id"));

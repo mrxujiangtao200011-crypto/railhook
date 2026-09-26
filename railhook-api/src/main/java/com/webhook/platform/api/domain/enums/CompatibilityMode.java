@@ -1,7 +1,7 @@
 package com.webhook.platform.api.domain.enums;
 
-import com.webhook.platform.common.util.JsonSchemaUtils.FieldChange;
-import com.webhook.platform.common.util.JsonSchemaUtils.SchemaDiff;
+import com.webhook.platform.common.util.EventSchemas.FieldChange;
+import com.webhook.platform.common.util.EventSchemas.SchemaDiff;
 
 import java.util.ArrayList;
 import java.util.List;

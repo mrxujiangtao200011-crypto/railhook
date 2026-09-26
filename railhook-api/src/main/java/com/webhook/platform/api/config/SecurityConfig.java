@@ -1,11 +1,13 @@
 package com.webhook.platform.api.config;
 
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ErrorResponseWriter;
 import com.webhook.platform.api.security.ApiKeyAuthenticationFilter;
 import com.webhook.platform.api.security.JwtAuthenticationFilter;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationFilter;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationToken;
 import com.webhook.platform.api.audit.AuditLogAspect;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.security.PlatformAdminAccessFilter;
 import com.webhook.platform.api.security.PortalSessionAuthenticationFilter;
 import com.webhook.platform.api.security.PortalSessionAuthenticationToken;
@@ -18,7 +20,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -47,7 +48,7 @@ public class SecurityConfig {
                         PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter,
                         PortalSessionAuthenticationFilter portalSessionAuthenticationFilter,
                         PlatformAdminAccessService platformAdminAccessService,
-                        JwtUtil jwtUtil,
+                        JwtTokenService jwtTokenService,
                         AuthRateLimiterService authRateLimiterService,
                         AuditLogAspect auditLogAspect,
                         TrustedProxyResolver trustedProxyResolver,
@@ -58,7 +59,7 @@ public class SecurityConfig {
                 this.jwtAuthenticationFilter = jwtAuthenticationFilter;
                 this.platformAdminAuthenticationFilter = platformAdminAuthenticationFilter;
                 this.portalSessionAuthenticationFilter = portalSessionAuthenticationFilter;
-                this.platformAdminAccessFilter = new PlatformAdminAccessFilter(platformAdminAccessService, jwtUtil,
+                this.platformAdminAccessFilter = new PlatformAdminAccessFilter(platformAdminAccessService, jwtTokenService,
                                 authRateLimiterService, auditLogAspect, trustedProxyResolver);
                 this.corsConfigurationSource = corsConfigurationSource;
                 this.swaggerEnabled = swaggerEnabled;
@@ -144,18 +145,12 @@ public class SecurityConfig {
                                         auth.anyRequest().authenticated();
                                 })
                                 .exceptionHandling(ex -> ex
-                                                .authenticationEntryPoint((request, response, authException) -> {
-                                                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                                                        response.setContentType("application/json");
-                                                        response.getWriter().write(
-                                                                        "{\"error\":\"unauthorized\",\"message\":\"Authentication required\",\"status\":401}");
-                                                })
-                                                .accessDeniedHandler((request, response, accessDeniedException) -> {
-                                                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                                                        response.setContentType("application/json");
-                                                        response.getWriter().write(
-                                                                        "{\"error\":\"forbidden\",\"message\":\"Access denied\",\"status\":403}");
-                                                }))
+                                                .authenticationEntryPoint((request, response, authException) ->
+                                                        ErrorResponseWriter.write(response, ErrorCode.UNAUTHORIZED,
+                                                                        "Authentication required"))
+                                                .accessDeniedHandler((request, response, accessDeniedException) ->
+                                                        ErrorResponseWriter.write(response, ErrorCode.FORBIDDEN,
+                                                                        "Access denied")))
                                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(apiKeyAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class)

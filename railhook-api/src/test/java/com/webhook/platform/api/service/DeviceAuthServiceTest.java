@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.DeviceAuthCode;
@@ -14,7 +15,7 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.JwtTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +25,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -57,7 +57,7 @@ class DeviceAuthServiceTest {
     private UserSessionService userSessionService;
 
     @Mock
-    private JwtUtil jwtUtil;
+    private JwtTokenService jwtTokenService;
 
     private static final SessionOrigin CLI_ORIGIN =
             SessionOrigin.of(SessionClient.CLI, "railhook-cli/2.9.1", "203.0.113.7");
@@ -71,8 +71,8 @@ class DeviceAuthServiceTest {
     }
 
     private void stubSessionTokenReads() {
-        when(jwtUtil.getJtiFromToken(anyString())).thenReturn(UUID.randomUUID().toString());
-        when(jwtUtil.getExpirationFromToken(anyString()))
+        when(jwtTokenService.getJtiFromToken(anyString())).thenReturn(UUID.randomUUID().toString());
+        when(jwtTokenService.getExpirationFromToken(anyString()))
                 .thenReturn(Date.from(Instant.now().plus(1, ChronoUnit.DAYS)));
     }
 
@@ -150,7 +150,7 @@ class DeviceAuthServiceTest {
                 .thenReturn(Optional.of(code));
         when(deviceAuthCodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThrows(ResponseStatusException.class, () ->
+        assertThrows(DomainException.class, () ->
                 deviceAuthService.approveDeviceCode(userCode, UUID.randomUUID()));
     }
 
@@ -189,7 +189,7 @@ class DeviceAuthServiceTest {
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
-        ResponseStatusException thrown = assertThrows(ResponseStatusException.class, () ->
+        DomainException thrown = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(403, thrown.getStatusCode().value());
         verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
@@ -219,9 +219,9 @@ class DeviceAuthServiceTest {
         when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(1);
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(User.builder().id(userId).emailVerified(true).build()));
-        when(jwtUtil.generateAccessToken(eq(userId), eq(tenantOrgId), eq(MembershipRole.OWNER), any(), eq(true)))
+        when(jwtTokenService.generateAccessToken(eq(userId), eq(tenantOrgId), eq(MembershipRole.OWNER), any(), eq(true)))
                 .thenReturn("access-token-123");
-        when(jwtUtil.generateRefreshToken(eq(userId), any())).thenReturn("refresh-token-456");
+        when(jwtTokenService.generateRefreshToken(eq(userId), any())).thenReturn("refresh-token-456");
         stubSessionTokenReads();
 
         AuthResponse response = deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN);
@@ -257,12 +257,12 @@ class DeviceAuthServiceTest {
         when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId))
                 .thenReturn(Optional.of(membership));
 
-        ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
+        DomainException thrown = assertThrows(DomainException.class,
                 () -> deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(HttpStatus.FORBIDDEN, thrown.getStatusCode());
 
         verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
-        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
+        verify(jwtTokenService, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -293,16 +293,16 @@ class DeviceAuthServiceTest {
         when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
                 .thenReturn(Optional.of(clientOrgMembership));
         when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(1);
-        when(jwtUtil.generateAccessToken(eq(userId), eq(clientOrgId), eq(MembershipRole.VIEWER), any(), anyBoolean()))
+        when(jwtTokenService.generateAccessToken(eq(userId), eq(clientOrgId), eq(MembershipRole.VIEWER), any(), anyBoolean()))
                 .thenReturn("viewer-token");
-        when(jwtUtil.generateRefreshToken(eq(userId), any())).thenReturn("refresh-token");
+        when(jwtTokenService.generateRefreshToken(eq(userId), any())).thenReturn("refresh-token");
         stubSessionTokenReads();
 
         AuthResponse response = deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN);
 
         assertEquals("viewer-token", response.getAccessToken());
-        verify(jwtUtil).generateAccessToken(eq(userId), eq(clientOrgId), eq(MembershipRole.VIEWER), any(), anyBoolean());
-        verify(jwtUtil, never()).generateAccessToken(eq(userId), eq(ownOrgId), any(), any(), anyBoolean());
+        verify(jwtTokenService).generateAccessToken(eq(userId), eq(clientOrgId), eq(MembershipRole.VIEWER), any(), anyBoolean());
+        verify(jwtTokenService, never()).generateAccessToken(eq(userId), eq(ownOrgId), any(), any(), anyBoolean());
         verify(membershipRepository, never()).findByUserId(any());
     }
 
@@ -324,11 +324,11 @@ class DeviceAuthServiceTest {
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
         when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId)).thenReturn(Optional.empty());
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(403, ex.getStatusCode().value());
         verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
-        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
+        verify(jwtTokenService, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -343,7 +343,7 @@ class DeviceAuthServiceTest {
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
         verify(membershipRepository, never()).findByUserIdAndOrganizationId(any(), any());
@@ -372,10 +372,10 @@ class DeviceAuthServiceTest {
         when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId)).thenReturn(Optional.of(membership));
         when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(0);
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
-        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
+        verify(jwtTokenService, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -390,7 +390,7 @@ class DeviceAuthServiceTest {
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(202, ex.getStatusCode().value());
     }
@@ -407,7 +407,7 @@ class DeviceAuthServiceTest {
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
     }

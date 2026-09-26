@@ -2,7 +2,6 @@ package com.webhook.platform.api.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.webhook.platform.common.util.CryptoUtils;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.micrometer.core.instrument.Counter;
@@ -15,6 +14,7 @@ import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Duration;
 
@@ -123,7 +123,7 @@ public class AuthRateLimiterService {
             return false;
         }
         if (sessionToken != null && !sessionToken.isBlank()) {
-            return tryAcquire(DEMO_SCRIPT_SESSION_KEY_PREFIX + CryptoUtils.hashApiKey(sessionToken),
+            return tryAcquire(DEMO_SCRIPT_SESSION_KEY_PREFIX + SecureTokens.hash(sessionToken),
                     demoScriptPerSessionRateLimit);
         }
         return true;
@@ -140,7 +140,7 @@ public class AuthRateLimiterService {
             return false;
         }
         if (token != null && !token.isBlank()) {
-            return tryAcquire(LOGIN_TOKEN_KEY_PREFIX + CryptoUtils.hashApiKey(token), loginRateLimit);
+            return tryAcquire(LOGIN_TOKEN_KEY_PREFIX + SecureTokens.hash(token), loginRateLimit);
         }
         return true;
     }
@@ -155,7 +155,7 @@ public class AuthRateLimiterService {
             return false;
         }
         if (token != null && !token.isBlank()) {
-            return tryAcquire(REFRESH_TOKEN_KEY_PREFIX + CryptoUtils.hashApiKey(token), refreshPerTokenRateLimit);
+            return tryAcquire(REFRESH_TOKEN_KEY_PREFIX + SecureTokens.hash(token), refreshPerTokenRateLimit);
         }
         return true;
     }
@@ -166,7 +166,7 @@ public class AuthRateLimiterService {
             return false;
         }
         if (deviceCode != null && !deviceCode.isBlank()) {
-            return tryAcquire(DEVICE_POLL_CODE_KEY_PREFIX + CryptoUtils.hashApiKey(deviceCode),
+            return tryAcquire(DEVICE_POLL_CODE_KEY_PREFIX + SecureTokens.hash(deviceCode),
                     DEVICE_POLL_PER_CODE_PER_MINUTE);
         }
         return true;
@@ -181,7 +181,7 @@ public class AuthRateLimiterService {
             return false;
         }
         if (clientId != null && !clientId.isBlank()) {
-            return tryAcquire(OAUTH_TOKEN_CLIENT_KEY_PREFIX + CryptoUtils.hashApiKey(clientId),
+            return tryAcquire(OAUTH_TOKEN_CLIENT_KEY_PREFIX + SecureTokens.hash(clientId),
                     OAUTH_TOKEN_PER_CLIENT_PER_MINUTE);
         }
         return true;

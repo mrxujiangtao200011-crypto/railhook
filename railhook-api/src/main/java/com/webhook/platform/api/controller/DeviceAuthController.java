@@ -6,6 +6,8 @@ import com.webhook.platform.api.dto.DeviceApproveRequest;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
 import com.webhook.platform.api.dto.DeviceDenyRequest;
 import com.webhook.platform.api.dto.DeviceTokenRequest;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
@@ -19,10 +21,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/auth/device")
@@ -61,7 +61,7 @@ public class DeviceAuthController {
         // Not the sign-in bucket: the CLI polls twelve times a minute and would starve the
         // browser approving from the same address.
         if (!authRateLimiterService.allowDevicePoll(getClientIp(httpRequest), request.getDeviceCode())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         AuthResponse response = deviceAuthService.pollDeviceToken(
                 request.getDeviceCode(),
@@ -85,7 +85,7 @@ public class DeviceAuthController {
         // The user_code space (~40 bits) is small enough to enumerate within its 10-minute
         // window, even for an authenticated caller.
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getUserCode())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         deviceAuthService.approveDeviceCode(
                 request.getUserCode(), auth.requireUserId());
@@ -108,7 +108,7 @@ public class DeviceAuthController {
             HttpServletRequest httpRequest) {
         // Same bucket as approve: guessing a code to deny it blocks somebody else's login.
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getUserCode())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         deviceAuthService.denyDeviceCode(request.getUserCode(), auth.requireUserId());
         return ResponseEntity.ok().build();

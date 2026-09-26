@@ -25,11 +25,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;
     private final TokenBlacklistService tokenBlacklistService;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, TokenBlacklistService tokenBlacklistService) {
-        this.jwtUtil = jwtUtil;
+    public JwtAuthenticationFilter(JwtTokenService jwtTokenService, TokenBlacklistService tokenBlacklistService) {
+        this.jwtTokenService = jwtTokenService;
         this.tokenBlacklistService = tokenBlacklistService;
     }
 
@@ -43,11 +43,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = authHeader.substring(BEARER_PREFIX.length());
             
             try {
-                Claims claims = jwtUtil.parseToken(token);
+                Claims claims = jwtTokenService.parseToken(token);
 
                 String jti = claims.getId();
                 String tokenType = claims.get("typ", String.class);
-                if (!JwtUtil.TOKEN_TYPE_ACCESS.equals(tokenType)) {
+                if (!JwtTokenService.TOKEN_TYPE_ACCESS.equals(tokenType)) {
                     // A refresh token, or one with no "typ" claim, must not authenticate requests.
                     log.debug("Token jti={} has type={}, expected access, rejecting", jti, tokenType);
                 } else if (tokenBlacklistService.isBlacklisted(jti)) {
@@ -70,7 +70,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         MembershipRole role = MembershipRole.valueOf(claims.get("role", String.class));
 
                         // Absent on older tokens, which read as verified.
-                        Boolean verifiedClaim = claims.get(JwtUtil.CLAIM_EMAIL_VERIFIED, Boolean.class);
+                        Boolean verifiedClaim = claims.get(JwtTokenService.CLAIM_EMAIL_VERIFIED, Boolean.class);
 
                         JwtAuthenticationToken authentication = new JwtAuthenticationToken(
                                 userId,
@@ -96,17 +96,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             MDC.remove("organizationId");
             MDC.remove("userId");
             MDC.remove("projectId");
-            JwtUtil.clearCache();
+            JwtTokenService.clearCache();
         }
     }
 
     private static boolean isDemo(Claims claims) {
-        return Boolean.TRUE.equals(claims.get(JwtUtil.CLAIM_DEMO, Boolean.class));
+        return Boolean.TRUE.equals(claims.get(JwtTokenService.CLAIM_DEMO, Boolean.class));
     }
 
     /** A malformed value is treated as no session, since it cannot match a real one. */
     private static UUID sessionIdOf(Claims claims) {
-        String raw = claims.get(JwtUtil.CLAIM_SESSION_ID, String.class);
+        String raw = claims.get(JwtTokenService.CLAIM_SESSION_ID, String.class);
         if (raw == null) {
             return null;
         }
@@ -114,7 +114,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return UUID.fromString(raw);
         } catch (IllegalArgumentException e) {
             log.debug("Token carries an unparseable {} claim, treating it as sessionless",
-                    JwtUtil.CLAIM_SESSION_ID);
+                    JwtTokenService.CLAIM_SESSION_ID);
             return null;
         }
     }

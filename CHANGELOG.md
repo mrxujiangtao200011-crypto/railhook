@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Logs no longer carry full email addresses or customer and alert URLs (masked, host only). Per-event, per-delivery and configuration-change lines moved from INFO to DEBUG; the audit log still records every configuration change.
+- API errors that used to carry the generic `client_error` or `server_error` now carry a specific code (`invalid_request`, `captcha_failed`, `gone`, `account_locked`, `rate_limit_exceeded`, `service_unavailable`, `internal_error`, `authorization_pending`, or the existing `unauthorized`, `forbidden`, `not_found`, `conflict`); status and message are unchanged. The public contact, tester and demo forms' errors now include `status` like every other error. The errors page in the docs lists every code, and the OpenAPI spec documents every error response as `ErrorResponse`.
 
 ## [2.31.1] - 2026-09-25
 

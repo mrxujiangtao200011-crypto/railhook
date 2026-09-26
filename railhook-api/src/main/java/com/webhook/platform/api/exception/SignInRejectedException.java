@@ -1,4 +1,6 @@
-package com.webhook.platform.api.service.signin;
+package com.webhook.platform.api.exception;
+
+import com.webhook.platform.api.service.signin.SignInFailure;
 
 /** A Google sign-in that must not complete. The message is for the log; the failure is for the page. */
 public class SignInRejectedException extends RuntimeException {

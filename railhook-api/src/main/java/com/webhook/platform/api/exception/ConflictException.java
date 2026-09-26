@@ -1,12 +1,12 @@
 package com.webhook.platform.api.exception;
 
-public class ConflictException extends RuntimeException {
+public class ConflictException extends DomainException {
 
     public ConflictException(String message) {
-        super(message);
+        super(ErrorCode.CONFLICT, message);
     }
 
     public ConflictException(String message, Throwable cause) {
-        super(message, cause);
+        super(ErrorCode.CONFLICT, message, cause);
     }
 }

@@ -17,7 +17,7 @@ public class WebClientConfig {
     /**
      * Spring's 256 KiB default once turned a large 2xx answer into a failed delivery. Both stores
      * truncate the body to 10 KiB anyway. A customizer, so it also reaches the builder
-     * {@code MtlsWebClientFactory} uses.
+     * {@code MtlsWebClientCache} uses.
      */
     @Bean
     public WebClientCustomizer responseBodyBufferLimit(

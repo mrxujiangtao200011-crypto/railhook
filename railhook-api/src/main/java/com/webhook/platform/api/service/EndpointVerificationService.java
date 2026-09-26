@@ -1,7 +1,6 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.common.http.SsrfProtectionCustomizer;
-import com.webhook.platform.common.util.CryptoUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Endpoint;
@@ -17,11 +16,12 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.beans.factory.annotation.Value;
 import reactor.netty.http.client.HttpClient;
+import com.webhook.platform.common.security.SecureTokens;
+import java.util.UUID;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.util.List;
@@ -123,7 +123,7 @@ public class EndpointVerificationService {
             }
 
             if (endpoint.getVerificationToken() == null) {
-                endpoint.setVerificationToken("whc_" + CryptoUtils.generateSecureToken(32));
+                endpoint.setVerificationToken("whc_" + SecureTokens.generate(32));
             }
             endpoint.setVerificationAttemptedAt(Instant.now());
             return endpointRepository.save(endpoint);

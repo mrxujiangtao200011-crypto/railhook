@@ -10,7 +10,8 @@ import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.LoginRequest;
-import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.security.JwtTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,7 +21,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -216,7 +216,7 @@ class AccountLockoutServiceTest {
         @Mock private OrganizationRepository organizationRepository;
         @Mock private MembershipRepository membershipRepository;
         @Mock private PlanRepository planRepository;
-        @Mock private JwtUtil jwtUtil;
+        @Mock private JwtTokenService jwtTokenService;
         @Mock private TokenBlacklistService tokenBlacklistService;
         @Mock private UserSessionService userSessionService;
         @Mock private EmailService emailService;
@@ -230,7 +230,7 @@ class AccountLockoutServiceTest {
             BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
             lockout = new AccountLockoutService(userRepository, true, 3, 60, 900, 60);
             authService = new AuthService(userRepository, organizationRepository, membershipRepository,
-                    planRepository, jwtUtil, encoder, tokenBlacklistService, userSessionService,
+                    planRepository, jwtTokenService, encoder, tokenBlacklistService, userSessionService,
                     lockout, emailService,
                     mock(VerificationMailBudget.class), mock(OnboardingMailService.class), false);
 
@@ -261,14 +261,14 @@ class AccountLockoutServiceTest {
 
             for (int i = 0; i < 3; i++) {
                 assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN))
-                        .isInstanceOf(ResponseStatusException.class)
-                        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                        .isInstanceOf(DomainException.class)
+                        .extracting(e -> ((DomainException) e).getStatusCode())
                         .isEqualTo(HttpStatus.UNAUTHORIZED);
             }
 
             assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.LOCKED);
         }
 
@@ -293,8 +293,8 @@ class AccountLockoutServiceTest {
             }
 
             assertThatThrownBy(() -> authService.login(attempt(PASSWORD), ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.LOCKED);
             verify(userSessionService, never()).open(any());
         }
@@ -323,9 +323,9 @@ class AccountLockoutServiceTest {
                             .organizationId(UUID.randomUUID())
                             .role(MembershipRole.OWNER)
                             .build()));
-            when(jwtUtil.generateRefreshToken(any(), any())).thenReturn("refresh");
-            when(jwtUtil.getJtiFromToken("refresh")).thenReturn(UUID.randomUUID().toString());
-            when(jwtUtil.getExpirationFromToken("refresh"))
+            when(jwtTokenService.generateRefreshToken(any(), any())).thenReturn("refresh");
+            when(jwtTokenService.getJtiFromToken("refresh")).thenReturn(UUID.randomUUID().toString());
+            when(jwtTokenService.getExpirationFromToken("refresh"))
                     .thenReturn(new Date(System.currentTimeMillis() + 86_400_000L));
 
             assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN)).isNotNull();
@@ -347,8 +347,8 @@ class AccountLockoutServiceTest {
             request.setPassword("whatever");
 
             assertThatThrownBy(() -> authService.login(request, ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }

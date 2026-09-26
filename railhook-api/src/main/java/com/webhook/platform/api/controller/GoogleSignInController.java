@@ -1,6 +1,8 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.SignInProvidersResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthCookies;
 import com.webhook.platform.api.security.TrustedProxyResolver;
@@ -22,7 +24,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -70,7 +71,7 @@ public class GoogleSignInController {
             HttpServletResponse response) {
         requireEnabled();
         if (!authRateLimiterService.allowTokenAction(trustedProxyResolver.resolve(request), "google-start")) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         GoogleSignInService.Start start = googleSignInService.start(intent, returnTo);
         response.addHeader(HttpHeaders.SET_COOKIE,
@@ -98,7 +99,7 @@ public class GoogleSignInController {
         requireEnabled();
         if (!authRateLimiterService.allowTokenAction(trustedProxyResolver.resolve(request),
                 state == null ? "google-callback" : state)) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         GoogleSignInService.Completion completion = googleSignInService.complete(code, state, error, stateCookie);
         // Spent either way: a state is good for one callback.
