@@ -186,6 +186,13 @@ class UrlValidatorTest {
         assertFalse(e instanceof UrlValidator.UnresolvableHostException);
     }
 
+    @Test
+    void hostOfKeepsOnlyTheHostOfACustomerUrl() {
+        assertEquals("hooks.slack.com", UrlValidator.hostOf("https://hooks.slack.com/services/T000/B000/secret?token=x"));
+        assertEquals("(no host)", UrlValidator.hostOf(null));
+        assertEquals("(invalid url)", UrlValidator.hostOf("https://exa mple.com/secret"));
+    }
+
     // InetAddress.getByName folds ::ffff:a.b.c.d into an Inet4Address, so build it from bytes.
     private static InetAddress ipv6Mapped(int a, int b, int c, int d) throws Exception {
         byte[] bytes = new byte[16];

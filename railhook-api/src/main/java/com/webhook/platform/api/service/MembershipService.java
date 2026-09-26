@@ -104,7 +104,7 @@ public class MembershipService {
                     User saved = userRepository.save(newUser);
                     // Never log the temp password.
                     emailService.sendTemporaryPasswordEmail(request.getEmail(), tempPass);
-                    log.info("Created new user for invite: userId={}, email={}", saved.getId(), request.getEmail());
+                    log.info("Created new user for invite: userId={}, email={}", saved.getId(), EmailService.maskRecipient(request.getEmail()));
                     return saved;
                 });
 

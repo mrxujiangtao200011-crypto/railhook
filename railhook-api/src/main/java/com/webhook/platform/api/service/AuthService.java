@@ -416,7 +416,7 @@ public class AuthService {
         user.setVerificationTokenExpiresAt(null);
         userRepository.save(user);
         onboardingMailService.welcome(user);
-        log.info("Email verified for user {}", user.getEmail());
+        log.info("Email verified for user {}", EmailService.maskRecipient(user.getEmail()));
     }
 
     @SystemTenant("acts on a User by email address, with no authenticated caller")
@@ -438,7 +438,7 @@ public class AuthService {
 
         verificationMailBudget.recordSend(user.getId(), VerificationEmailSend.RESEND);
         emailService.sendVerificationEmail(user.getEmail(), newToken);
-        log.info("Resent verification email to {}", user.getEmail());
+        log.info("Resent verification email to {}", EmailService.maskRecipient(user.getEmail()));
     }
 
     @Auditable(action = AuditAction.PASSWORD_CHANGED, resourceType = "Auth")
@@ -477,7 +477,7 @@ public class AuthService {
 
         // Always succeeds, to prevent email enumeration.
         if (user == null) {
-            log.info("Password reset requested for non-existent email: {}", email);
+            log.info("Password reset requested for non-existent email: {}", EmailService.maskRecipient(email));
             return;
         }
 
@@ -487,7 +487,7 @@ public class AuthService {
         userRepository.save(user);
 
         emailService.sendPasswordResetEmail(user.getEmail(), resetToken);
-        log.info("Password reset token generated for user {}", user.getEmail());
+        log.info("Password reset token generated for user {}", EmailService.maskRecipient(user.getEmail()));
     }
 
     @SystemTenant("acts on a User by emailed token, with no authenticated caller")
@@ -512,7 +512,7 @@ public class AuthService {
         userRepository.save(user);
         // Reset is how a taken-over account is recovered, so the attacker's tokens must die now.
         userSessionService.revokeAllSessions(user.getId());
-        log.info("Password reset completed for user {}, all sessions revoked", user.getEmail());
+        log.info("Password reset completed for user {}, all sessions revoked", EmailService.maskRecipient(user.getEmail()));
     }
 
     @Transactional

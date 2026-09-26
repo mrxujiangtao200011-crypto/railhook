@@ -5,6 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.Arrays;
@@ -100,6 +101,19 @@ public class UrlValidator {
             return false;
         }
         return isPrivateOrLocalAddress(address);
+    }
+
+    // A customer URL can carry a credential in its path or query (a Slack webhook is one), so logs get the host.
+    public static String hostOf(String url) {
+        if (url == null) {
+            return "(no host)";
+        }
+        try {
+            String host = new URI(url).getHost();
+            return host != null ? host : "(no host)";
+        } catch (URISyntaxException e) {
+            return "(invalid url)";
+        }
     }
 
     public static boolean isPrivateOrLocalAddress(InetAddress address) {

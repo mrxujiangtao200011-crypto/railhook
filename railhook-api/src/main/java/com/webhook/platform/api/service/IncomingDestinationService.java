@@ -141,7 +141,7 @@ public class IncomingDestinationService {
 
         retryLadderEscalationCap.requireIncomingFits(destination.getRetryDelays(), destination.getMaxAttempts());
         destination = destinationRepository.saveAndFlush(destination);
-        log.info("Created incoming destination: id={}, sourceId={}, url={}", destination.getId(), sourceId, request.getUrl());
+        log.debug("Created incoming destination: id={}, sourceId={}, host={}", destination.getId(), sourceId, UrlValidator.hostOf(request.getUrl()));
         return mapToResponse(destination);
     }
 

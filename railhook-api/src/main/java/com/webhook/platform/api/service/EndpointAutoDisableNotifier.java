@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.security.UrlValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -74,7 +75,7 @@ public class EndpointAutoDisableNotifier {
         }
         List<String> owners = membershipRepository.findOwnerEmails(organizationId);
         if (owners.isEmpty()) {
-            log.warn("Organization {} has no verified owner to tell about {}", organizationId, url);
+            log.warn("Organization {} has no verified owner to tell about {}", organizationId, UrlValidator.hostOf(url));
             return;
         }
         String html = body(url, failingSince, failures, link);
