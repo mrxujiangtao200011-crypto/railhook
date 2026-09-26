@@ -37,13 +37,15 @@ describe('ResetPasswordPage', () => {
     expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
   });
 
-  it('resets the password with the token from the link', async () => {
+  it('resets the password with the token from the link, and replaces the form with the confirmation', async () => {
     const reset = vi.spyOn(authApi, 'resetPassword').mockResolvedValue(undefined);
 
     renderAt('?token=the-token');
     await fill('a good long password', 'a good long password');
 
     await waitFor(() => expect(reset).toHaveBeenCalledWith('the-token', 'a good long password'));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /reset|set|save|submit|change/i })).not.toBeInTheDocument());
   });
 
   it('does not send anything when the two passwords differ', async () => {
@@ -85,15 +87,5 @@ describe('ResetPasswordPage', () => {
 
     await screen.findByRole('alert');
     expect(screen.getByRole('button', { name: /reset|set|save|submit|change/i })).toBeEnabled();
-  });
-
-  it('confirms success rather than leaving the form looking untouched', async () => {
-    vi.spyOn(authApi, 'resetPassword').mockResolvedValue(undefined);
-
-    renderAt('?token=the-token');
-    await fill('a good long password', 'a good long password');
-
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /reset|set|save|submit|change/i })).not.toBeInTheDocument());
   });
 });

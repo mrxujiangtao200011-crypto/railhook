@@ -29,8 +29,4 @@ describe('locale parity (en.json vs uk.json)', () => {
     const missingFromEn = [...ukKeys].filter((key) => !enKeys.has(key)).sort();
     expect(missingFromEn).toEqual([]);
   });
-
-  it('has the same total key count in both locales', () => {
-    expect(ukKeys.size).toBe(enKeys.size);
-  });
 });

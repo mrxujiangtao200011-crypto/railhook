@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Node } from '@xyflow/react';
 import '../../i18n';
+import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { TransformationResponse } from '../../types/api.types';
 
@@ -55,7 +56,8 @@ function renderPanel(node: Node, onUpdate = vi.fn()) {
   return onUpdate;
 }
 
-const sourceToggle = () => screen.getByRole('group', { name: /where the shape|звідки береться/i });
+const nodeConfig = en.workflows.nodeConfig;
+const sourceToggle = () => screen.getByRole('group', { name: nodeConfig.transformSource });
 
 describe('the transform node’s source', () => {
   beforeEach(() => {
@@ -63,10 +65,11 @@ describe('the transform node’s source', () => {
     vi.mocked(transformationsApi.list).mockResolvedValue([TRANSFORMATION]);
   });
 
-  it('offers the project’s saved transformations by name', async () => {
+  it('offers the project’s saved transformations by name, and creates nothing by being opened', async () => {
     renderPanel(transformNode({ transformationId: TRANSFORMATION.id }));
 
     expect(await screen.findByRole('option', { name: /Flatten the customer/ })).toBeInTheDocument();
+    expect(transformationsApi.create).not.toHaveBeenCalled();
   });
 
   it('starts on the inline template when the node has no reference', async () => {
@@ -74,7 +77,7 @@ describe('the transform node’s source', () => {
 
     await waitFor(() => expect(within(sourceToggle()).getAllByRole('button')
       .find((b) => b.getAttribute('aria-pressed') === 'true')?.textContent)
-      .toMatch(/inline|на місці/i));
+      .toBe(nodeConfig.transformSourceInline));
   });
 
   it('clears the reference when switching back to an inline template', async () => {
@@ -82,16 +85,14 @@ describe('the transform node’s source', () => {
     const onUpdate = renderPanel(transformNode({ transformationId: TRANSFORMATION.id }));
     await screen.findByRole('option', { name: /Flatten the customer/ });
 
-    const inline = within(sourceToggle()).getAllByRole('button')
-      .find((b) => /inline|на місці/i.test(b.textContent ?? ''))!;
-    await userEvent.click(inline);
+    await userEvent.click(within(sourceToggle()).getByRole('button', { name: nodeConfig.transformSourceInline }));
 
     expect(onUpdate).toHaveBeenCalledWith('node-1', expect.objectContaining({ transformationId: '' }));
   });
 
   it('selecting a transformation records its id on the node', async () => {
     const onUpdate = renderPanel(transformNode({ transformationId: 'x' }));
-    const select = await screen.findByRole('combobox', { name: /transformation|трансформац/i });
+    const select = await screen.findByRole('combobox', { name: nodeConfig.transformation });
 
     await userEvent.selectOptions(select, TRANSFORMATION.id);
 
@@ -104,9 +105,9 @@ describe('the transform node’s source', () => {
     vi.mocked(transformationsApi.create).mockResolvedValue({ ...TRANSFORMATION, id: 'transformation-new' });
     const onUpdate = renderPanel(transformNode({ transformationId: TRANSFORMATION.id }));
 
-    await userEvent.click(await screen.findByRole('button', { name: /new transformation|нова трансформац/i }));
-    await userEvent.type(screen.getByLabelText(/^(name|назва)\s*\*?$/i), 'Strip PII');
-    await userEvent.click(screen.getByRole('button', { name: /^create$|^створити$/i }));
+    await userEvent.click(await screen.findByRole('button', { name: nodeConfig.createTransformation }));
+    await userEvent.type(screen.getByLabelText(new RegExp(`^${nodeConfig.transformationName}\\s*\\*?$`)), 'Strip PII');
+    await userEvent.click(screen.getByRole('button', { name: en.common.create }));
 
     await waitFor(() => expect(transformationsApi.create).toHaveBeenCalledWith(
       TEST_PROJECT_ID,
@@ -115,12 +116,5 @@ describe('the transform node’s source', () => {
     await waitFor(() => expect(onUpdate).toHaveBeenCalledWith('node-1', expect.objectContaining({
       transformationId: 'transformation-new',
     })));
-  });
-
-  it('creates nothing by being opened', async () => {
-    renderPanel(transformNode({ transformationId: TRANSFORMATION.id }));
-
-    await screen.findByRole('option', { name: /Flatten the customer/ });
-    expect(transformationsApi.create).not.toHaveBeenCalled();
   });
 });

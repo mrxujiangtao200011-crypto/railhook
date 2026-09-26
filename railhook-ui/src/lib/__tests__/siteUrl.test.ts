@@ -8,13 +8,13 @@ describe('siteUrl', () => {
     delete window.__RAILHOOK__;
   });
 
-  it('uses the origin the page is served from when nothing is configured', () => {
-    window.__RAILHOOK__ = { siteUrl: '' };
+  it.each([
+    ['nothing is configured', { siteUrl: '' }],
+    ['there is no runtime config at all', undefined],
+    ['the value is only whitespace, rather than emitting a bare path', { siteUrl: '   ' }],
+  ])('uses the origin the page is served from when %s', (_, config) => {
+    window.__RAILHOOK__ = config;
 
-    expect(siteUrl()).toBe(window.location.origin);
-  });
-
-  it('uses the origin the page is served from when there is no runtime config at all', () => {
     expect(siteUrl()).toBe(window.location.origin);
   });
 
@@ -28,11 +28,5 @@ describe('siteUrl', () => {
     window.__RAILHOOK__ = { siteUrl: 'https://hooks.example.com//' };
 
     expect(`${siteUrl()}/pricing`).toBe('https://hooks.example.com/pricing');
-  });
-
-  it('ignores a value that is only whitespace rather than emitting a bare path', () => {
-    window.__RAILHOOK__ = { siteUrl: '   ' };
-
-    expect(siteUrl()).toBe(window.location.origin);
   });
 });

@@ -11,11 +11,6 @@ function withRouter(ui: React.ReactElement) {
 }
 
 describe('EmptyState', () => {
-  it('renders title and description', () => {
-    withRouter(<EmptyState icon={Webhook} title="No endpoints yet" description="Create your first endpoint" />);
-    expect(screen.getByText('No endpoints yet')).toBeInTheDocument();
-    expect(screen.getByText('Create your first endpoint')).toBeInTheDocument();
-  });
 
   it('keeps its centred layout when a caller only changes the spacing', () => {
     // "py-10" used to replace the whole layout inside a card.
@@ -24,32 +19,20 @@ describe('EmptyState', () => {
     expect(container).toHaveClass('flex', 'flex-col', 'items-center', 'justify-center', 'py-10');
     expect(container).not.toHaveClass('py-16');
   });
-
-  it('renders the provided action', () => {
-    withRouter(
-      <EmptyState icon={Webhook} title="No endpoints yet" action={<button>Create endpoint</button>} />
-    );
-    expect(screen.getByRole('button', { name: 'Create endpoint' })).toBeInTheDocument();
-  });
 });
 
 describe('ErrorState', () => {
-  it('renders as an alert, distinct from EmptyState, with a retry button', () => {
-    withRouter(<ErrorState error={{}} onRetry={() => {}} />);
+  it('renders as an alert, distinct from EmptyState, with a retry button that retries', () => {
+    const onRetry = vi.fn();
+    withRouter(<ErrorState error={{}} onRetry={onRetry} />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it('does not render a retry button when onRetry is omitted', () => {
     withRouter(<ErrorState error={{}} />);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
-  });
-
-  it('calls onRetry when the retry button is clicked', () => {
-    const onRetry = vi.fn();
-    withRouter(<ErrorState error={{}} onRetry={onRetry} />);
-    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
-    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it('surfaces the server-provided error message over the fallback key', () => {

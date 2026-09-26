@@ -65,13 +65,12 @@ describe('formatBytes', () => {
 });
 
 describe('canonicalTimezone', () => {
-  it('names Kyiv by its current IANA name', () => {
-    expect(canonicalTimezone('Europe/Kiev')).toBe('Europe/Kyiv');
-  });
-
-  it('leaves every other zone alone', () => {
-    expect(canonicalTimezone('Europe/Berlin')).toBe('Europe/Berlin');
-    expect(canonicalTimezone('UTC')).toBe('UTC');
+  it.each([
+    ['Europe/Kiev', 'Europe/Kyiv'],
+    ['Europe/Berlin', 'Europe/Berlin'],
+    ['UTC', 'UTC'],
+  ])('names %s by its current IANA name, %s', (zone, canonical) => {
+    expect(canonicalTimezone(zone)).toBe(canonical);
   });
 });
 

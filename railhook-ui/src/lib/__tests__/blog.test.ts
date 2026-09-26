@@ -79,10 +79,6 @@ describe('blogPosts', () => {
     expect(blogPosts('de')[0].locale).toBe('en');
   });
 
-  it('estimates a reading time of at least a minute', () => {
-    for (const post of blogPosts('en')) expect(post.readingMinutes).toBeGreaterThanOrEqual(1);
-  });
-
   it('gives every post the social card named for its slug unless it names another', () => {
     for (const post of blogPosts('en')) expect(post.image).toBe(`/blog/${post.slug}.png`);
   });

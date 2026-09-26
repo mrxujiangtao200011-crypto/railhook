@@ -123,40 +123,21 @@ describe('App session', () => {
     expect(http.getToken()).toBeNull();
   });
 
-  it('forgets everything cached for the person who signed out', async () => {
-    await renderSignedIn();
-    seen.queryClient!.setQueryData(['projects'], [{ id: 'p1', name: 'Their project' }]);
-
-    await userEvent.click(screen.getByRole('button', { name: 'sign out' }));
-    await screen.findByText('signed out');
-
-    expect(seen.queryClient!.getQueryData(['projects'])).toBeUndefined();
-  });
-
   it.each([
     ['signs out', async () => { await userEvent.click(screen.getByRole('button', { name: 'sign out' })); }],
     ['is signed out by the server', async () => {
       overrides = { '/api/v1/projects': 401, '/api/v1/auth/refresh': 401 };
       await act(async () => { await http.get('/api/v1/projects').catch(() => undefined); });
     }],
-  ])('does not hand the page a person %s on to whoever signs in next', async (_, endSession) => {
+  ])('forgets the cache and the page of a person who %s, rather than hand them to whoever signs in next', async (_, endSession) => {
     await renderSignedIn();
+    seen.queryClient!.setQueryData(['projects'], [{ id: 'p1', name: 'Their project' }]);
 
     await endSession();
     await screen.findByText('signed out');
 
+    expect(seen.queryClient!.getQueryData(['projects'])).toBeUndefined();
     const from = '/admin/projects/their-project/endpoints';
     expect(destinationAfterSignIn({ redirect: null, from, userId: 'someone-new' }, '/admin/projects')).toBe('/admin/projects');
-  });
-
-  it('forgets everything cached when the session ends on its own', async () => {
-    await renderSignedIn();
-    seen.queryClient!.setQueryData(['audit-log'], [{ id: 'a1' }]);
-    overrides = { '/api/v1/projects': 401, '/api/v1/auth/refresh': 401 };
-
-    await act(async () => { await http.get('/api/v1/projects').catch(() => undefined); });
-    await screen.findByText('signed out');
-
-    expect(seen.queryClient!.getQueryData(['audit-log'])).toBeUndefined();
   });
 });

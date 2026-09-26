@@ -16,38 +16,23 @@ function classesOf(el: Element | null): string {
 }
 
 describe('a dialog is bounded by the viewport', () => {
-  it('caps its height and scrolls inside itself', () => {
-    render(
+  it.each([
+    ['a dialog', () => (
       <Dialog open>
         <DialogContent>
           <DialogHeader><DialogTitle>Add endpoint</DialogTitle></DialogHeader>
           <p>A form long enough to matter.</p>
           <DialogFooter><button type="button">Save</button></DialogFooter>
         </DialogContent>
-      </Dialog>,
-    );
-
-    const content = classesOf(screen.getByRole('dialog'));
-    expect(content).toMatch(/max-h-\[calc\(100dvh-2rem\)\]/);
-    expect(content).toMatch(/overflow-y-auto/);
-  });
-
-  it('measures against dvh, which is the window a phone actually has', () => {
-    // 100vh counts the space behind a mobile address bar.
-    render(
-      <Dialog open>
-        <DialogContent><DialogTitle>Anything</DialogTitle></DialogContent>
-      </Dialog>,
-    );
-    expect(classesOf(screen.getByRole('dialog'))).not.toMatch(/max-h-\[\d+vh\]/);
-  });
-
-  it('applies to the confirmation dialogs too', () => {
-    render(
+      </Dialog>
+    )],
+    ['a confirmation dialog', () => (
       <AlertDialog open>
         <AlertDialogContent><AlertDialogTitle>Delete this?</AlertDialogTitle></AlertDialogContent>
-      </AlertDialog>,
-    );
+      </AlertDialog>
+    )],
+  ])('caps the height of %s to the phone-sized window (dvh) and scrolls inside it', (_, Dialogue) => {
+    render(<Dialogue />);
 
     const content = classesOf(screen.getByRole('dialog'));
     expect(content).toMatch(/max-h-\[calc\(100dvh-2rem\)\]/);

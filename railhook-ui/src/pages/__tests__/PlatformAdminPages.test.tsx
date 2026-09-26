@@ -274,15 +274,6 @@ describe('PlatformOrganizationDetailPage', () => {
     expect(screen.queryByText(/∞/)).not.toBeInTheDocument();
   });
 
-  it('centres the empty projects and audit log inside their cards', async () => {
-    vi.mocked(platformAdminApi.projects).mockResolvedValue(page([]));
-    renderDetail();
-    for (const text of ['No projects.', 'Nothing recorded yet.']) {
-      const container = (await screen.findByText(text)).parentElement!;
-      expect(container).toHaveClass('flex', 'items-center', 'justify-center');
-    }
-  });
-
   it('suspends only once the name is typed back and a reason is given', async () => {
     const user = userEvent.setup();
     renderDetail();

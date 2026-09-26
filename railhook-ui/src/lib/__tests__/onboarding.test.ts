@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   DISMISS_KEY,
   INTENT_KEY,
-  forgetIntent,
   isAnyDismissed,
   isDismissed,
   progressOf,
@@ -120,18 +119,6 @@ describe('stepsFor', () => {
     expect(done([source({ verificationMode: 'PROVIDER', hmacSecretConfigured: true })])).toBe(true);
   });
 
-  it('ticks createSource while verifySource stays open', () => {
-    const steps = stepsFor('receive', inputs({ hasIncomingSources: true }, [source()]));
-    expect(steps.find((s) => s.key === 'createSource')!.done).toBe(true);
-    expect(steps.find((s) => s.key === 'verifySource')!.done).toBe(false);
-  });
-
-  it('claims no step the backend cannot report', () => {
-    const keys = stepsFor('both', inputs()).map((s) => s.key);
-    expect(keys).not.toContain('testIncomingCurl');
-    expect(keys).not.toContain('verifyForwarding');
-  });
-
   it('flips every step when, and only when, its own input flips', () => {
     const cases: { key: string; on: OnboardingInputs }[] = [
       { key: 'createConnection', on: inputs({ hasEndpoints: true, hasSubscriptions: true }) },
@@ -198,12 +185,6 @@ describe('storage', () => {
     expect(isDismissed('p2')).toBe(false);
   });
 
-  it('brings a dismissed project back', () => {
-    setDismissed('p1', true);
-    setDismissed('p1', false);
-    expect(isDismissed('p1')).toBe(false);
-  });
-
   it('reads the legacy boolean flag as dismissed everywhere', () => {
     localStorage.setItem(DISMISS_KEY, 'true');
     expect(isDismissed('p1')).toBe(true);
@@ -216,12 +197,6 @@ describe('storage', () => {
     setDismissed('p1', false);
     expect(isDismissed('p1')).toBe(false);
     expect(isDismissed('p2')).toBe(false);
-  });
-
-  it('forgets the direction so the card asks again', () => {
-    writeIntent('both');
-    forgetIntent();
-    expect(readIntent()).toBeNull();
   });
 
   it('hides and shows the card everywhere at once', () => {

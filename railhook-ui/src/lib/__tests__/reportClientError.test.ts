@@ -12,7 +12,7 @@ describe('reportClientError', () => {
     vi.restoreAllMocks();
   });
 
-  it('posts the failure to this installation, not to anyone else', async () => {
+  it('posts the failure, and the page that broke, to this installation, not to anyone else', async () => {
     const post = vi.spyOn(clientErrorsApi, 'report').mockResolvedValue(undefined);
 
     await reportClientError(new Error('boom'), { componentStack: '  at DeliveriesPage' });
@@ -21,15 +21,8 @@ describe('reportClientError', () => {
     expect(post.mock.calls[0][0]).toMatchObject({
       message: 'boom',
       componentStack: '  at DeliveriesPage',
+      url: window.location.href,
     });
-  });
-
-  it('says which page broke', async () => {
-    const post = vi.spyOn(clientErrorsApi, 'report').mockResolvedValue(undefined);
-
-    await reportClientError(new Error('boom'));
-
-    expect(post.mock.calls[0][0].url).toBe(window.location.href);
   });
 
   it('never throws when the report itself fails', async () => {

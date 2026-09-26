@@ -100,20 +100,12 @@ describe('DlqPage', () => {
     expect(await screen.findByText(/no failed messages|no items/i)).toBeInTheDocument();
   });
 
-  it('renders populated rows when DLQ items exist', async () => {
-    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-    vi.mocked(dlqApi.list).mockResolvedValue(populatedPage([DLQ_ITEM]));
-    vi.mocked(dlqApi.getStats).mockResolvedValue(POPULATED_STATS);
-    renderDlq();
-    expect(await screen.findByText('order.created')).toBeInTheDocument();
-  });
-
-  it('has no detectable axe accessibility violations when populated', async () => {
+  it('lists the rows it is given, with no detectable axe violations', async () => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(dlqApi.list).mockResolvedValue(populatedPage([DLQ_ITEM]));
     vi.mocked(dlqApi.getStats).mockResolvedValue(POPULATED_STATS);
     const { container } = renderDlq();
-    await screen.findByText('order.created');
+    expect(await screen.findByText('order.created')).toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
   });
 

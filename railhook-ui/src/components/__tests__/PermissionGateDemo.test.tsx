@@ -44,6 +44,8 @@ describe('PermissionGate in the live demo', () => {
 
     const button = screen.getByRole('button', { name: 'New endpoint' });
     await userEvent.hover(button.parentElement as HTMLElement);
+    const requires = en.permissions.requiredRole.replace('{{role}}', en.roles.DEVELOPER.name);
+    expect((await screen.findAllByText(requires)).length).toBeGreaterThan(0);
     expect(screen.queryByText(en.demo.readOnlyTooltip)).toBeNull();
   });
 });

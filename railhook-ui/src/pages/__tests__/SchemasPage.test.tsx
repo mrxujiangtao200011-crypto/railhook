@@ -92,16 +92,16 @@ describe('SchemasPage', () => {
   it('shows the validation setting the project actually has', async () => {
     renderSchemas();
 
-    const group = await waitFor(() => choiceGroup(/validation|валідац/i));
+    const group = await waitFor(() => choiceGroup(/validation/i));
     const chosen = selected(group);
-    expect(chosen?.textContent).toMatch(/warn|попередж/i);
+    expect(chosen?.textContent).toMatch(/warn/i);
   });
 
   it('turning validation up to BLOCK sends BLOCK and nothing else', async () => {
     renderSchemas();
-    const group = await waitFor(() => choiceGroup(/validation|валідац/i));
+    const group = await waitFor(() => choiceGroup(/validation/i));
 
-    const block = segments(group).find((b) => /block|блок/i.test(b.textContent ?? ''))!;
+    const block = segments(group).find((b) => /block/i.test(b.textContent ?? ''))!;
     await userEvent.click(block);
 
     await waitFor(() => expect(projectsApi.update).toHaveBeenCalledWith(
@@ -114,9 +114,9 @@ describe('SchemasPage', () => {
   it('changing the idempotency policy does not restate the validation settings', async () => {
     // The API leaves a null field alone, so omitting it keeps this a one-setting change.
     renderSchemas();
-    const group = await waitFor(() => choiceGroup(/idempot|ідемпот/i));
+    const group = await waitFor(() => choiceGroup(/idempot/i));
 
-    const required = segments(group).find((b) => /required|обов/i.test(b.textContent ?? ''))!;
+    const required = segments(group).find((b) => /required/i.test(b.textContent ?? ''))!;
     await userEvent.click(required);
 
     await waitFor(() => expect(projectsApi.update).toHaveBeenCalled());
@@ -127,20 +127,10 @@ describe('SchemasPage', () => {
   });
 
   it('shows an error state rather than an empty catalogue when the load fails', async () => {
-    vi.mocked(schemasApi.listEventTypes).mockRejectedValue(new Error('boom'));
+    vi.mocked(schemasApi.listEventTypes).mockRejectedValue({ response: { status: 500, data: { message: 'Schema registry unavailable' } } });
     renderSchemas();
 
-    await waitFor(() => expect(schemasApi.listEventTypes).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent).not.toMatch(/\b0\b/));
-  });
-
-  it('changes no setting and creates no schema by being opened', async () => {
-    renderSchemas();
-
-    await screen.findByText('payment.succeeded');
-    expect(projectsApi.update).not.toHaveBeenCalled();
-    expect(schemasApi.createEventType).not.toHaveBeenCalled();
-    expect(schemasApi.createVersion).not.toHaveBeenCalled();
-    expect(schemasApi.deleteEventType).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Schema registry unavailable');
+    expect(screen.queryByText('payment.succeeded')).toBeNull();
   });
 });

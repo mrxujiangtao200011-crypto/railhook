@@ -62,38 +62,28 @@ function plainText(code: string, language: Parameters<typeof highlight>[1]): str
 }
 
 describe('normalizeLanguage', () => {
-  it('maps the labels callers actually pass', () => {
-    expect(normalizeLanguage('bash')).toBe('bash');
-    expect(normalizeLanguage('curl')).toBe('bash');
-    expect(normalizeLanguage('node')).toBe('javascript');
-    expect(normalizeLanguage('typescript')).toBe('javascript');
-    expect(normalizeLanguage('python')).toBe('python');
-    expect(normalizeLanguage('php')).toBe('php');
-    expect(normalizeLanguage('http')).toBe('http');
-    expect(normalizeLanguage('json')).toBe('json');
-  });
-
-  it('falls back to unhighlighted text rather than guessing', () => {
-    expect(normalizeLanguage('brainfuck')).toBe('text');
-    expect(normalizeLanguage(undefined)).toBe('text');
+  it.each([
+    ['bash', 'bash'],
+    ['curl', 'bash'],
+    ['sh', 'bash'],
+    ['node', 'javascript'],
+    ['typescript', 'javascript'],
+    ['ts', 'javascript'],
+    ['python', 'python'],
+    ['php', 'php'],
+    ['http', 'http'],
+    ['json', 'json'],
+    ['java', 'java'],
+    ['sql', 'sql'],
+    ['yml', 'yaml'],
+    ['brainfuck', 'text'],
+    [undefined, 'text'],
+  ])('maps %s to %s, and anything unknown to unhighlighted text', (label, language) => {
+    expect(normalizeLanguage(label)).toBe(language);
   });
 });
 
 describe('highlight', () => {
-  const cases: Array<[string, string, Parameters<typeof highlight>[1]]> = [
-    ['a curl with a JSON body', jsonInShell, 'bash'],
-    ['a quickstart request', eventRequest, 'bash'],
-    ['a shell session with comments', shellSession, 'bash'],
-    ['a piped install one-liner', pipedInstall, 'bash'],
-    ['a Node sample', nodeSample, 'javascript'],
-    ['a Python sample', pythonSample, 'python'],
-    ['a PHP sample', phpSample, 'php'],
-  ];
-
-  it.each(cases)('renders %s without losing a character', (_name, code, language) => {
-    expect(plainText(code, language)).toBe(code);
-  });
-
   it('reuses the same scanner across calls — a leaked lastIndex would drop the first token', () => {
     expect(highlight(jsonInShell, 'bash')).toEqual(highlight(jsonInShell, 'bash'));
   });
@@ -106,10 +96,6 @@ describe('highlight', () => {
     );
     const keys = screen.getByTestId('out').querySelectorAll('.tok-key');
     expect([...keys].map((node) => node.textContent)).toContain('"name"');
-  });
-
-  it('leaves unknown languages alone', () => {
-    expect(highlight('anything at all', 'text')).toEqual(['anything at all']);
   });
 });
 
@@ -156,20 +142,19 @@ const yamlSample = `services:
 
 describe('the IDE grammars', () => {
   it.each([
-    ['Java', javaSample, 'java'],
-    ['TypeScript', tsSample, 'javascript'],
-    ['SQL', sqlSample, 'sql'],
-    ['YAML', yamlSample, 'yaml'],
-  ] as const)('round-trips a %s sample without losing a character', (_name, code, language) => {
+    ['a curl with a JSON body', jsonInShell, 'bash'],
+    ['a quickstart request', eventRequest, 'bash'],
+    ['a shell session with comments', shellSession, 'bash'],
+    ['a piped install one-liner', pipedInstall, 'bash'],
+    ['a Node sample', nodeSample, 'javascript'],
+    ['a Python sample', pythonSample, 'python'],
+    ['a PHP sample', phpSample, 'php'],
+    ['a Java sample', javaSample, 'java'],
+    ['a TypeScript sample', tsSample, 'javascript'],
+    ['an SQL sample', sqlSample, 'sql'],
+    ['a YAML sample', yamlSample, 'yaml'],
+  ] as const)('renders %s without losing a character', (_name, code, language) => {
     expect(plainText(code, language)).toBe(code);
-  });
-
-  it('maps the fence labels the blog uses', () => {
-    expect(normalizeLanguage('java')).toBe('java');
-    expect(normalizeLanguage('ts')).toBe('javascript');
-    expect(normalizeLanguage('sql')).toBe('sql');
-    expect(normalizeLanguage('yml')).toBe('yaml');
-    expect(normalizeLanguage('sh')).toBe('bash');
   });
 
   it('colours a Java fence by kind: annotations, keywords, types and generics, calls, constants', () => {

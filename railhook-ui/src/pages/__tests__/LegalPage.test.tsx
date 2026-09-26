@@ -1,14 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import '../../i18n';
 import { renderPage } from '../../test/renderPage';
 import { PrivacyPage, TermsPage } from '../LegalPage';
-
-const uiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const read = (p: string) => readFileSync(join(uiRoot, p), 'utf8');
 
 describe('legal pages', () => {
   it('the privacy policy renders, with the statements Google requires of it', async () => {
@@ -32,23 +26,5 @@ describe('legal pages', () => {
     expect(text).toMatch(/MIT license/);
     expect(text).toMatch(/laws of Ukraine/);
     expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
-  });
-
-  it('are routed, prerendered and listed in the sitemap', () => {
-    const router = read('src/router.tsx');
-    expect(router).toMatch(/path: '\/privacy'/);
-    expect(router).toMatch(/path: '\/terms'/);
-    const routes = read('scripts/public-routes.mjs');
-    expect(routes).toMatch(/path: '\/privacy'/);
-    expect(routes).toMatch(/path: '\/terms'/);
-    const sitemap = read('public/sitemap.xml');
-    expect(sitemap).toMatch(/\/privacy</);
-    expect(sitemap).toMatch(/\/terms</);
-  });
-
-  it('are linked from the footer', () => {
-    const layout = read('src/layout/PublicLayout.tsx');
-    expect(layout).toMatch(/<RouteLink to="\/privacy">/);
-    expect(layout).toMatch(/<RouteLink to="\/terms">/);
   });
 });

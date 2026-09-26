@@ -48,22 +48,16 @@ describe('IncomingSourcesPage — clearing a field on edit', () => {
     vi.mocked(incomingSourcesApi.update).mockResolvedValue(SOURCE);
   });
 
-  it('sends 0 for a cleared rate limit, which the API stores as "no limit of its own"', async () => {
+  it.each([
+    ['0 for a cleared rate limit, which the API stores as "no limit of its own"', /rate limit/i, 'rateLimitPerSecond', 0],
+    ['an empty string for a cleared signature prefix, which the API stores', /signature prefix/i, 'hmacSignaturePrefix', ''],
+  ] as const)('sends %s', async (_, label, field, sent) => {
     await openEdit();
-    fireEvent.change(screen.getByLabelText(/rate limit/i), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(label), { target: { value: '' } });
     save();
 
     await waitFor(() => expect(incomingSourcesApi.update).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(incomingSourcesApi.update).mock.calls[0][2].rateLimitPerSecond).toBe(0);
-  });
-
-  it('sends an empty string for a cleared signature prefix, which the API stores', async () => {
-    await openEdit();
-    fireEvent.change(screen.getByLabelText(/signature prefix/i), { target: { value: '' } });
-    save();
-
-    await waitFor(() => expect(incomingSourcesApi.update).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(incomingSourcesApi.update).mock.calls[0][2].hmacSignaturePrefix).toBe('');
+    expect(vi.mocked(incomingSourcesApi.update).mock.calls[0][2][field]).toBe(sent);
   });
 
   it('does not claim to have cleared a signature header the API cannot clear', async () => {

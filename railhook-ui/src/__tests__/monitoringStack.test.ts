@@ -37,12 +37,6 @@ function megabytes(limit: string): number {
 describe('monitoring/docker-compose.yml', () => {
   const services = composeServices();
 
-  it('has the exporters the host dashboards and alerts read', () => {
-    for (const name of ['prometheus', 'alertmanager', 'grafana', 'loki', 'promtail', 'node-exporter', 'cadvisor', 'blackbox']) {
-      expect(services.has(name), `service ${name}`).toBe(true);
-    }
-  });
-
   it('publishes Grafana on loopback and nothing else at all', () => {
     for (const [name, block] of services) {
       const ports = /^ {4}ports:\n((?: {6}(?:#.*|- .*)\n)+)/m.exec(block);

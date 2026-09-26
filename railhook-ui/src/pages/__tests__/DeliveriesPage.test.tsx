@@ -96,33 +96,21 @@ describe('DeliveriesPage', () => {
     expect(await screen.findByText(/no deliveries found/i)).toBeInTheDocument();
   });
 
-  it('renders populated rows when deliveries exist', async () => {
+  it.each([
+    ['the event type, so a list of deliveries reads without opening each one', { eventType: 'order.created' }, 'order.created'],
+    ['the event id where the type is missing', {}, /event-1/],
+  ])('names %s', async (_, overrides, shown) => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));
+    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([{ ...DELIVERY, ...overrides }]));
     renderDeliveries();
-    expect(await screen.findByText('https://example.com/webhook')).toBeInTheDocument();
+    expect(await screen.findByText(shown)).toBeInTheDocument();
   });
 
-  it('names the event type in the row, so a list of deliveries reads without opening each one', async () => {
-    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-    vi.mocked(deliveriesApi.listByProject)
-      .mockResolvedValue(populatedPage([{ ...DELIVERY, eventType: 'order.created' }]));
-    renderDeliveries();
-    expect(await screen.findByText('order.created')).toBeInTheDocument();
-  });
-
-  it('falls back to the event id where the type is missing', async () => {
-    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));
-    renderDeliveries();
-    expect(await screen.findByText(/event-1/)).toBeInTheDocument();
-  });
-
-  it('has no detectable axe accessibility violations when populated', async () => {
+  it('lists the rows it is given, with no detectable axe violations', async () => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));
     const { container } = renderDeliveries();
-    await screen.findByText('https://example.com/webhook');
+    expect(await screen.findByText('https://example.com/webhook')).toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
   });
 

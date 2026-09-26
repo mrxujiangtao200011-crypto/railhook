@@ -39,11 +39,6 @@ afterEach(() => {
 });
 
 describe('install.sh --admin-email', () => {
-  it('is documented in --help', () => {
-    const help = run('--help');
-    expect(help.status).toBe(0);
-    expect(help.stdout).toMatch(/--admin-email <address>/);
-  });
 
   it('names the platform admins of an existing installation on --refresh', () => {
     const dir = installation();

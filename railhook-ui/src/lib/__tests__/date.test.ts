@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../../i18n', () => ({
   default: {
@@ -15,80 +15,23 @@ vi.mock('../../i18n', () => ({
   },
 }));
 
-import { formatDateTime, formatDate, formatRelativeTime, formatNumber } from '../date';
+import { formatRelativeTime } from '../date';
 
-describe('date utilities', () => {
-  describe('formatDateTime', () => {
-    it('formats an ISO date string to locale string', () => {
-      const result = formatDateTime('2025-01-15T14:30:15Z');
-      expect(result).toBeTruthy();
-      expect(typeof result).toBe('string');
-      expect(result).toContain('2025');
-    });
+describe('formatRelativeTime', () => {
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  describe('formatDate', () => {
-    it('formats an ISO date string to date-only string', () => {
-      const result = formatDate('2025-06-20T10:00:00Z');
-      expect(result).toContain('2025');
-    });
-  });
-
-  describe('formatRelativeTime', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    it('returns "just now" for recent times', () => {
-      const now = new Date('2025-03-01T12:00:00Z');
-      vi.setSystemTime(now);
-      const tenSecondsAgo = new Date(now.getTime() - 10_000).toISOString();
-      expect(formatRelativeTime(tenSecondsAgo)).toBe('just now');
-    });
-
-    it('returns minutes ago', () => {
-      const now = new Date('2025-03-01T12:00:00Z');
-      vi.setSystemTime(now);
-      const fiveMinAgo = new Date(now.getTime() - 5 * 60_000).toISOString();
-      expect(formatRelativeTime(fiveMinAgo)).toBe('5m ago');
-    });
-
-    it('returns hours ago', () => {
-      const now = new Date('2025-03-01T12:00:00Z');
-      vi.setSystemTime(now);
-      const threeHoursAgo = new Date(now.getTime() - 3 * 3600_000).toISOString();
-      expect(formatRelativeTime(threeHoursAgo)).toBe('3h ago');
-    });
-
-    it('returns days ago for less than 7 days', () => {
-      const now = new Date('2025-03-01T12:00:00Z');
-      vi.setSystemTime(now);
-      const twoDaysAgo = new Date(now.getTime() - 2 * 86400_000).toISOString();
-      expect(formatRelativeTime(twoDaysAgo)).toBe('2d ago');
-    });
-
-    it('falls back to formatted date for >7 days', () => {
-      const now = new Date('2025-03-01T12:00:00Z');
-      vi.setSystemTime(now);
-      const tenDaysAgo = new Date(now.getTime() - 10 * 86400_000).toISOString();
-      const result = formatRelativeTime(tenDaysAgo);
-      expect(result).toContain('2025');
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-  });
-
-  describe('formatNumber', () => {
-    it('formats large numbers with locale separators', () => {
-      const result = formatNumber(1234567);
-      expect(result).toContain('234');
-      expect(result).toContain('567');
-    });
-
-    it('formats zero', () => {
-      expect(formatNumber(0)).toBe('0');
-    });
+  it.each([
+    ['10 seconds', 10_000, /^just now$/],
+    ['5 minutes', 5 * 60_000, /^5m ago$/],
+    ['3 hours', 3 * 3600_000, /^3h ago$/],
+    ['2 days', 2 * 86400_000, /^2d ago$/],
+    ['10 days, past which it shows the date', 10 * 86400_000, /2025/],
+  ])('%s ago', (_, ago, expected) => {
+    vi.useFakeTimers();
+    const now = new Date('2025-03-01T12:00:00Z');
+    vi.setSystemTime(now);
+    expect(formatRelativeTime(new Date(now.getTime() - ago).toISOString())).toMatch(expected);
   });
 });
