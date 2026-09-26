@@ -76,7 +76,7 @@ public class DeliveryController {
             @ParameterObject Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        log.info("Deliveries request - projectId: {}, status: {}, endpointId: {}, eventId: {}, eventType: {}, fromDate: {}, toDate: {}", 
+        log.debug("Deliveries request - projectId: {}, status: {}, endpointId: {}, eventId: {}, eventType: {}, fromDate: {}, toDate: {}", 
                  projectId, status, endpointId, eventId, eventType, fromDate, toDate);
         
         Page<DeliveryResponse> response = deliveryService.listDeliveriesByProject(

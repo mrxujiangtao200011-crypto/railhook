@@ -141,7 +141,7 @@ public class EndpointController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         EndpointTestResponse response = endpointService.testEndpoint(projectId, id);
-        log.info("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
+        log.debug("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
         return ResponseEntity.ok(response);
     }
 
@@ -158,7 +158,6 @@ public class EndpointController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         EndpointResponse response = endpointService.configureMtls(projectId, id, request);
-        log.info("Configured mTLS for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
 
@@ -174,7 +173,6 @@ public class EndpointController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         EndpointResponse response = endpointService.disableMtls(projectId, id);
-        log.info("Disabled mTLS for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
 
@@ -189,7 +187,7 @@ public class EndpointController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         var result = verificationService.verify(projectId, id);
-        log.info("Verification attempt for endpoint {}: success={}", id, result.success());
+        log.debug("Verification attempt for endpoint {}: success={}", id, result.success());
         
         return ResponseEntity.ok(new VerificationResponse(
                 result.success(),
@@ -225,11 +223,8 @@ public class EndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        
         String reason = request != null ? request.reason() : "Skipped by administrator";
-        var endpoint = verificationService.skipVerification(projectId, id, reason);
-        log.info("Skipped verification for endpoint {}: {}", id, reason);
-        
+        verificationService.skipVerification(projectId, id, reason);
         return ResponseEntity.ok(endpointService.getEndpoint(projectId, id));
     }
 

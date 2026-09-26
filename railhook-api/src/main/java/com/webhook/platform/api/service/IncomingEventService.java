@@ -180,7 +180,7 @@ public class IncomingEventService {
             }
         }
 
-        log.info("Replayed incoming event {} to {} destinations", eventId, replayed);
+        log.debug("Replayed incoming event {} to {} destinations", eventId, replayed);
         return replayed;
     }
 

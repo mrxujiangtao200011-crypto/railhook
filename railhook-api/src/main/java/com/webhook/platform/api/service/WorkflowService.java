@@ -106,7 +106,7 @@ public class WorkflowService {
                 .build();
 
         workflow = workflowRepository.save(workflow);
-        log.info("Created workflow '{}' for project {}", workflow.getName(), projectId);
+        log.debug("Created workflow '{}' for project {}", workflow.getName(), projectId);
         return mapToResponse(workflow);
     }
 
@@ -179,7 +179,7 @@ public class WorkflowService {
         }
 
         workflow = workflowRepository.save(workflow);
-        log.info("Updated workflow '{}' (v{})", workflow.getName(), workflow.getVersion());
+        log.debug("Updated workflow '{}' (v{})", workflow.getName(), workflow.getVersion());
         return mapToResponse(workflow);
     }
 
@@ -187,7 +187,7 @@ public class WorkflowService {
     public void delete(UUID projectId, UUID id) {
         Workflow workflow = requireWorkflow(projectId, id);
         workflowRepository.delete(workflow);
-        log.info("Deleted workflow '{}'", workflow.getName());
+        log.debug("Deleted workflow '{}'", workflow.getName());
     }
 
     @Transactional
@@ -195,7 +195,7 @@ public class WorkflowService {
         Workflow workflow = requireWorkflow(projectId, id);
         workflow.setEnabled(enabled);
         workflow = workflowRepository.save(workflow);
-        log.info("Workflow '{}' {}", workflow.getName(), enabled ? "enabled" : "disabled");
+        log.debug("Workflow '{}' {}", workflow.getName(), enabled ? "enabled" : "disabled");
         return mapToResponse(workflow);
     }
 

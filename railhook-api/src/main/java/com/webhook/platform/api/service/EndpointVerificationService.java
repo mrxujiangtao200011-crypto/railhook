@@ -87,7 +87,7 @@ public class EndpointVerificationService {
                     .block();
 
             if (verifyChallengeResponse(response, token)) {
-                log.info("Endpoint {} verified successfully", endpointId);
+                log.debug("Endpoint {} verified successfully", endpointId);
                 return new VerificationResult(true, "Verification successful",
                         recordVerificationOutcome(endpointId, VerificationStatus.VERIFIED), null);
             }
@@ -98,7 +98,7 @@ public class EndpointVerificationService {
         } catch (WebClientResponseException e) {
             // A raw 503 from an offline tunnel looks like our outage; the fix is on the caller's machine.
             if (isOfflineTunnel(e)) {
-                log.info("Endpoint {} verification failed - tunnel not connected", endpointId);
+                log.debug("Endpoint {} verification failed - tunnel not connected", endpointId);
                 return new VerificationResult(false,
                         "The tunnel is not connected. Start it with `railhook tunnel`, then verify again.",
                         recordVerificationOutcome(endpointId, VerificationStatus.FAILED),

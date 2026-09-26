@@ -38,7 +38,7 @@ public class DashboardController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        log.info("Dashboard stats request for projectId: {}", projectId);
+        log.debug("Dashboard stats request for projectId: {}", projectId);
         DashboardStatsResponse stats = dashboardService.getProjectStats(projectId);
         return ResponseEntity.ok(stats);
     }
@@ -60,7 +60,7 @@ public class DashboardController {
             @Parameter(description = "Time period: 24h, 7d, 30d") @RequestParam(name = "period", defaultValue = "24h") String period,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        log.info("Analytics request for projectId: {}, period: {}", projectId, period);
+        log.debug("Analytics request for projectId: {}, period: {}", projectId, period);
         AnalyticsResponse analytics = analyticsService.getAnalytics(projectId, period);
         return ResponseEntity.ok(analytics);
     }

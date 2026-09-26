@@ -62,7 +62,7 @@ public class SharedDebugLinkService {
                 .build();
 
         link = linkRepository.save(link);
-        log.info("Created shared debug link for event {} in project {}, expires in {}h", eventId, projectId, expiryHours);
+        log.debug("Created shared debug link for event {} in project {}, expires in {}h", eventId, projectId, expiryHours);
         return toResponse(link);
     }
 
@@ -92,7 +92,7 @@ public class SharedDebugLinkService {
                 .orElseThrow(() -> new NotFoundException("Debug link not found"));
 
         linkRepository.delete(link);
-        log.info("Deleted shared debug link {} for project {}", linkId, projectId);
+        log.debug("Deleted shared debug link {} for project {}", linkId, projectId);
     }
 
     @SystemTenant("the share token in the URL is the only identity a public debug link carries; it resolves the link and its Event unscoped")

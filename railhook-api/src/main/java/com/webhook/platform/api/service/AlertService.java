@@ -150,7 +150,7 @@ public class AlertService {
                 .build();
 
         rule = ruleRepository.save(rule);
-        log.info("Created alert rule '{}' ({}) for project {}", rule.getName(), rule.getAlertType(), projectId);
+        log.debug("Created alert rule '{}' ({}) for project {}", rule.getName(), rule.getAlertType(), projectId);
         return toRuleResponse(rule);
     }
 
@@ -179,7 +179,7 @@ public class AlertService {
         if (request.getEmailRecipients() != null) rule.setEmailRecipients(requireMemberRecipients(request.getEmailRecipients()));
 
         rule = ruleRepository.save(rule);
-        log.info("Updated alert rule '{}' for project {}", rule.getName(), projectId);
+        log.debug("Updated alert rule '{}' for project {}", rule.getName(), projectId);
         return toRuleResponse(rule);
     }
 
@@ -190,7 +190,7 @@ public class AlertService {
         AlertRule rule = ruleRepository.findByIdAndProjectId(ruleId, projectId)
                 .orElseThrow(() -> new NotFoundException("Alert rule not found"));
         ruleRepository.delete(rule);
-        log.info("Deleted alert rule '{}' from project {}", rule.getName(), projectId);
+        log.debug("Deleted alert rule '{}' from project {}", rule.getName(), projectId);
     }
 
     @Transactional(readOnly = true)

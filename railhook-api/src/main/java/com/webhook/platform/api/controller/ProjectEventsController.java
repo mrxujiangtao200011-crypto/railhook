@@ -104,7 +104,7 @@ public class ProjectEventsController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         
-        log.info("Sending test event type: {} for project: {}", request.getType(), projectId);
+        log.debug("Sending test event type: {} for project: {}", request.getType(), projectId);
         EventResponse response = eventService.sendTestEvent(projectId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

@@ -113,7 +113,7 @@ public class OrganizationService {
 
         organization.setName(request.getName().trim());
         organization = organizationRepository.save(organization);
-        log.info("Organization {} renamed to '{}'", organizationId, organization.getName());
+        log.debug("Organization {} renamed to '{}'", organizationId, organization.getName());
 
         return OrganizationResponse.builder()
                 .id(organization.getId())

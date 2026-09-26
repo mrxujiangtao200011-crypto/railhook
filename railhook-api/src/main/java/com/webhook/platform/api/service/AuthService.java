@@ -525,7 +525,7 @@ public class AuthService {
         }
 
         user = userRepository.save(user);
-        log.info("Profile updated for user {}", userId);
+        log.debug("Profile updated for user {}", userId);
 
         return UserResponse.builder()
                 .id(user.getId())

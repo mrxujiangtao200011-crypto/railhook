@@ -123,7 +123,7 @@ public class DeliveryNodeExecutor implements NodeExecutor {
             });
             chargeQuota();
 
-            log.info("Workflow delivery created: {} → endpoint {} (event {})",
+            log.debug("Workflow delivery created: {} → endpoint {} (event {})",
                     delivery.getId(), endpointId, delivery.getEventId());
 
             ObjectNode result = objectMapper.createObjectNode();

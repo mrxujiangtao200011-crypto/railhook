@@ -90,7 +90,7 @@ public class TestEndpointService {
                 .build();
 
         endpoint = testEndpointRepository.saveAndFlush(endpoint);
-        log.info("Created test endpoint {} for project {}", slug, projectId);
+        log.debug("Created test endpoint {} for project {}", slug, projectId);
 
         return mapToResponse(endpoint);
     }
@@ -131,7 +131,7 @@ public class TestEndpointService {
 
         capturedRequestRepository.deleteByTestEndpointId(id);
         testEndpointRepository.delete(endpoint);
-        log.info("Deleted test endpoint {}", id);
+        log.debug("Deleted test endpoint {}", id);
     }
 
     // Not @Transactional: Hibernate binds the tenant when the session opens.

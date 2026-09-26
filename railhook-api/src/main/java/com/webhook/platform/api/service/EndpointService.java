@@ -438,7 +438,7 @@ public class EndpointService {
         endpoint.setEncryptionKeyVersion(encryptedCert.getKeyVersion());
 
         endpoint = endpointRepository.saveAndFlush(endpoint);
-        log.info("Configured mTLS for endpoint {}", endpointId);
+        log.debug("Configured mTLS for endpoint {}", endpointId);
 
         return mapToResponse(endpoint);
     }
@@ -455,7 +455,7 @@ public class EndpointService {
         endpoint.setCaCert(null);
 
         endpoint = endpointRepository.saveAndFlush(endpoint);
-        log.info("Disabled mTLS for endpoint {}", endpointId);
+        log.debug("Disabled mTLS for endpoint {}", endpointId);
 
         return mapToResponse(endpoint);
     }

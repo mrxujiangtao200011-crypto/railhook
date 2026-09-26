@@ -51,7 +51,7 @@ public class PiiMaskingService {
                 .build();
 
         rule = ruleRepository.save(rule);
-        log.info("Created PII masking rule '{}' for project {}", rule.getPatternName(), projectId);
+        log.debug("Created PII masking rule '{}' for project {}", rule.getPatternName(), projectId);
         return PiiMaskingRuleResponse.of(rule);
     }
 
@@ -74,7 +74,7 @@ public class PiiMaskingService {
         }
 
         rule = ruleRepository.save(rule);
-        log.info("Updated PII masking rule '{}' for project {}", rule.getPatternName(), projectId);
+        log.debug("Updated PII masking rule '{}' for project {}", rule.getPatternName(), projectId);
         return PiiMaskingRuleResponse.of(rule);
     }
 
@@ -87,7 +87,7 @@ public class PiiMaskingService {
                 .orElseThrow(() -> new NotFoundException("Masking rule not found"));
 
         ruleRepository.delete(rule);
-        log.info("Deleted PII masking rule '{}' from project {}", rule.getPatternName(), projectId);
+        log.debug("Deleted PII masking rule '{}' from project {}", rule.getPatternName(), projectId);
     }
 
     // From the project row: a first project may be created outside any tenant scope.
