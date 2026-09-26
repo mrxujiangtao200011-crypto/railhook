@@ -25,7 +25,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -38,7 +37,6 @@ public class ExternalSignInService {
 
     static final Duration HANDOFF_LIFETIME = Duration.ofSeconds(60);
 
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final UserIdentityRepository userIdentityRepository;
@@ -130,9 +128,7 @@ public class ExternalSignInService {
         Instant now = Instant.now();
         signInHandoffRepository.deleteExpiredBefore(now.minus(Duration.ofHours(1)));
 
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        String code = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String code = CryptoUtils.generateSecureToken(32);
 
         signInHandoffRepository.save(SignInHandoff.builder()
                 .codeHash(CryptoUtils.hashApiKey(code))

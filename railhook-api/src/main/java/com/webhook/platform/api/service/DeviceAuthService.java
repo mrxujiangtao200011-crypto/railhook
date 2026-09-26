@@ -14,6 +14,7 @@ import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
 import com.webhook.platform.api.security.JwtUtil;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,7 +27,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
 import java.util.UUID;
 import com.webhook.platform.api.domain.repository.UserRepository;
 
@@ -51,7 +51,7 @@ public class DeviceAuthService {
     @SystemTenant("issues a device code before any user or organization is known -- device_auth_codes is deliberately not tenant-scoped for the same reason")
     @Transactional
     public DeviceCodeResponse initiateDeviceAuth() {
-        String deviceCode = generateDeviceCode();
+        String deviceCode = CryptoUtils.generateSecureToken(32);
         String userCode = generateUserCode();
         Instant expiresAt = Instant.now().plus(CODE_EXPIRY_MINUTES, ChronoUnit.MINUTES);
 
@@ -190,12 +190,6 @@ public class DeviceAuthService {
         if (expired > 0) {
             log.debug("Expired {} device auth codes", expired);
         }
-    }
-
-    private String generateDeviceCode() {
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private String generateUserCode() {

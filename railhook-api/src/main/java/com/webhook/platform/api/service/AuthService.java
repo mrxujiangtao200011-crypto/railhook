@@ -30,11 +30,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,7 +55,6 @@ public class AuthService {
     private final OnboardingMailService onboardingMailService;
     private final boolean billingEnabled;
 
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int TOKEN_EXPIRY_HOURS = 24;
 
     public AuthService(
@@ -101,7 +98,7 @@ public class AuthService {
         // Without email a token could never arrive, and VerificationGate would block every write.
         boolean verificationIsDeliverable = emailService.isEnabled();
 
-        String verificationToken = verificationIsDeliverable ? generateVerificationToken() : null;
+        String verificationToken = verificationIsDeliverable ? CryptoUtils.generateSecureToken(32) : null;
 
         User user = User.builder()
                 .email(email)
@@ -434,7 +431,7 @@ public class AuthService {
         // Daily budget, shared with email change so neither bypasses the other.
         verificationMailBudget.requireSendAllowance(user);
 
-        String newToken = generateVerificationToken();
+        String newToken = CryptoUtils.generateSecureToken(32);
         user.setVerificationToken(CryptoUtils.hashApiKey(newToken));
         user.setVerificationTokenExpiresAt(Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS));
         userRepository.save(user);
@@ -442,12 +439,6 @@ public class AuthService {
         verificationMailBudget.recordSend(user.getId(), VerificationEmailSend.RESEND);
         emailService.sendVerificationEmail(user.getEmail(), newToken);
         log.info("Resent verification email to {}", user.getEmail());
-    }
-
-    private String generateVerificationToken() {
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     @Auditable(action = AuditAction.PASSWORD_CHANGED, resourceType = "Auth")
@@ -490,7 +481,7 @@ public class AuthService {
             return;
         }
 
-        String resetToken = generateVerificationToken();
+        String resetToken = CryptoUtils.generateSecureToken(32);
         user.setPasswordResetToken(CryptoUtils.hashApiKey(resetToken));
         user.setPasswordResetTokenExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
         userRepository.save(user);

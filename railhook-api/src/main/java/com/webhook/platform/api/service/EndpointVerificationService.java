@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.common.http.SsrfProtectionCustomizer;
+import com.webhook.platform.common.util.CryptoUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Endpoint;
@@ -17,10 +18,8 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.beans.factory.annotation.Value;
 import reactor.netty.http.client.HttpClient;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -61,12 +60,6 @@ public class EndpointVerificationService {
                                 HttpClient.create(), allowPrivateIps, allowedHosts)))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0 Verification")
                 .build();
-    }
-
-    public String generateVerificationToken() {
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        return "whc_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     // Not @Transactional: a slow customer URL held a connection and row lock and drained the pool.
@@ -130,7 +123,7 @@ public class EndpointVerificationService {
             }
 
             if (endpoint.getVerificationToken() == null) {
-                endpoint.setVerificationToken(generateVerificationToken());
+                endpoint.setVerificationToken("whc_" + CryptoUtils.generateSecureToken(32));
             }
             endpoint.setVerificationAttemptedAt(Instant.now());
             return endpointRepository.save(endpoint);
