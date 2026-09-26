@@ -1117,10 +1117,19 @@ jobs:
           done
           trivy --version
       
+      # One registry being down or rate-limiting once turned this required check red with nothing wrong.
       - name: Download Trivy DBs
         run: |
-          trivy image --download-db-only --db-repository public.ecr.aws/aquasecurity/trivy-db:2
-          trivy image --download-java-db-only --java-db-repository public.ecr.aws/aquasecurity/trivy-java-db:1
+          for attempt in 1 2 3; do
+            trivy image --download-db-only \
+              --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2 \
+            && trivy image --download-java-db-only \
+              --java-db-repository mirror.gcr.io/aquasec/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1,public.ecr.aws/aquasecurity/trivy-java-db:1 \
+            && exit 0
+            echo "Trivy DB download attempt ${attempt} failed; retrying"
+            sleep $((attempt * 15))
+          done
+          exit 1
       
       # CRITICAL gates; HIGH stays advisory until the backlog is triaged.
       - name: Run Trivy on API image (CRITICAL - gating)
