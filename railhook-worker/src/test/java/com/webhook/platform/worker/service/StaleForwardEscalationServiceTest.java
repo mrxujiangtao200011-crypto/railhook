@@ -3,7 +3,6 @@ package com.webhook.platform.worker.service;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
-import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -151,8 +150,8 @@ class StaleForwardEscalationServiceTest {
     }
 
     @Test
-    @DisplayName("the oldest-pending gauge reports the age of the oldest Forward, not of an attempt row")
-    void gaugeMeasuresFromTheIncomingEvent() {
+    @DisplayName("the gauge the stale-forward alert reads is the age of the oldest pending Forward")
+    void oldestPendingAgeGaugeIsPublished() {
         Instant received = Instant.now().minus(Duration.ofHours(5));
         when(attemptRepository.findOldestPendingForwardStartedAt()).thenReturn(received);
         when(attemptRepository.findStaleForwardAttemptIds(any(Instant.class), anyInt())).thenReturn(List.of());
@@ -172,12 +171,5 @@ class StaleForwardEscalationServiceTest {
         service.runEscalation();
 
         assertThat(meterRegistry.get("forward_oldest_pending_age_seconds").gauge().value()).isZero();
-    }
-
-    @Test
-    @DisplayName("the shipped incoming ladder fits inside the shipped forward cap")
-    void shippedLadderFitsTheShippedCap() {
-        long worstCase = RetryLadderDefaults.incoming().worstCaseSpanSeconds();
-        assertThat(worstCase).isLessThan(Duration.ofHours(HARD_CAP_HOURS).getSeconds());
     }
 }

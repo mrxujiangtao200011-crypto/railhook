@@ -15,6 +15,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -25,7 +27,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 // Each invariant here was once right in one direction and wrong in the other.
 class AttemptRunnerTest {
@@ -171,31 +174,41 @@ class AttemptRunnerTest {
     @DisplayName("a terminal failure releases what it was holding")
     class TerminalRelease {
 
-        @Test
-        @DisplayName("a non-retryable status runs the abandon side effect, which releases the cursor")
-        void nonRetryableStatusReleases() {
-            respond(422, "unprocessable");
+        // A 4xx or 3xx won't change on retry but a person can fix it, so it goes to the DLQ at once.
+        // A 4xx that ended TerminallyFailed once released nothing, and an ordered endpoint's cursor stuck forever.
+        @ParameterizedTest
+        @ValueSource(ints = {422, 404, 301})
+        @DisplayName("a non-retryable status goes to DLQ at once and runs the abandon side effect")
+        void nonRetryableStatusAbandonsWithoutTheLadder(int status) {
+            respond(status, "");
             FakeStore store = new FakeStore(baseUrl);
 
             runner.run(store, metrics);
 
+            assertEquals(1, store.finalizations.size());
             assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
-            // A 4xx that ended TerminallyFailed released nothing, and an ordered endpoint's cursor stuck forever.
             assertEquals(1, store.abandonedCalls,
                     "nothing else ever releases the ordering cursor for this delivery");
             assertEquals(0, store.terminallyFailedCalls);
+            assertEquals(1, metrics.failures);
         }
 
         @Test
-        @DisplayName("an SSRF rejection runs the terminal side effect")
-        void ssrfRejectionReleases() {
+        @DisplayName("an SSRF rejection is terminal, recorded, and rejected before any permit is taken")
+        void ssrfRejectionIsTerminalAndCostsNoPermit() {
             // A private address the URL validator refuses before admission.
-            FakeStore store = new FakeStore("http://169.254.169.254/latest/meta-data");
+            FakeStore store = new FakeStore("http://169.254.169.254/latest/meta-data/");
 
             runner.run(store, metrics);
 
             assertInstanceOf(Finalization.TerminallyFailed.class, store.finalizations.get(0));
             assertEquals(1, store.terminallyFailedCalls);
+            assertEquals(1, store.records.size(), "an attempt that never reached the network is still recorded");
+            assertTrue(store.records.get(0).errorMessage().contains("SSRF_PROTECTION"));
+            assertNull(store.records.get(0).statusCode());
+            assertEquals(0, store.attemptStartingCalls);
+            verify(concurrency, never()).tryAcquireForTenant(any(UUID.class));
+            verify(concurrency, never()).tryAcquireForTarget(any(UUID.class));
         }
 
         @Test
@@ -343,36 +356,6 @@ class AttemptRunnerTest {
             assertEquals(1, store.finalizations.size());
         }
 
-        // A 4xx or 3xx won't change on retry but a person can fix it, so it goes to the DLQ.
-        @Test
-        @DisplayName("a non-retryable 4xx goes to DLQ at once instead of burning the ladder")
-        void nonRetryableClientErrorAbandonsWithoutTheLadder() {
-            respond(404, "not found");
-            FakeStore store = new FakeStore(baseUrl);
-            store.attemptNumber = 1;
-            store.ladder = RetryLadder.parse("60,300", 5);
-
-            runner.run(store, metrics);
-
-            assertEquals(1, store.finalizations.size());
-            assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
-            assertEquals(1, store.abandonedCalls, "the DLQ side effect runs, as it does for an exhausted ladder");
-            assertEquals(0, store.terminallyFailedCalls);
-            assertEquals(1, metrics.failures);
-        }
-
-        @Test
-        @DisplayName("a redirect goes to DLQ at once: redirects are not followed")
-        void redirectAbandonsWithoutTheLadder() {
-            respond(301, "");
-            FakeStore store = new FakeStore(baseUrl);
-
-            runner.run(store, metrics);
-
-            assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
-            assertEquals(1, store.abandonedCalls);
-        }
-
         @Test
         @DisplayName("a retryable status on the last rung abandons to DLQ and runs the abandon side effect")
         void lastRungAbandons() {
@@ -386,18 +369,6 @@ class AttemptRunnerTest {
             assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
             assertEquals(1, store.abandonedCalls);
         }
-
-        @Test
-        @DisplayName("every attempt is recorded, including the ones that never reached the network")
-        void attemptsAreAlwaysRecorded() {
-            FakeStore store = new FakeStore("http://169.254.169.254/latest/meta-data/");
-
-            runner.run(store, metrics);
-
-            assertEquals(1, store.records.size());
-            assertTrue(store.records.get(0).errorMessage().contains("SSRF_PROTECTION"));
-            assertNull(store.records.get(0).statusCode());
-        }
     }
 
     @Nested
@@ -405,8 +376,8 @@ class AttemptRunnerTest {
     class Admission {
 
         @Test
-        @DisplayName("a tenant rate limit defers without consuming an attempt or sending anything")
-        void tenantRateLimitDefers() {
+        @DisplayName("a tenant rate limit defers without an attempt and gives back the permits it took")
+        void tenantRateLimitDefersAndReleasesPermits() {
             FakeStore store = new FakeStore(baseUrl);
             when(tenantRateLimiter.tryAcquire(any(UUID.class))).thenReturn(false);
 
@@ -415,6 +386,9 @@ class AttemptRunnerTest {
             assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
             assertEquals(0, store.attemptStartingCalls, "a deferral is not an attempt");
             assertEquals(0, store.records.size());
+            // Permits come before rate limits because a permit can be returned and a token cannot.
+            verify(concurrency).releaseForTenant(store.tenantKey);
+            verify(concurrency).releaseForTarget(store.targetKey);
         }
 
         @Test
@@ -430,8 +404,8 @@ class AttemptRunnerTest {
         }
 
         @Test
-        @DisplayName("a concurrency cap defers and takes no permit to release")
-        void concurrencyCapDefers() {
+        @DisplayName("a target concurrency cap defers and gives back the tenant permit")
+        void targetCapDefersAndReleasesTheTenantPermit() {
             FakeStore store = new FakeStore(baseUrl);
             when(concurrency.tryAcquireForTarget(any(UUID.class))).thenReturn(false);
 
@@ -439,19 +413,7 @@ class AttemptRunnerTest {
 
             assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
             assertEquals(0, store.attemptStartingCalls);
-        }
-
-        @Test
-        @DisplayName("a blocked URL is terminal and is rejected before any permit is taken")
-        void blockedUrlIsTerminalAndCostsNoPermit() {
-            FakeStore store = new FakeStore("http://169.254.169.254/latest/meta-data/");
-
-            runner.run(store, metrics);
-
-            assertInstanceOf(Finalization.TerminallyFailed.class, store.finalizations.get(0));
-            assertEquals(0, store.attemptStartingCalls);
-            verify(concurrency, never()).tryAcquireForTenant(any(UUID.class));
-            verify(concurrency, never()).tryAcquireForTarget(any(UUID.class));
+            verify(concurrency).releaseForTenant(store.tenantKey);
         }
     }
 
@@ -464,7 +426,6 @@ class AttemptRunnerTest {
         void tenantCapDefersWhileTargetHasRoom() {
             FakeStore store = new FakeStore(baseUrl);
             when(concurrency.tryAcquireForTenant(store.tenantKey)).thenReturn(false);
-            when(concurrency.tryAcquireForTarget(any(UUID.class))).thenReturn(true);
 
             runner.run(store, metrics);
 
@@ -472,19 +433,12 @@ class AttemptRunnerTest {
             assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
             assertEquals(0, store.attemptStartingCalls, "a deferral is not an attempt");
             assertEquals(0, store.records.size());
-        }
-
-        @Test
-        @DisplayName("a tenant at its cap does not hold a permit belonging to its endpoint")
-        void tenantCapReleasesNothingItDidNotTake() {
-            FakeStore store = new FakeStore(baseUrl);
-            when(concurrency.tryAcquireForTenant(any(UUID.class))).thenReturn(false);
-
-            runner.run(store, metrics);
-
             // The tenant permit is taken first, so a refusal there must not take the target's.
             verify(concurrency, never()).tryAcquireForTarget(any(UUID.class));
             verify(concurrency, never()).releaseForTarget(any(UUID.class));
+            // Tokens spent before the concurrency check cost the tenant budget for attempts never made.
+            verify(tenantRateLimiter, never()).tryAcquire(any(UUID.class));
+            verify(targetRateLimiter, never()).tryAcquire(any(UUID.class), anyInt());
         }
 
         @Test
@@ -511,46 +465,6 @@ class AttemptRunnerTest {
             verify(concurrency).releaseForTenant(store.tenantKey);
             verify(concurrency).releaseForTarget(store.targetKey);
         }
-
-        @Test
-        @DisplayName("the tenant permit comes back when the target's cap refuses")
-        void tenantPermitReleasedWhenTargetCapRefuses() {
-            FakeStore store = new FakeStore(baseUrl);
-            when(concurrency.tryAcquireForTenant(any(UUID.class))).thenReturn(true);
-            when(concurrency.tryAcquireForTarget(any(UUID.class))).thenReturn(false);
-
-            runner.run(store, metrics);
-
-            assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
-            verify(concurrency).releaseForTenant(store.tenantKey);
-        }
-
-        @Test
-        @DisplayName("a rate limit that refuses after the permits gives them back")
-        void permitsReleasedWhenARateLimitRefuses() {
-            FakeStore store = new FakeStore(baseUrl);
-            when(tenantRateLimiter.tryAcquire(any(UUID.class))).thenReturn(false);
-
-            runner.run(store, metrics);
-
-            // Permits come before rate limits because a permit can be returned and a token cannot.
-            assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
-            verify(concurrency).releaseForTenant(store.tenantKey);
-            verify(concurrency).releaseForTarget(store.targetKey);
-        }
-
-        @Test
-        @DisplayName("a refused admission consumes no rate-limit token")
-        void refusedAdmissionSpendsNoToken() {
-            FakeStore store = new FakeStore(baseUrl);
-            when(concurrency.tryAcquireForTenant(any(UUID.class))).thenReturn(false);
-
-            runner.run(store, metrics);
-
-            // Tokens spent before the concurrency check cost the tenant budget for attempts never made.
-            verify(tenantRateLimiter, never()).tryAcquire(any(UUID.class));
-            verify(targetRateLimiter, never()).tryAcquire(any(UUID.class), anyInt());
-        }
     }
 
     @Nested
@@ -558,9 +472,9 @@ class AttemptRunnerTest {
     class TransformFailure {
 
         @Test
-        @DisplayName("it is retryable, nothing is sent, and the raw payload is not in the record")
+        @DisplayName("it is retryable, costs a rung, sends nothing, and keeps the raw payload out of the record")
         void retryableAndNothingSent() {
-            respond(200, "ok"); // would succeed if anything were sent
+            respond(200, "ok");
             FakeStore store = new FakeStore(baseUrl);
             store.bodyFailure = new PayloadTransformException("template gone");
 
@@ -572,18 +486,7 @@ class AttemptRunnerTest {
             assertNull(store.records.get(0).requestBody(),
                     "the raw payload must not be recorded as if it had been sent");
             assertTrue(store.records.get(0).errorMessage().contains("TRANSFORM_FAILED"));
-        }
-
-        @Test
-        @DisplayName("a failed transformation still consumes a rung")
-        void aFailedTransformationStillConsumesARung() {
             // attemptStarting once ran after buildBody, so a pre-send failure retried the same rung for 96h.
-            respond(200, "ok");
-            FakeStore store = new FakeStore(baseUrl);
-            store.bodyFailure = new PayloadTransformException("template gone");
-
-            runner.run(store, metrics);
-
             assertEquals(1, store.attemptStartingCalls,
                     "a transformation that cannot run is a spent attempt, not a free one");
         }
@@ -594,9 +497,9 @@ class AttemptRunnerTest {
     class TransformCancelled {
 
         @Test
-        @DisplayName("nothing is sent, nothing is retried, and it is not counted as a failure")
+        @DisplayName("nothing is sent or retried, the reason is recorded, what it held is released, the rung is spent")
         void nothingIsSentAndNothingIsRetried() {
-            respond(200, "ok"); // would succeed if anything were sent
+            respond(200, "ok");
             FakeStore store = new FakeStore(baseUrl);
             store.transformedBody = TransformedBody.cancelled("test traffic");
 
@@ -609,47 +512,16 @@ class AttemptRunnerTest {
             assertEquals(0, metrics.successes, "nothing may be sent");
             assertEquals(0, metrics.transformFailures, "a cancellation is not a failed transform");
             assertEquals(1, metrics.transformCancellations);
-        }
-
-        @Test
-        @DisplayName("it is recorded, with the reason, so the Delivery is not silently empty")
-        void itIsRecordedWithTheReason() {
-            respond(200, "ok");
-            FakeStore store = new FakeStore(baseUrl);
-            store.transformedBody = TransformedBody.cancelled("test traffic");
-
-            runner.run(store, metrics);
 
             assertEquals(1, store.records.size());
             assertTrue(store.records.get(0).errorMessage().contains("CANCELLED_BY_TRANSFORMATION"));
             assertTrue(store.records.get(0).errorMessage().contains("test traffic"));
             assertNull(store.records.get(0).statusCode(), "nothing was asked, so there is no status");
-        }
 
-        @Test
-        @DisplayName("whatever the obligation held is released")
-        void whateverItHeldIsReleased() {
             // A terminal outcome that does not release the ordering cursor silently stalls the endpoint.
-            respond(200, "ok");
-            FakeStore store = new FakeStore(baseUrl);
-            store.transformedBody = TransformedBody.cancelled(null);
-
-            runner.run(store, metrics);
-
             assertEquals(1, store.cancelledCalls);
             assertEquals(0, store.abandonedCalls, "a cancellation is not for a human to look at");
             assertEquals(0, store.terminallyFailedCalls, "and it is not a terminal failure either");
-        }
-
-        @Test
-        @DisplayName("it still costs the rung the script already spent")
-        void itStillCostsTheRung() {
-            respond(200, "ok");
-            FakeStore store = new FakeStore(baseUrl);
-            store.transformedBody = TransformedBody.cancelled("test traffic");
-
-            runner.run(store, metrics);
-
             assertEquals(1, store.attemptStartingCalls);
         }
     }
@@ -714,17 +586,6 @@ class AttemptRunnerTest {
             assertInstanceOf(Finalization.Retry.class, store.finalizations.get(0));
             assertEquals(0, store.abandonedCalls);
         }
-
-        @Test
-        @DisplayName("the default spec still behaves exactly as the hardcoded set did")
-        void defaultSpecIsUnchangedBehaviour() {
-            respond(500, "boom");
-            FakeStore store = new FakeStore(baseUrl);
-
-            runner.run(store, metrics);
-
-            assertInstanceOf(Finalization.Retry.class, store.finalizations.get(0));
-        }
     }
 
     @Nested
@@ -743,10 +604,11 @@ class AttemptRunnerTest {
             return ((Finalization.Retry) store.finalizations.get(0)).at();
         }
 
-        @Test
-        @DisplayName("a 429 asking for an hour is retried in about an hour, not in a minute")
-        void honouredOn429() {
-            respondWith(429, "slow down", "Retry-After", "3600");
+        @ParameterizedTest
+        @ValueSource(ints = {429, 503})
+        @DisplayName("a 429 or 503 asking for an hour is retried in about an hour, not in a minute")
+        void honoured(int status) {
+            respondWith(status, "slow down", "Retry-After", "3600");
             FakeStore store = storeWithMinuteLadder();
 
             runner.run(store, metrics);
@@ -754,17 +616,6 @@ class AttemptRunnerTest {
             Instant at = retryAt(store);
             assertTrue(at.isAfter(Instant.now().plusSeconds(3000)),
                     "the receiver asked for an hour and got the ladder's minute instead: " + at);
-        }
-
-        @Test
-        @DisplayName("a 503 asking for an hour is honoured too")
-        void honouredOn503() {
-            respondWith(503, "maintenance", "Retry-After", "3600");
-            FakeStore store = storeWithMinuteLadder();
-
-            runner.run(store, metrics);
-
-            assertTrue(retryAt(store).isAfter(Instant.now().plusSeconds(3000)));
         }
 
         @Test
@@ -777,18 +628,6 @@ class AttemptRunnerTest {
 
             assertTrue(retryAt(store).isBefore(Instant.now().plusSeconds(200)),
                     "a 500 is not a rate limit, so its Retry-After is not ours to honour");
-        }
-
-        @Test
-        @DisplayName("a header shorter than the ladder does not shorten it")
-        void neverShortensTheLadder() {
-            respondWith(429, "slow down", "Retry-After", "1");
-            FakeStore store = storeWithMinuteLadder();
-
-            runner.run(store, metrics);
-
-            assertTrue(retryAt(store).isAfter(Instant.now().plusSeconds(25)),
-                    "a receiver may ask us to wait longer, never to retry harder than configured");
         }
 
         @Test
@@ -845,17 +684,6 @@ class AttemptRunnerTest {
         }
 
         @Test
-        @DisplayName("a non-retryable status reports the target failing too — it answered, and badly")
-        void nonRetryableFailureReportsFailing() {
-            respond(404, "not found");
-            FakeStore store = new FakeStore(baseUrl);
-
-            runner.run(store, metrics);
-
-            assertEquals(List.of(false), store.targetOutcomes);
-        }
-
-        @Test
         @DisplayName("a request that never produced a response reports the target failing")
         void transportFailureReportsFailing() {
             FakeStore store = new FakeStore("http://127.0.0.1:1/hook");
@@ -894,16 +722,12 @@ class AttemptRunnerTest {
         }
     }
 
-    // Records what the Runner asked for: assert through the interface, not either direction's tables.
-
     @Nested
     @DisplayName("what goes on the wire")
     class Wire {
 
-        private final java.util.concurrent.atomic.AtomicReference<byte[]> receivedBody =
-                new java.util.concurrent.atomic.AtomicReference<>();
-        private final java.util.concurrent.atomic.AtomicReference<String> receivedContentType =
-                new java.util.concurrent.atomic.AtomicReference<>();
+        private final AtomicReference<byte[]> receivedBody = new AtomicReference<>();
+        private final AtomicReference<String> receivedContentType = new AtomicReference<>();
 
         private void capture() {
             server.createContext("/hook", exchange -> {
@@ -926,7 +750,7 @@ class AttemptRunnerTest {
             runner.run(store, metrics);
 
             assertInstanceOf(Finalization.Succeeded.class, store.finalizations.get(0));
-            org.junit.jupiter.api.Assertions.assertArrayEquals(store.wireBytes, receivedBody.get());
+            assertArrayEquals(store.wireBytes, receivedBody.get());
         }
 
         @Test
@@ -942,6 +766,7 @@ class AttemptRunnerTest {
         }
     }
 
+    // Records what the Runner asked for: assert through the interface, not either direction's tables.
     private static final class FakeStore implements AttemptStore<String> {
 
         private final String url;

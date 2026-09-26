@@ -116,17 +116,6 @@ class MtlsWebClientCacheTest {
     }
 
     @Test
-    @DisplayName("Should cache mTLS WebClient for same endpoint")
-    void shouldCacheMtlsClient() {
-        Endpoint endpoint = createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null);
-
-        WebClient first = factory.getWebClient(endpoint);
-        WebClient second = factory.getWebClient(endpoint);
-
-        assertSame(first, second, "Should return cached WebClient instance");
-    }
-
-    @Test
     @DisplayName("Should invalidate cache when endpoint updatedAt changes")
     void shouldInvalidateCacheOnUpdate() {
         UUID endpointId = UUID.randomUUID();

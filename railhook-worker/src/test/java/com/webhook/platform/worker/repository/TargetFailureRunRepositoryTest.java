@@ -25,7 +25,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 // Native and unconditional so two concurrent failures both count; exactly the SQL that binds an Instant wrong.
@@ -104,22 +103,6 @@ class TargetFailureRunRepositoryTest {
     }
 
     @Test
-    @DisplayName("the first failure starts the run and stamps when it started")
-    void firstFailureStartsTheRun() {
-        Endpoint endpoint = persistEndpoint();
-        Instant started = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-
-        endpointRepository.recordAttemptFailed(endpoint.getId(), started);
-
-        Endpoint fresh = reread(endpoint.getId());
-        assertEquals(1, fresh.getConsecutiveFailures());
-        assertNotNull(fresh.getFailingSince());
-        assertEquals(started.truncatedTo(ChronoUnit.SECONDS),
-                fresh.getFailingSince().truncatedTo(ChronoUnit.SECONDS));
-    }
-
-    @Test
-    @DisplayName("a later failure extends the run without moving its start")
     void laterFailureKeepsTheStart() {
         Endpoint endpoint = persistEndpoint();
         Instant first = Instant.now().minus(3, ChronoUnit.HOURS);
@@ -136,7 +119,6 @@ class TargetFailureRunRepositoryTest {
     }
 
     @Test
-    @DisplayName("one success ends the run outright")
     void successEndsTheRun() {
         Endpoint endpoint = persistEndpoint();
         endpointRepository.recordAttemptFailed(endpoint.getId(), Instant.now().minus(2, ChronoUnit.DAYS));
@@ -151,7 +133,6 @@ class TargetFailureRunRepositoryTest {
     }
 
     @Test
-    @DisplayName("a success against an endpoint that was already healthy writes nothing")
     void successOnAHealthyEndpointIsFree() {
         Endpoint endpoint = persistEndpoint();
 

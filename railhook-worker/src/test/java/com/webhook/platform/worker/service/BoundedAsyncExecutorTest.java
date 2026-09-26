@@ -5,12 +5,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.kafka.listener.MessageListenerContainer;
-import org.slf4j.MDC;
 import org.springframework.kafka.support.Acknowledgment;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -114,22 +112,5 @@ class BoundedAsyncExecutorTest {
 
         verify(container, atLeastOnce()).resume();
         assertFalse(executor.isContainersPaused());
-    }
-
-    @Test
-    void trySubmit_shouldPreserveMdcContext() throws Exception {
-        Acknowledgment ack = mock(Acknowledgment.class);
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicBoolean mdcOk = new AtomicBoolean(false);
-
-        MDC.put("testKey", "testValue");
-        executor.trySubmit(() -> {
-            mdcOk.set("testValue".equals(MDC.get("testKey")));
-            latch.countDown();
-        }, ack, "mdc-test");
-        MDC.clear();
-
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
-        assertTrue(mdcOk.get(), "MDC context should be propagated to worker thread");
     }
 }

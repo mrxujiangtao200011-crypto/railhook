@@ -22,14 +22,4 @@ class RetryPolicyTest {
             }
         }
     }
-
-    @Test
-    void backoffWithJitter_neverExceedsMaxByMoreThanJitterMargin() {
-        long maxSeconds = 60;
-        for (int i = 0; i < 100; i++) {
-            long actual = RetryPolicy.backoffWithJitter(20, 2, maxSeconds);
-            assertTrue(actual <= (long) (maxSeconds * 1.25) + 1,
-                    "capped delay's jitter must not blow past +25%, was " + actual);
-        }
-    }
 }

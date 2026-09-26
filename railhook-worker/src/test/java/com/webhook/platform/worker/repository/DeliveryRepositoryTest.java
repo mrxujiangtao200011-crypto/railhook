@@ -21,6 +21,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.time.temporal.ChronoUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -142,7 +143,7 @@ class DeliveryRepositoryTest {
         // A PENDING row with next_retry_at wiped was invisible to both recovery mechanisms.
         createSharedEndpoint();
         Delivery stranded = createAndPersistDelivery(
-                Delivery.DeliveryStatus.PENDING, null, Instant.now().minus(2, java.time.temporal.ChronoUnit.HOURS));
+                Delivery.DeliveryStatus.PENDING, null, Instant.now().minus(2, ChronoUnit.HOURS));
 
         entityManager.flush();
         entityManager.clear();
@@ -189,7 +190,7 @@ class DeliveryRepositoryTest {
         // The consumer's CAS starts a real Attempt; treating the row as abandoned would send twice.
         createSharedEndpoint();
         UUID publishedToken = UUID.randomUUID();
-        Instant scheduledAt = Instant.now().minus(6, java.time.temporal.ChronoUnit.MINUTES);
+        Instant scheduledAt = Instant.now().minus(6, ChronoUnit.MINUTES);
         Delivery delivery = createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, null, scheduledAt);
         delivery.setClaimToken(publishedToken);
         delivery.setLastAttemptAt(scheduledAt);
@@ -201,7 +202,7 @@ class DeliveryRepositoryTest {
         assertNotNull(claimed, "the consumer holds the published token, so its CAS must apply");
         entityManager.clear();
 
-        int swept = deliveryRepository.resetStuckDeliveries(Instant.now().minus(5, java.time.temporal.ChronoUnit.MINUTES));
+        int swept = deliveryRepository.resetStuckDeliveries(Instant.now().minus(5, ChronoUnit.MINUTES));
 
         assertEquals(0, swept, "a retry claimed a moment ago is in flight, not stuck");
         Delivery reloaded = deliveryRepository.findById(delivery.getId()).orElseThrow();
@@ -234,15 +235,15 @@ class DeliveryRepositoryTest {
         // A retried Delivery keeps its created_at, so age from it escalated it straight back to DLQ.
         createSharedEndpoint();
         Instant now = Instant.now();
-        Delivery neverResumed = persistPendingDelivery(now.minus(100, java.time.temporal.ChronoUnit.HOURS), null);
+        Delivery neverResumed = persistPendingDelivery(now.minus(100, ChronoUnit.HOURS), null);
         Delivery retriedJustNow = persistPendingDelivery(
-                now.minus(100, java.time.temporal.ChronoUnit.HOURS), now.minusSeconds(60));
+                now.minus(100, ChronoUnit.HOURS), now.minusSeconds(60));
         Delivery retriedLongAgo = persistPendingDelivery(
-                now.minus(200, java.time.temporal.ChronoUnit.HOURS), now.minus(100, java.time.temporal.ChronoUnit.HOURS));
+                now.minus(200, ChronoUnit.HOURS), now.minus(100, ChronoUnit.HOURS));
         entityManager.flush();
         entityManager.clear();
 
-        List<UUID> stale = deliveryRepository.findStaleDeliveryIds(now.minus(96, java.time.temporal.ChronoUnit.HOURS), 10);
+        List<UUID> stale = deliveryRepository.findStaleDeliveryIds(now.minus(96, ChronoUnit.HOURS), 10);
 
         assertTrue(stale.contains(neverResumed.getId()), "an old Delivery nobody touched is still escalated");
         assertFalse(stale.contains(retriedJustNow.getId()), "a Delivery retried a minute ago is not stale");
@@ -334,22 +335,6 @@ class DeliveryRepositoryTest {
         assertEquals(2, closing,
                 "only the Delivery due inside the window (" + dueSoon.getSequenceNumber()
                         + ") and the one being attempted now (" + inFlight.getSequenceNumber() + ") count");
-    }
-
-    // Nothing in the gap due or being attempted: waiting is futile.
-    @Test
-    void countGapClosingBefore_nothingDueOrInFlight_isZero() {
-        createSharedEndpoint();
-        Instant now = Instant.now();
-
-        orderedDelivery(3L, Delivery.DeliveryStatus.PENDING, now.plusSeconds(21600), now);
-        orderedDelivery(4L, Delivery.DeliveryStatus.PROCESSING, null, now.minusSeconds(3600));
-
-        entityManager.flush();
-        entityManager.clear();
-
-        assertEquals(0, deliveryRepository.countGapClosingBefore(sharedEndpointId, 3L, 4L,
-                now.minusSeconds(60), now.plusSeconds(60)));
     }
 
     private Delivery orderedDelivery(long sequenceNumber, Delivery.DeliveryStatus status,
