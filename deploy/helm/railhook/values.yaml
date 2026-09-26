@@ -143,7 +143,7 @@ worker:
 ui:
   terminationGracePeriodSeconds: 30
   replicaCount: 2
-  # Domain for the sales@ / support@ addresses on /contact, e.g. example.com. Empty shows none.
+  # Domain for the sales@ / support@ addresses in the contact form and footer, e.g. example.com. Empty shows none.
   contactDomain: ""
   # Registration CAPTCHA public key; set together with the API's CAPTCHA_SECRET_KEY.
   # Empty scriptUrl means Cloudflare Turnstile.

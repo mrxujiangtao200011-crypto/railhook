@@ -27,7 +27,7 @@ Most defaults are fine. These are development defaults that become wrong once th
 | `WEBHOOK_ALLOW_PRIVATE_IPS`, `WEBHOOK_ALLOWED_HOSTS` | Keep private addresses blocked. List a named internal host to allow just that one |
 | `DB_HOST` and `COMPOSE_PROFILES` | To use a managed PostgreSQL, set the `DB_*` variables and leave `embedded-db` out of the profiles |
 | `PLATFORM_ADMIN_TOKEN` | Unlocks the operator endpoints. Empty keeps them unreachable |
-| `API_REPLICAS` | `2` makes upgrades seamless, at the cost of roughly another 600 MB |
+| `API_REPLICAS` | `2` keeps the API answering while `./railhook upgrade` restarts it, at the cost of roughly another 600 MB. With `1`, expect about 30 s of 502 per upgrade |
 
 <Aside type="caution">
 Variables that start with `VITE_` are baked into the dashboard when its image is built. On the published images they cannot be changed. To change one, you have to build your own `ui` image.
