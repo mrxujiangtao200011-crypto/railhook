@@ -73,10 +73,3 @@ jobs:
           name: dependency-check-report
           path: target/dependency-check-report.html
           retention-days: 14
-
-      - name: SCA Summary
-        if: always()
-        run: |
-          echo "### SCA (OWASP Dependency-Check) Results" >> $GITHUB_STEP_SUMMARY
-          echo "Dependency vulnerability scan completed. Report uploaded as artifact." >> $GITHUB_STEP_SUMMARY
-          echo "Gates on CVSS >= 9 (see the comment above the scan step for the staged rollout plan)." >> $GITHUB_STEP_SUMMARY
