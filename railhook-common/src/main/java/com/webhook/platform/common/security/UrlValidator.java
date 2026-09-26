@@ -103,7 +103,6 @@ public class UrlValidator {
         return isPrivateOrLocalAddress(address);
     }
 
-    // A customer URL can carry a credential in its path or query (a Slack webhook is one), so logs get the host.
     public static String hostOf(String url) {
         if (url == null) {
             return "(no host)";

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Logs no longer carry full email addresses or customer and alert URLs (masked, host only). Per-event, per-delivery and configuration-change lines moved from INFO to DEBUG; the audit log still records every configuration change.
+
 ## [2.31.1] - 2026-09-25
 
 ### Changed
