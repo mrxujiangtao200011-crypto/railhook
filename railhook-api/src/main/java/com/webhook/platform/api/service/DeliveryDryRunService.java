@@ -12,7 +12,7 @@ import com.webhook.platform.api.dto.TransformPreviewResponse;
 import com.webhook.platform.api.service.transform.TransformationRunner;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.transform.ScriptConsoleLine;
-import com.webhook.platform.common.transform.ScriptTransformException;
+import com.webhook.platform.common.exception.ScriptTransformException;
 import com.webhook.platform.common.transform.TransformRequest;
 import com.webhook.platform.common.transform.TransformationKind;
 import com.webhook.platform.common.util.WebhookSignatureUtils;

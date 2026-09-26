@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.worker.service.CircuitBreakerService;
-import com.webhook.platform.worker.service.PayloadTransformException;
+import com.webhook.platform.worker.exception.PayloadTransformException;
 import com.webhook.platform.worker.service.ProjectRateLimiterService;
 import com.webhook.platform.worker.service.RedisConcurrencyControlService;
 import com.webhook.platform.worker.service.RedisRateLimiterService;

@@ -9,6 +9,7 @@ import com.webhook.platform.cli.config.CliConfig;
 import com.webhook.platform.cli.config.CliConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.webhook.platform.cli.exception.ApiException;
 
 import java.io.IOException;
 import java.net.URI;
@@ -173,16 +174,5 @@ public class HttpApiClient {
             }
             throw new ApiException(response.statusCode(), message);
         }
-    }
-
-    public static class ApiException extends IOException {
-        private final int statusCode;
-
-        public ApiException(int statusCode, String message) {
-            super("HTTP " + statusCode + ": " + message);
-            this.statusCode = statusCode;
-        }
-
-        public int getStatusCode() { return statusCode; }
     }
 }

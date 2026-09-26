@@ -6,6 +6,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.LocatorAdapter;
+import com.webhook.platform.api.exception.SignInRejectedException;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;

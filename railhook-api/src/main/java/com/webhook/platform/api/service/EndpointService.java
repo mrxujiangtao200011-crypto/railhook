@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.http.SsrfProtectionCustomizer;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
@@ -28,6 +29,7 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import reactor.netty.http.client.HttpClient;
 
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.dto.MtlsConfigRequest;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -35,7 +37,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import com.webhook.platform.api.dto.MtlsConfigRequest;
 import com.webhook.platform.api.dto.TestResult;
 
 @Slf4j
@@ -315,7 +316,7 @@ public class EndpointService {
         
         try {
             UrlValidator.validateWebhookUrl(endpoint.getUrl(), allowPrivateIps, allowedHosts);
-        } catch (UrlValidator.InvalidUrlException e) {
+        } catch (InvalidUrlException e) {
             return EndpointTestResponse.builder()
                     .success(false)
                     .errorMessage("SSRF protection: " + e.getMessage())

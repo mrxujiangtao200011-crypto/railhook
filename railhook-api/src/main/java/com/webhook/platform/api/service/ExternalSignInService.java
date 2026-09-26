@@ -12,7 +12,7 @@ import com.webhook.platform.api.domain.repository.UserIdentityRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.service.signin.SignInFailure;
-import com.webhook.platform.api.service.signin.SignInRejectedException;
+import com.webhook.platform.api.exception.SignInRejectedException;
 import com.webhook.platform.api.service.signin.VerifiedIdentity;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.common.util.CryptoUtils;

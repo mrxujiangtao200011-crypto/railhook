@@ -1,5 +1,6 @@
 package com.webhook.platform.api.exception;
 
+import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.security.UrlValidator;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -9,9 +10,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -33,8 +34,8 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("a URL the validator rejected is a 400 that names the reason")
     void invalidUrlIsBadRequest() {
-        UrlValidator.InvalidUrlException ex =
-                new UrlValidator.InvalidUrlException("Cannot resolve host: api.acme.com: Name or service not known");
+        InvalidUrlException ex =
+                new InvalidUrlException("Cannot resolve host: api.acme.com: Name or service not known");
 
         ResponseEntity<ErrorResponse> response = handler.handleInvalidUrlException(ex, null);
 

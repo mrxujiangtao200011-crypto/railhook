@@ -12,6 +12,7 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.security.UrlValidator;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
@@ -212,7 +213,7 @@ class AlertServiceTest {
         @DisplayName("the cloud metadata endpoint is refused on create")
         void metadataEndpointRefusedOnCreate() {
             assertThatThrownBy(() -> service.createRule(projectId, request("http://169.254.169.254/latest/meta-data/")))
-                    .isInstanceOf(UrlValidator.InvalidUrlException.class);
+                    .isInstanceOf(InvalidUrlException.class);
 
             verify(ruleRepository, never()).save(any());
         }
@@ -221,7 +222,7 @@ class AlertServiceTest {
         @DisplayName("a private address is refused on update too — the hole is not only on create")
         void privateAddressRefusedOnUpdate() {
             assertThatThrownBy(() -> service.updateRule(projectId, ruleId, request("http://127.0.0.1:8080/admin")))
-                    .isInstanceOf(UrlValidator.InvalidUrlException.class);
+                    .isInstanceOf(InvalidUrlException.class);
 
             verify(ruleRepository, never()).save(any());
         }

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.exception.PublicBinLimitException;
 import com.webhook.platform.api.security.AllowedInDemo;
 import com.webhook.platform.api.dto.PublicBinCreateRequest;
 import com.webhook.platform.api.dto.PublicBinResponse;
@@ -59,7 +60,7 @@ public class PublicBinController {
         }
         try {
             return ResponseEntity.status(HttpStatus.CREATED).body(publicBinService.create(ip));
-        } catch (PublicBinService.LimitReached e) {
+        } catch (PublicBinLimitException e) {
             return e.isOverall()
                     ? error(HttpStatus.SERVICE_UNAVAILABLE, "tester_busy", e.getMessage())
                     : error(HttpStatus.TOO_MANY_REQUESTS, "too_many_active_urls", e.getMessage());

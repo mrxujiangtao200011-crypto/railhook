@@ -1,4 +1,4 @@
-package com.webhook.platform.api.service.ingress;
+package com.webhook.platform.api.exception;
 
 public class OrganizationSuspendedException extends RuntimeException {
     public OrganizationSuspendedException(String message) { super(message); }

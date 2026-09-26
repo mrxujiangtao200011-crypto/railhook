@@ -1,4 +1,4 @@
-package com.webhook.platform.api.service.ingress;
+package com.webhook.platform.api.exception;
 
 public class SignatureVerificationFailedException extends RuntimeException {
 

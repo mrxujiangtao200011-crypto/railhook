@@ -1,4 +1,4 @@
-package com.webhook.platform.api.mcp.oauth;
+package com.webhook.platform.api.exception;
 
 import org.springframework.http.HttpStatus;
 

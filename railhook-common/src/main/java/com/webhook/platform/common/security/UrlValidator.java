@@ -2,6 +2,7 @@ package com.webhook.platform.common.security;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.webhook.platform.common.exception.InvalidUrlException;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -11,6 +12,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import com.webhook.platform.common.exception.UnresolvableHostException;
 
 /**
  * SSRF guard for outbound URLs. A denylist of special-purpose ranges rather than an allowlist of
@@ -267,17 +269,5 @@ public class UrlValidator {
         InetAddress[] addresses = InetAddress.getAllByName(host);
         DNS_CACHE.put(host, addresses);
         return addresses;
-    }
-
-    public static class InvalidUrlException extends RuntimeException {
-        public InvalidUrlException(String message) {
-            super(message);
-        }
-    }
-
-    public static class UnresolvableHostException extends InvalidUrlException {
-        public UnresolvableHostException(String message) {
-            super(message);
-        }
     }
 }

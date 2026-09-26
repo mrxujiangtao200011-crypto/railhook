@@ -1,4 +1,4 @@
-package com.webhook.platform.worker.service;
+package com.webhook.platform.worker.exception;
 
 /**
  * A configured transformation could not be applied. Callers fail the attempt as retryable and

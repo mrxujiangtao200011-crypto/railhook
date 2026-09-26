@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.McpToolException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.exception.UnauthorizedException;
@@ -14,6 +15,7 @@ import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.security.UrlValidator;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -106,7 +108,7 @@ public class McpCaller {
             return CallToolResult.builder().addTextContent(json(result)).build();
         } catch (McpToolException | IllegalArgumentException | NotFoundException | ForbiddenException
                  | ConflictException | UnauthorizedException | QuotaExceededException
-                 | UrlValidator.InvalidUrlException e) {
+                 | InvalidUrlException e) {
             return error(e.getMessage());
         } catch (DataIntegrityViolationException e) {
             return error("The request conflicts with the current state of the resource.");
@@ -129,12 +131,5 @@ public class McpCaller {
 
     private static CallToolResult error(String message) {
         return CallToolResult.builder().isError(true).addTextContent(message).build();
-    }
-
-    /** Its message is shown to the model as-is. */
-    public static class McpToolException extends RuntimeException {
-        public McpToolException(String message) {
-            super(message);
-        }
     }
 }

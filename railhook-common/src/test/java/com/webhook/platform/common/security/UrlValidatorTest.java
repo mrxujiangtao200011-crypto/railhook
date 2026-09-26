@@ -4,11 +4,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import com.webhook.platform.common.exception.InvalidUrlException;
 
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.util.Collections;
 import java.util.List;
+import com.webhook.platform.common.exception.UnresolvableHostException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -58,7 +60,7 @@ class UrlValidatorTest {
             "http://[64:ff9b::a9fe:a9fe]/latest/meta-data",
     })
     void rejectsAMalformedNonHttpPrivateOrSpecialTarget(String url) {
-        assertThrows(UrlValidator.InvalidUrlException.class,
+        assertThrows(InvalidUrlException.class,
                 () -> UrlValidator.validateWebhookUrl(url, false, Collections.emptyList()));
     }
 
@@ -80,7 +82,7 @@ class UrlValidatorTest {
 
     @Test
     void shouldRejectAlibabaMetadataAddress_evenWhenAllowlisted() {
-        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+        assertThrows(InvalidUrlException.class, () ->
             UrlValidator.validateWebhookUrl("http://100.100.100.200", false, List.of("100.100.100.200"))
         );
     }
@@ -172,18 +174,18 @@ class UrlValidatorTest {
     // Failing to resolve says nothing about where a name points, so it must not read as a refusal.
     @Test
     void anUnresolvableHostIsReportedAsSuchAndNotAsABlockedTarget() {
-        UrlValidator.InvalidUrlException e = assertThrows(UrlValidator.InvalidUrlException.class, () ->
+        InvalidUrlException e = assertThrows(InvalidUrlException.class, () ->
             UrlValidator.validateWebhookUrl("https://no-such-host.invalid/hook", false, Collections.emptyList())
         );
-        assertInstanceOf(UrlValidator.UnresolvableHostException.class, e);
+        assertInstanceOf(UnresolvableHostException.class, e);
     }
 
     @Test
     void aRefusedAddressIsNotReportedAsUnresolvable() {
-        UrlValidator.InvalidUrlException e = assertThrows(UrlValidator.InvalidUrlException.class, () ->
+        InvalidUrlException e = assertThrows(InvalidUrlException.class, () ->
             UrlValidator.validateWebhookUrl("http://10.0.0.1/hook", false, Collections.emptyList())
         );
-        assertFalse(e instanceof UrlValidator.UnresolvableHostException);
+        assertFalse(e instanceof UnresolvableHostException);
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.webhook.platform.api.tenancy;
 
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.webhook.platform.api.exception.TenantNotResolvedException;
 
 import java.util.UUID;
 import java.util.concurrent.Callable;

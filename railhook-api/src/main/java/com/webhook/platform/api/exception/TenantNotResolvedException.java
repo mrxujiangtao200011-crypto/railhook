@@ -1,4 +1,4 @@
-package com.webhook.platform.api.tenancy;
+package com.webhook.platform.api.exception;
 
 /**
  * Not an IllegalStateException, which the exception handler maps to 422: a missing tenant scope

@@ -1,11 +1,13 @@
 package com.webhook.platform.worker.attempt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.common.exception.InvalidUrlException;
+import com.webhook.platform.common.exception.UnresolvableHostException;
 import com.webhook.platform.common.retry.RetryAfter;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.worker.service.CircuitBreakerService;
-import com.webhook.platform.worker.service.PayloadTransformException;
+import com.webhook.platform.worker.exception.PayloadTransformException;
 import com.webhook.platform.worker.service.ProjectRateLimiterService;
 import com.webhook.platform.worker.service.RedisConcurrencyControlService;
 import com.webhook.platform.worker.service.RedisRateLimiterService;
@@ -95,7 +97,7 @@ public class AttemptRunner {
 
         try {
             UrlValidator.validateWebhookUrl(ctx.url(), allowPrivateIps, allowedHosts);
-        } catch (UrlValidator.UnresolvableHostException e) {
+        } catch (UnresolvableHostException e) {
             // DNS failure is retryable, unlike a refused address. It used to fail the obligation
             // for good after one bad minute of DNS. It costs a rung (invariant 5) but no permit.
             String reason = "DNS_RESOLUTION_FAILED: " + e.getMessage();
@@ -108,7 +110,7 @@ public class AttemptRunner {
             }
             fail(store, metrics, claim, ctx, reason, null, null, elapsed(startedAt));
             return;
-        } catch (UrlValidator.InvalidUrlException e) {
+        } catch (InvalidUrlException e) {
             String reason = "SSRF_PROTECTION: " + e.getMessage();
             log.error("{}: {}", ctx.description(), reason);
             recordQuietly(store, claim, ctx, errorRecord(null, null, reason, elapsed(startedAt)));

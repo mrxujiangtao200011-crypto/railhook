@@ -1,5 +1,6 @@
 package com.webhook.platform.api.exception;
 
+import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.security.UrlValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -247,9 +248,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
-    @ExceptionHandler(UrlValidator.InvalidUrlException.class)
+    @ExceptionHandler(InvalidUrlException.class)
     public ResponseEntity<ErrorResponse> handleInvalidUrlException(
-            UrlValidator.InvalidUrlException ex, WebRequest request) {
+            InvalidUrlException ex, WebRequest request) {
         log.warn("Rejected webhook URL: {}", ex.getMessage());
         ErrorResponse error = new ErrorResponse(
                 "invalid_url",

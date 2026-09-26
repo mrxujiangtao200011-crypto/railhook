@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service.signin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.api.exception.SignInRejectedException;
 import com.webhook.platform.api.service.ExternalSignInService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

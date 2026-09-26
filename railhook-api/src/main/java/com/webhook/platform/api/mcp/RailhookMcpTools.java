@@ -8,7 +8,7 @@ import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.RateLimitResult;
 import com.webhook.platform.api.dto.SubscriptionRequest;
 import com.webhook.platform.api.dto.SubscriptionResponse;
-import com.webhook.platform.api.mcp.McpCaller.McpToolException;
+import com.webhook.platform.api.exception.McpToolException;
 import com.webhook.platform.api.service.DeliveryService;
 import com.webhook.platform.api.service.EndpointService;
 import com.webhook.platform.api.service.EventIngestService;

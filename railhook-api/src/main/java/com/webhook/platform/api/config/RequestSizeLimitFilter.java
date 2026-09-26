@@ -14,6 +14,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import com.webhook.platform.api.exception.RequestBodyTooLargeException;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -95,12 +96,6 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
             cause = cause.getCause();
         }
         return false;
-    }
-
-    public static class RequestBodyTooLargeException extends IOException {
-        public RequestBodyTooLargeException(long limit) {
-            super("Request body exceeds maximum allowed size of " + limit + " bytes");
-        }
     }
 
     private static class ContentLimitedRequestWrapper extends HttpServletRequestWrapper {
