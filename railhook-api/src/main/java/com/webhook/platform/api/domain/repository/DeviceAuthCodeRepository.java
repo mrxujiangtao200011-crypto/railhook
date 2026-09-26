@@ -17,8 +17,6 @@ public interface DeviceAuthCodeRepository extends JpaRepository<DeviceAuthCode, 
 
     Optional<DeviceAuthCode> findByDeviceCode(String deviceCode);
 
-    Optional<DeviceAuthCode> findByUserCode(String userCode);
-
     Optional<DeviceAuthCode> findByUserCodeAndStatus(String userCode, DeviceAuthStatus status);
 
     @Modifying

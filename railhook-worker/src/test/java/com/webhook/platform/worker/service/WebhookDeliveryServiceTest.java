@@ -580,7 +580,7 @@ class WebhookDeliveryServiceTest {
                 .build();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
         // Disabled or deleted after being configured.
-        when(transformationCacheService.findEnabledTemplate(transformationId)).thenReturn(null);
+        when(transformationCacheService.findEnabled(transformationId)).thenReturn(null);
 
         DeliveryMessage message = DeliveryMessage.builder()
                 .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();

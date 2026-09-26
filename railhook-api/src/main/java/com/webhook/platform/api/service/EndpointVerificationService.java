@@ -7,7 +7,6 @@ import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Endpoint.VerificationStatus;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.exception.NotFoundException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -68,14 +67,6 @@ public class EndpointVerificationService {
         byte[] bytes = new byte[32];
         new SecureRandom().nextBytes(bytes);
         return "whc_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    @Transactional
-    public Endpoint initializeVerification(Endpoint endpoint) {
-        String token = generateVerificationToken();
-        endpoint.setVerificationToken(token);
-        endpoint.setVerificationStatus(VerificationStatus.PENDING);
-        return endpointRepository.save(endpoint);
     }
 
     // Not @Transactional: a slow customer URL held a connection and row lock and drained the pool.

@@ -48,9 +48,6 @@ public interface IncomingEventRepository extends JpaRepository<IncomingEvent, UU
             "ORDER BY e.receivedAt DESC")
     Page<IncomingEvent> findByProjectId(@Param("projectId") UUID projectId, Pageable pageable);
 
-    @Query("SELECT e FROM IncomingEvent e WHERE e.incomingSourceId IN :sourceIds ORDER BY e.receivedAt DESC")
-    Page<IncomingEvent> findBySourceIds(@Param("sourceIds") List<UUID> sourceIds, Pageable pageable);
-
     @Query("SELECT e FROM IncomingEvent e WHERE e.incomingSourceId = :sourceId " +
             "AND (:from IS NULL OR e.receivedAt >= :from) " +
             "AND (:to IS NULL OR e.receivedAt < :to) " +

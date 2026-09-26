@@ -1,7 +1,6 @@
 package com.webhook.platform.api.domain.repository;
 
 import com.webhook.platform.api.domain.entity.EventSchemaVersion;
-import com.webhook.platform.api.domain.enums.SchemaStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,8 +17,6 @@ public interface EventSchemaVersionRepository extends JpaRepository<EventSchemaV
     List<EventSchemaVersion> findByEventTypeIdOrderByVersionDesc(UUID eventTypeId);
 
     Optional<EventSchemaVersion> findByEventTypeIdAndVersion(UUID eventTypeId, int version);
-
-    Optional<EventSchemaVersion> findByEventTypeIdAndStatus(UUID eventTypeId, SchemaStatus status);
 
     Optional<EventSchemaVersion> findByEventTypeIdAndFingerprint(UUID eventTypeId, String fingerprint);
 

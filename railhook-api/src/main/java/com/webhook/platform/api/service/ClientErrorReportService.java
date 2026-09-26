@@ -66,12 +66,6 @@ public class ClientErrorReportService {
                 suffix(" | component: ", clean(report.getComponentStack(), MAX_COMPONENT_STACK)));
     }
 
-    // For tests.
-    long trackedWindows() {
-        windows.cleanUp();
-        return windows.estimatedSize();
-    }
-
     private boolean admit(UUID userId) {
         if (userId == null) {
             return true;

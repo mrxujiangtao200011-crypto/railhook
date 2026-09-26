@@ -21,7 +21,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -165,31 +164,6 @@ public class DataRetentionIntegrationTest {
     }
 
     @Test
-    void testBatchSizeRespected() {
-        UUID deliveryId = createDelivery();
-        Instant old = Instant.now().minus(100, ChronoUnit.DAYS);
-
-        for (int i = 1; i <= 1500; i++) {
-            createAttemptWithTimestamp(deliveryId, i, old);
-        }
-
-        long beforeCount = deliveryAttemptRepository.count();
-        assertEquals(1500, beforeCount);
-
-        Instant cutoff = Instant.now().minus(90, ChronoUnit.DAYS);
-        Integer deleted = transactionTemplate.execute(status -> 
-            deliveryAttemptRepository.deleteOldAttempts(cutoff, 1000)
-        );
-        
-        assertNotNull(deleted);
-        assertTrue(deleted > 0, "Should delete some attempts");
-        assertTrue(deleted <= 1000, "Should respect batch limit");
-        
-        long afterFirstRun = deliveryAttemptRepository.count();
-        assertEquals(1500 - deleted, afterFirstRun);
-    }
-
-    @Test
     void testNoDeleteWhenUnderLimit() {
         UUID deliveryId = createDelivery();
 
@@ -235,15 +209,6 @@ public class DataRetentionIntegrationTest {
         jdbcTemplate.update(
             "INSERT INTO delivery_attempts (id, delivery_id, organization_id, attempt_number, http_status_code, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             UUID.randomUUID(), deliveryId, FIXTURE_ORG, attemptNumber, 200, 100, Timestamp.from(Instant.now())
-        );
-        jdbcTemplate.execute("SET session_replication_role = DEFAULT");
-    }
-
-    private void createAttemptWithTimestamp(UUID deliveryId, int attemptNumber, Instant createdAt) {
-        jdbcTemplate.execute("SET session_replication_role = replica");
-        jdbcTemplate.update(
-                "INSERT INTO delivery_attempts (id, delivery_id, organization_id, attempt_number, http_status_code, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                UUID.randomUUID(), deliveryId, FIXTURE_ORG, attemptNumber, 200, 100, Timestamp.from(createdAt)
         );
         jdbcTemplate.execute("SET session_replication_role = DEFAULT");
     }

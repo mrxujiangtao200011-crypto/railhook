@@ -41,8 +41,4 @@ public class BillingProviderRegistry {
     public Collection<BillingProvider> all() {
         return providers.values();
     }
-
-    public Set<String> providerCodes() {
-        return providers.keySet();
-    }
 }

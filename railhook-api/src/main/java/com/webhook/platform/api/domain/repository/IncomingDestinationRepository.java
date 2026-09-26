@@ -28,9 +28,6 @@ public interface IncomingDestinationRepository extends JpaRepository<IncomingDes
 
     Page<IncomingDestination> findByIncomingSourceId(UUID incomingSourceId, Pageable pageable);
 
-    @Query("SELECT COUNT(d) FROM IncomingDestination d JOIN IncomingSource s ON d.incomingSourceId = s.id WHERE s.projectId = :projectId")
-    long countByProjectId(@Param("projectId") UUID projectId);
-
     @Query("SELECT CASE WHEN COUNT(d) > 0 THEN true ELSE false END FROM IncomingDestination d JOIN IncomingSource s ON d.incomingSourceId = s.id WHERE s.projectId = :projectId")
     boolean existsByProjectId(@Param("projectId") UUID projectId);
 

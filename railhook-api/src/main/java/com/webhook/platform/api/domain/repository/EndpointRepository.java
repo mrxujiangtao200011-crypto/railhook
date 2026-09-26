@@ -38,10 +38,6 @@ public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
     List<Object[]> countLiveByConsumerIds(@Param("consumerIds") Collection<UUID> consumerIds);
     boolean existsByProjectIdAndDeletedAtIsNull(UUID projectId);
 
-    @Query("SELECT COUNT(e) FROM Endpoint e JOIN Project p ON e.projectId = p.id " +
-           "WHERE p.organizationId = :orgId AND e.deletedAt IS NULL AND p.deletedAt IS NULL")
-    long countActiveByOrganizationId(@Param("orgId") UUID organizationId);
-
     @Query(value = "SELECT COALESCE(MAX(cnt), 0) FROM (" +
            "SELECT COUNT(*) AS cnt FROM endpoints e JOIN projects p ON e.project_id = p.id " +
            "WHERE p.organization_id = :orgId AND e.deleted_at IS NULL AND p.deleted_at IS NULL " +

@@ -350,7 +350,7 @@ class IncomingForwardServiceTest {
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(dest));
         // Deleted or disabled after being configured.
-        when(transformationCacheService.findEnabledTemplate(transformationId)).thenReturn(null);
+        when(transformationCacheService.findEnabled(transformationId)).thenReturn(null);
 
         IncomingForwardAttempt existingAttempt = IncomingForwardAttempt.builder()
                 .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
@@ -401,7 +401,7 @@ class IncomingForwardServiceTest {
 
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(dest));
-        when(transformationCacheService.findEnabledTemplate(transformationId)).thenReturn(null);
+        when(transformationCacheService.findEnabled(transformationId)).thenReturn(null);
 
         IncomingForwardAttempt existingAttempt = IncomingForwardAttempt.builder()
                 .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)

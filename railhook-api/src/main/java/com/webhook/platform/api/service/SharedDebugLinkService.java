@@ -67,18 +67,6 @@ public class SharedDebugLinkService {
     }
 
     @Transactional(readOnly = true)
-    public List<SharedDebugLinkResponse> listLinks(UUID projectId) {
-        UUID organizationId = TenantContext.require();
-        projectRepository.findById(projectId)
-                .filter(p -> p.getOrganizationId().equals(organizationId))
-                .orElseThrow(() -> new NotFoundException("Project not found"));
-
-        return linkRepository.findByProjectId(projectId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
     public List<SharedDebugLinkResponse> listLinksForEvent(UUID projectId, UUID eventId) {
         UUID organizationId = TenantContext.require();
         projectRepository.findById(projectId)
