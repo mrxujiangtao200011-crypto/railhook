@@ -35,9 +35,9 @@
         },
         {
           "name": "APP_BASE_URL",
-          "default": "http://localhost",
+          "default": "http://localhost:8080",
           "example": null,
-          "description": "Public origin of the dashboard, used in emails, shared links, canonical tags and the sitemap.\nInclude the port when it is not 80, e.g. http://localhost:8080."
+          "description": "Public origin of the dashboard, used in emails, shared links, canonical tags and the sitemap.\nInclude the port when it is not 80; this one matches RAILHOOK_PORT below."
         }
       ]
     },
