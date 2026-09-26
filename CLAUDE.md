@@ -122,6 +122,9 @@ gate. `develop` blocks only force-push and deletion. Commit prefixes: `feat:`, `
   format. A task file is deleted when its branch merges.
 - `railhook-ui/CLAUDE.md` carries the frontend conventions and loads automatically in that
   directory — add UI rules there, not here.
+- **Boilerplate is Lombok, not hand-written**: `@RequiredArgsConstructor` with `private final`
+  fields for beans, `@Getter`/`@Setter`, `@Slf4j`. Write a constructor only when it computes or
+  validates something. No `@Data` on JPA entities; records stay records.
 - Comments explain why, never what: an invariant, a race, a past bug, a library quirk. No comments
   restating code, no section labels, no links to docs.
 - Operational procedures: `docs/OPERATIONS.md`.
