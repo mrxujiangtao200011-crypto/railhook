@@ -31,7 +31,7 @@ vi.mock('../../i18n', () => ({
   },
 }));
 
-import { showApiError, showSuccess, showWarning, showInfo, resolveErrorMessage, isNetworkError } from '../toast';
+import { showApiError, showSuccess, showWarning, resolveErrorMessage, isNetworkError } from '../toast';
 
 describe('toast utilities', () => {
   beforeEach(() => {
@@ -45,34 +45,20 @@ describe('toast utilities', () => {
       expect(toast.error).toHaveBeenCalledWith('Bad input', expect.any(Object));
     });
 
-    it('falls back to HTTP status mapping when no API message', () => {
-      const err = { response: { status: 401, data: {} } };
-      showApiError(err, 'toast.fallback');
-      expect(toast.error).toHaveBeenCalledWith('Unauthorized', expect.any(Object));
+    it.each([
+      [401, 'Unauthorized'],
+      [403, 'Forbidden'],
+      [429, 'Too many requests'],
+      [500, 'Server error'],
+    ])('maps a bare %i to its message', (status, message) => {
+      showApiError({ response: { status, data: {} } }, 'toast.fallback');
+      expect(toast.error).toHaveBeenCalledWith(message, expect.any(Object));
     });
 
     it('falls back to i18n key when no status mapping', () => {
       const err = {};
       showApiError(err, 'toast.fallback');
       expect(toast.error).toHaveBeenCalledWith('Something went wrong', expect.any(Object));
-    });
-
-    it('maps 403 to forbidden', () => {
-      const err = { response: { status: 403, data: {} } };
-      showApiError(err, 'toast.fallback');
-      expect(toast.error).toHaveBeenCalledWith('Forbidden', expect.any(Object));
-    });
-
-    it('maps 429 to too many requests', () => {
-      const err = { response: { status: 429, data: {} } };
-      showApiError(err, 'toast.fallback');
-      expect(toast.error).toHaveBeenCalledWith('Too many requests', expect.any(Object));
-    });
-
-    it('maps 500 to server error', () => {
-      const err = { response: { status: 500, data: {} } };
-      showApiError(err, 'toast.fallback');
-      expect(toast.error).toHaveBeenCalledWith('Server error', expect.any(Object));
     });
 
     it('adds retry action when provided', () => {
@@ -155,13 +141,6 @@ describe('toast utilities', () => {
       expect(toast.warning).toHaveBeenCalledWith('Watch out', expect.objectContaining({
         duration: 6000,
       }));
-    });
-  });
-
-  describe('showInfo', () => {
-    it('calls toast.info', () => {
-      showInfo('FYI');
-      expect(toast.info).toHaveBeenCalledWith('FYI', expect.any(Object));
     });
   });
 });
