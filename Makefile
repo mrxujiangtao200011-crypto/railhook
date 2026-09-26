@@ -33,7 +33,6 @@ up: init ## Start services (embedded DB, dev mode)
 	@$(MAKE) doctor
 	@$(DOCKER_COMPOSE_BUILD) --profile embedded-db --profile backup up -d --build
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
 	@$(MAKE) health
 	@echo ""
 	@echo "$(GREEN)Ready — http://localhost:$${RAILHOOK_PORT:-8080}$(NC)"
@@ -43,21 +42,18 @@ up-external-db: init ## Start services (external DB, dev mode)
 	@$(MAKE) doctor DB_MODE=external
 	@$(DOCKER_COMPOSE_BUILD) up -d --build
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
 	@$(MAKE) health
 
 up-prod: init ## Start services (embedded DB, production mode)
 	@$(MAKE) doctor
 	@$(DOCKER_COMPOSE) --profile embedded-db up -d --no-build
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
 	@$(MAKE) health
 
 up-prod-external: init ## Start services (external DB, production mode)
 	@$(MAKE) doctor DB_MODE=external
 	@$(DOCKER_COMPOSE) up -d --no-build
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
 	@$(MAKE) health
 
 DOCKER_COMPOSE_BUILD := $(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.build.yml
@@ -106,14 +102,12 @@ rebuild: ## Rebuild and restart services (embedded DB)
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache
 	@$(DOCKER_COMPOSE_BUILD) --profile embedded-db up -d
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
 
 rebuild-external-db: ## Rebuild and restart services (external DB)
 	@$(DOCKER_COMPOSE) down
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache
 	@$(DOCKER_COMPOSE_BUILD) up -d
 	@$(MAKE) wait-healthy
-	@$(MAKE) create-topics
 
 ##@ Development (Fast Rebuilds)
 # Build and start through the overlay, which renames the images: via the base file `up -d` served
@@ -203,20 +197,8 @@ version-set: ## Set the version everywhere (usage: make version-set VERSION=2.3.
 	@scripts/set-version.sh $(VERSION)
 
 ##@ Kafka
-KAFKA_PARTITIONS ?= 12
-create-topics: ## Create Kafka topics (idempotent)
-	@echo "$(GREEN)Creating Kafka topics with $(KAFKA_PARTITIONS) partitions...$(NC)"
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.dispatch --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.1m --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.5m --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.15m --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.1h --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.6h --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.retry.24h --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic deliveries.dlq --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic incoming.forward.dispatch --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic incoming.forward.retry --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
-	@docker exec webhook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic incoming.forward.dlq --partitions $(KAFKA_PARTITIONS) --replication-factor 1 2>/dev/null || true
+create-topics: ## Create the Kafka topics again (kafka-init already does it on every start)
+	@$(DOCKER_COMPOSE) up --no-deps --force-recreate kafka-init
 
 ##@ Monitoring
 logs: ## Follow logs for all services
