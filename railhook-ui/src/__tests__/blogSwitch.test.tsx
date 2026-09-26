@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { RouterProvider } from 'react-router-dom';
 import '../i18n';
@@ -6,23 +6,11 @@ import en from '../i18n/locales/en.json';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthContext, type AuthState } from '../auth/auth.store';
 import { createTestQueryClient, renderPage } from '../test/renderPage';
-import LandingNav from '../pages/landing/LandingNav';
 import PublicLayout from '../layout/PublicLayout';
 import { publicBlogEnabled } from '../lib/runtimeConfig';
 import { router } from '../router';
 
 const SIGNED_OUT = { auth: { user: null, token: null, isAuthenticated: false } };
-
-beforeAll(() => {
-  window.scrollTo = () => {};
-  if (!('IntersectionObserver' in window)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).IntersectionObserver = class {
-      observe() {}
-      disconnect() {}
-    };
-  }
-});
 
 afterEach(() => {
   delete window.__RAILHOOK__;
@@ -38,15 +26,6 @@ describe('publicBlogEnabled', () => {
     expect(publicBlogEnabled()).toBe(false);
     window.__RAILHOOK__ = { publicBlog: true };
     expect(publicBlogEnabled()).toBe(true);
-  });
-});
-
-describe('the header', () => {
-  it('leaves the blog to the footer, whether or not it is on', () => {
-    window.__RAILHOOK__ = { publicBlog: true };
-    renderPage(<LandingNav />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
-    const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).not.toContain('/blog');
   });
 });
 

@@ -1,5 +1,5 @@
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, screen, within } from '@testing-library/react';
 import LandingPage from '../LandingPage';
 import LandingNav from '../landing/LandingNav';
@@ -26,17 +26,6 @@ function sectionTitled(name: string | RegExp): HTMLElement {
   expect(section, `no section titled ${name}`).not.toBeNull();
   return section;
 }
-
-beforeAll(() => {
-  window.scrollTo = () => {};
-  if (!('IntersectionObserver' in window)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).IntersectionObserver = class {
-      observe() {}
-      disconnect() {}
-    };
-  }
-});
 
 describe('LandingPage', () => {
   it('has exactly one h1, and it names what the product is', () => {

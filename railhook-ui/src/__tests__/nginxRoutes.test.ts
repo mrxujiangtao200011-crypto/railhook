@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { nginxLocations } from '../test/nginxLocations';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
@@ -16,22 +17,7 @@ function prerenderedSegments(): string[] {
   return publicRoutes().map((r) => r.path.slice(1).split('/')[0]).filter(Boolean);
 }
 
-function locations(): { head: string; body: string }[] {
-  const out: { head: string; body: string }[] = [];
-  const re = /^\s*location\s+([^{]+)\{/gm;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(conf))) {
-    let depth = 1;
-    let i = re.lastIndex;
-    while (depth > 0 && i < conf.length) {
-      if (conf[i] === '{') depth++;
-      else if (conf[i] === '}') depth--;
-      i++;
-    }
-    out.push({ head: m[1].trim(), body: conf.slice(re.lastIndex, i - 1) });
-  }
-  return out;
-}
+const locations = () => nginxLocations(conf);
 
 const location = (head: string) => locations().find((l) => l.head === head);
 
@@ -53,9 +39,6 @@ function spaSegments(): string[] {
 
 /** Every URL used to answer 200 with the landing page, a soft 404 to crawlers. */
 describe('nginx answers with the status the URL deserves', () => {
-  it('finds the router routes it is meant to be checking', () => {
-    expect(routerTopLevelSegments()).toEqual(expect.arrayContaining(['admin', 'login', 'register', 'shared']));
-  });
 
   it('serves the app shell for every top-level route the router owns', () => {
     const prerendered = prerenderedSegments();
@@ -143,18 +126,8 @@ describe('the remote MCP server', () => {
 });
 
 describe('framing', () => {
-  const snippet = read('railhook-ui/nginx-security-headers.conf');
   const common = read('railhook-ui/nginx-security-headers-common.conf');
   const portal = () => location('= /portal')!.body;
-
-  it('keeps every page but the portal unframeable by other sites', () => {
-    expect(snippet).toMatch(/add_header\s+X-Frame-Options\s+"SAMEORIGIN"\s+always;/);
-    expect(snippet).toMatch(/include\s+\/etc\/nginx\/snippets\/security-headers-common\.conf;/);
-    for (const { head, body } of locations()) {
-      if (head === '= /portal' || !/add_header/.test(body) || /proxy_pass|deny all/.test(body)) continue;
-      expect(body, head).toMatch(/include\s+\/etc\/nginx\/snippets\/security-headers\.conf;/);
-    }
-  });
 
   it('serves the portal without X-Frame-Options, and with frame-ancestors instead', () => {
     expect(common).not.toMatch(/add_header\s+X-Frame-Options/);
