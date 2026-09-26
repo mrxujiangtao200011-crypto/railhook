@@ -6,6 +6,7 @@ import com.webhook.platform.api.exception.DemoReadOnlyException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,6 +27,7 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ScopeEnforcementInterceptor implements HandlerInterceptor {
 
     private static final String PROJECT_ID_PATH_VAR = "projectId";
@@ -33,10 +35,6 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
     private static final Set<String> READ_METHODS = Set.of("GET", "HEAD", "OPTIONS");
 
     private final SuspensionCheck suspensionCheck;
-
-    public ScopeEnforcementInterceptor(SuspensionCheck suspensionCheck) {
-        this.suspensionCheck = suspensionCheck;
-    }
 
     /**
      * Runs before the scope check because that one returns early for a JWT, and dashboard

@@ -16,6 +16,7 @@ import com.webhook.platform.api.service.signin.SignInFailure;
 import com.webhook.platform.api.exception.SignInRejectedException;
 import com.webhook.platform.api.service.signin.VerifiedIdentity;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ExternalSignInService {
 
     static final Duration HANDOFF_LIFETIME = Duration.ofSeconds(60);
@@ -44,22 +46,6 @@ public class ExternalSignInService {
     private final AuthService authService;
     private final ProjectService projectService;
     private final OnboardingMailService onboardingMailService;
-
-    public ExternalSignInService(UserRepository userRepository,
-                                 UserIdentityRepository userIdentityRepository,
-                                 SignInHandoffRepository signInHandoffRepository,
-                                 UserSessionService userSessionService,
-                                 AuthService authService,
-                                 ProjectService projectService,
-                                 OnboardingMailService onboardingMailService) {
-        this.userRepository = userRepository;
-        this.userIdentityRepository = userIdentityRepository;
-        this.signInHandoffRepository = signInHandoffRepository;
-        this.userSessionService = userSessionService;
-        this.authService = authService;
-        this.projectService = projectService;
-        this.onboardingMailService = onboardingMailService;
-    }
 
     // Matched on the provider subject first, then the address. An unverified account's password
     // is removed, since someone else may have registered it.

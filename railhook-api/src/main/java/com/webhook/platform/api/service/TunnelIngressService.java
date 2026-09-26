@@ -11,6 +11,7 @@ import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.concurrent.Executor;
 /** Admission (tunnel up, rate limit, body size) is decided here, so a refusal never reaches the CLI. */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class TunnelIngressService {
 
     private static final int MAX_BODY_SIZE = 512 * 1024;
@@ -47,26 +49,9 @@ public class TunnelIngressService {
     private final TunnelRequestLogRepository requestLogRepository;
     private final TunnelBandwidthService bandwidthService;
     private final MeterRegistry meterRegistry;
+    @Qualifier("tunnelMeteringExecutor")
     private final Executor tunnelMeteringExecutor;
     private final SuspensionCheck suspensionCheck;
-
-    public TunnelIngressService(TunnelService tunnelService,
-            RedisTunnelCoordinator redisTunnelCoordinator,
-            RedisRateLimiterService rateLimiterService,
-            TunnelRequestLogRepository requestLogRepository,
-            TunnelBandwidthService bandwidthService,
-            MeterRegistry meterRegistry,
-            @Qualifier("tunnelMeteringExecutor") Executor tunnelMeteringExecutor,
-            SuspensionCheck suspensionCheck) {
-        this.tunnelService = tunnelService;
-        this.redisTunnelCoordinator = redisTunnelCoordinator;
-        this.rateLimiterService = rateLimiterService;
-        this.requestLogRepository = requestLogRepository;
-        this.bandwidthService = bandwidthService;
-        this.meterRegistry = meterRegistry;
-        this.tunnelMeteringExecutor = tunnelMeteringExecutor;
-        this.suspensionCheck = suspensionCheck;
-    }
 
     public Outcome forward(String slug, TunnelRequestMessage request, byte[] body) {
         if (!redisTunnelCoordinator.isActiveInCluster(slug)) {

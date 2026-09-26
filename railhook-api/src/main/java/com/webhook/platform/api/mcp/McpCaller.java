@@ -21,6 +21,7 @@ import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.context.SecurityContext;
@@ -42,17 +43,12 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class McpCaller {
 
     private final ObjectMapper objectMapper;
     private final Validator validator;
     private final SuspensionCheck suspensionCheck;
-
-    public McpCaller(ObjectMapper objectMapper, Validator validator, SuspensionCheck suspensionCheck) {
-        this.objectMapper = objectMapper;
-        this.validator = validator;
-        this.suspensionCheck = suspensionCheck;
-    }
 
     public CallToolResult read(McpTransportContext context, Function<AuthContext, Object> body) {
         return run(context, null, body);

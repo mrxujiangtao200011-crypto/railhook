@@ -19,6 +19,7 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.security.SecretEncryption;
 import com.webhook.platform.common.security.UrlValidator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -35,32 +36,18 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class IncomingDestinationService {
 
     private final IncomingDestinationRepository destinationRepository;
     private final IncomingSourceRepository sourceRepository;
     private final TransformationRepository transformationRepository;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
+    @Value("${webhook.url-validation.allow-private-ips:false}")
     private final boolean allowPrivateIps;
+    @Value("${webhook.url-validation.allowed-hosts:}")
     private final List<String> allowedHosts;
     private final RetryLadderEscalationCap retryLadderEscalationCap;
-
-    public IncomingDestinationService(
-            IncomingDestinationRepository destinationRepository,
-            IncomingSourceRepository sourceRepository,
-            TransformationRepository transformationRepository,
-            EncryptionKeyRegistry encryptionKeyRegistry,
-            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
-            RetryLadderEscalationCap retryLadderEscalationCap) {
-        this.destinationRepository = destinationRepository;
-        this.sourceRepository = sourceRepository;
-        this.transformationRepository = transformationRepository;
-        this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.allowPrivateIps = allowPrivateIps;
-        this.allowedHosts = allowedHosts;
-        this.retryLadderEscalationCap = retryLadderEscalationCap;
-    }
 
     // Narrowed to the project, not just the tenant: an API key is confined to the project in the URL.
     private IncomingSource requireSource(UUID projectId, UUID sourceId) {

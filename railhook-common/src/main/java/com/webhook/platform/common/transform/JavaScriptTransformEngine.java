@@ -2,6 +2,8 @@ package com.webhook.platform.common.transform;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
@@ -421,6 +423,7 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         }
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     private final class Guard {
 
         private final Context context;
@@ -429,13 +432,6 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         private final long allocationStart;
         private volatile ScriptTransformException.Reason tripped;
         private volatile ScheduledFuture<?> future;
-
-        private Guard(Context context, long threadId, long deadlineNanos, long allocationStart) {
-            this.context = context;
-            this.threadId = threadId;
-            this.deadlineNanos = deadlineNanos;
-            this.allocationStart = allocationStart;
-        }
 
         private void check() {
             if (tripped != null) {

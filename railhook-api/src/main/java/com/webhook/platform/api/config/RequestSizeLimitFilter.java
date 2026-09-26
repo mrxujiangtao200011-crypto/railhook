@@ -7,6 +7,8 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
@@ -24,17 +26,13 @@ import java.io.InputStreamReader;
 @Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
+@RequiredArgsConstructor
 public class RequestSizeLimitFilter extends OncePerRequestFilter {
 
+    @Value("${webhook.max-payload-size-bytes:262144}")
     private final long maxPayloadSizeBytes;
+    @Value("${webhook.incoming.max-payload-size-bytes:524288}")
     private final long ingressMaxPayloadSizeBytes;
-
-    public RequestSizeLimitFilter(
-            @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
-            @Value("${webhook.incoming.max-payload-size-bytes:524288}") long ingressMaxPayloadSizeBytes) {
-        this.maxPayloadSizeBytes = maxPayloadSizeBytes;
-        this.ingressMaxPayloadSizeBytes = ingressMaxPayloadSizeBytes;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -117,16 +115,12 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
         }
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     private static class LimitedServletInputStream extends ServletInputStream {
 
         private final ServletInputStream delegate;
         private final long maxBytes;
         private long bytesRead = 0;
-
-        LimitedServletInputStream(ServletInputStream delegate, long maxBytes) {
-            this.delegate = delegate;
-            this.maxBytes = maxBytes;
-        }
 
         @Override
         public int read() throws IOException {

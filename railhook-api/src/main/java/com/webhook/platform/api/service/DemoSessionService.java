@@ -6,6 +6,7 @@ import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.common.demo.DemoTenant;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ public class DemoSessionService {
 
     private final JwtTokenService jwtTokenService;
     private final JdbcTemplate jdbcTemplate;
+    @Getter
     private final boolean enabled;
     private final Duration sessionTtl;
 
@@ -30,10 +32,6 @@ public class DemoSessionService {
         this.jdbcTemplate = jdbcTemplate;
         this.enabled = enabled;
         this.sessionTtl = Duration.ofMinutes(Math.max(1, Math.min(sessionTtlMinutes, 240)));
-    }
-
-    public boolean isEnabled() {
-        return enabled;
     }
 
     // A 404 where the demo is off, so an installation that never enabled it has no such thing.

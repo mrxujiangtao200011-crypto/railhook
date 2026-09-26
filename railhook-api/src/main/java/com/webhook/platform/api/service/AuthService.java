@@ -26,6 +26,7 @@ import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -42,6 +43,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -56,38 +58,10 @@ public class AuthService {
     private final EmailService emailService;
     private final VerificationMailBudget verificationMailBudget;
     private final OnboardingMailService onboardingMailService;
+    @Value("${billing.enabled:false}")
     private final boolean billingEnabled;
 
     private static final int TOKEN_EXPIRY_HOURS = 24;
-
-    public AuthService(
-            UserRepository userRepository,
-            OrganizationRepository organizationRepository,
-            MembershipRepository membershipRepository,
-            PlanRepository planRepository,
-            JwtTokenService jwtTokenService,
-            BCryptPasswordEncoder passwordEncoder,
-            TokenBlacklistService tokenBlacklistService,
-            UserSessionService userSessionService,
-            AccountLockoutService accountLockoutService,
-            EmailService emailService,
-            VerificationMailBudget verificationMailBudget,
-            OnboardingMailService onboardingMailService,
-            @Value("${billing.enabled:false}") boolean billingEnabled) {
-        this.userRepository = userRepository;
-        this.organizationRepository = organizationRepository;
-        this.membershipRepository = membershipRepository;
-        this.planRepository = planRepository;
-        this.jwtTokenService = jwtTokenService;
-        this.passwordEncoder = passwordEncoder;
-        this.tokenBlacklistService = tokenBlacklistService;
-        this.userSessionService = userSessionService;
-        this.accountLockoutService = accountLockoutService;
-        this.emailService = emailService;
-        this.verificationMailBudget = verificationMailBudget;
-        this.onboardingMailService = onboardingMailService;
-        this.billingEnabled = billingEnabled;
-    }
 
     @SystemTenant("creates the Organization it then belongs to, so there is no tenant to run in yet; the Membership it inserts sets organizationId explicitly")
     @Auditable(action = AuditAction.REGISTER, resourceType = "Auth")

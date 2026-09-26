@@ -7,6 +7,8 @@ import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.common.util.RailhookSignature;
 import com.webhook.platform.common.util.StandardWebhookSignature;
 import com.webhook.platform.worker.domain.entity.Endpoint;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Clock;
@@ -15,17 +17,12 @@ import java.util.UUID;
 
 /** Both schemes sign the same bytes with the same timestamp. */
 @Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class DeliverySigner {
 
     private final Endpoint endpoint;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final Clock clock;
-
-    DeliverySigner(Endpoint endpoint, EncryptionKeyRegistry encryptionKeyRegistry, Clock clock) {
-        this.endpoint = endpoint;
-        this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.clock = clock;
-    }
 
     /** Masked for the dashboard: anyone who can read a signature can replay the delivery. */
     record Signatures(long timestampMillis, String legacy, String standard) {

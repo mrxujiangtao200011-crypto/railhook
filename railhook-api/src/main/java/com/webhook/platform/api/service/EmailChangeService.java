@@ -19,6 +19,7 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -39,6 +40,7 @@ import java.util.UUID;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class EmailChangeService {
 
     static final Duration CONFIRMATION_LIFETIME = Duration.ofHours(24);
@@ -52,24 +54,6 @@ public class EmailChangeService {
     private final EmailService emailService;
     private final CaptchaVerifier captchaVerifier;
     private final VerificationMailBudget budget;
-
-    public EmailChangeService(UserRepository userRepository,
-                              EmailChangeRequestRepository changeRepository,
-                              UserSessionService userSessionService,
-                              JwtTokenService jwtTokenService,
-                              BCryptPasswordEncoder passwordEncoder,
-                              EmailService emailService,
-                              CaptchaVerifier captchaVerifier,
-                              VerificationMailBudget budget) {
-        this.userRepository = userRepository;
-        this.changeRepository = changeRepository;
-        this.userSessionService = userSessionService;
-        this.jwtTokenService = jwtTokenService;
-        this.passwordEncoder = passwordEncoder;
-        this.emailService = emailService;
-        this.captchaVerifier = captchaVerifier;
-        this.budget = budget;
-    }
 
     @SystemTenant("acts on the caller's own account, which is not confined to the organization the request is scoped to")
     @Transactional(readOnly = true)

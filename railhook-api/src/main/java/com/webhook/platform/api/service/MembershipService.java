@@ -16,6 +16,7 @@ import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class MembershipService {
 
     private static final int INVITE_EXPIRATION_HOURS = 48;
@@ -44,21 +46,6 @@ public class MembershipService {
     private final TokenBlacklistService tokenBlacklistService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final TunnelService tunnelService;
-
-    public MembershipService(
-            UserRepository userRepository,
-            MembershipRepository membershipRepository,
-            EmailService emailService,
-            TokenBlacklistService tokenBlacklistService,
-            BCryptPasswordEncoder passwordEncoder,
-            TunnelService tunnelService) {
-        this.userRepository = userRepository;
-        this.membershipRepository = membershipRepository;
-        this.emailService = emailService;
-        this.tokenBlacklistService = tokenBlacklistService;
-        this.passwordEncoder = passwordEncoder;
-        this.tunnelService = tunnelService;
-    }
 
     public List<MemberResponse> getOrganizationMembers() {
         UUID organizationId = TenantContext.require();

@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,22 +29,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Authentication", description = "User registration and login")
+@RequiredArgsConstructor
 public class GoogleSignInController {
 
     private final GoogleSignInService googleSignInService;
     private final AuthRateLimiterService authRateLimiterService;
     private final TrustedProxyResolver trustedProxyResolver;
     private final AuthCookies authCookies;
-
-    public GoogleSignInController(GoogleSignInService googleSignInService,
-                                  AuthRateLimiterService authRateLimiterService,
-                                  TrustedProxyResolver trustedProxyResolver,
-                                  AuthCookies authCookies) {
-        this.googleSignInService = googleSignInService;
-        this.authRateLimiterService = authRateLimiterService;
-        this.trustedProxyResolver = trustedProxyResolver;
-        this.authCookies = authCookies;
-    }
 
     @Operation(summary = "List sign-in providers",
             description = "Which identity providers the sign-in and registration pages offer on this deployment. "

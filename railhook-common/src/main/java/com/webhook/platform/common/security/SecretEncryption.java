@@ -14,6 +14,7 @@ import java.security.SecureRandom;
 import java.security.spec.KeySpec;
 import java.time.Duration;
 import java.util.Base64;
+import lombok.Getter;
 
 public final class SecretEncryption {
 
@@ -101,6 +102,7 @@ public final class SecretEncryption {
         }
     }
 
+    @Getter
     public static class EncryptedData {
         private final String ciphertext;
         private final String iv;
@@ -114,18 +116,6 @@ public final class SecretEncryption {
             this.ciphertext = ciphertext;
             this.iv = iv;
             this.keyVersion = keyVersion;
-        }
-
-        public String getCiphertext() {
-            return ciphertext;
-        }
-
-        public String getIv() {
-            return iv;
-        }
-
-        public int getKeyVersion() {
-            return keyVersion;
         }
     }
 }

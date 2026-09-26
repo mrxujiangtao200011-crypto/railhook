@@ -11,6 +11,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import com.webhook.platform.common.security.SecureTokens;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -23,17 +24,13 @@ import java.util.Collections;
 import java.util.Optional;
 
 @Component
+@RequiredArgsConstructor
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String API_KEY_HEADER = "X-API-Key";
     private static final String BEARER_PREFIX = "Bearer ";
     private final ApiKeyRepository apiKeyRepository;
     private final ProjectRepository projectRepository;
-
-    public ApiKeyAuthenticationFilter(ApiKeyRepository apiKeyRepository, ProjectRepository projectRepository) {
-        this.apiKeyRepository = apiKeyRepository;
-        this.projectRepository = projectRepository;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)

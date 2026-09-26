@@ -12,6 +12,7 @@ import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.util.EventSchemas;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class SchemaRegistryService {
 
     private final EventTypeCatalogRepository catalogRepository;
@@ -31,21 +33,6 @@ public class SchemaRegistryService {
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
-
-    public SchemaRegistryService(
-            EventTypeCatalogRepository catalogRepository,
-            EventSchemaVersionRepository versionRepository,
-            SchemaChangeRepository changeRepository,
-            ProjectRepository projectRepository,
-            ObjectMapper objectMapper,
-            MeterRegistry meterRegistry) {
-        this.catalogRepository = catalogRepository;
-        this.versionRepository = versionRepository;
-        this.changeRepository = changeRepository;
-        this.projectRepository = projectRepository;
-        this.objectMapper = objectMapper;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Auditable(action = AuditAction.CREATE, resourceType = "EventType")
     @Transactional

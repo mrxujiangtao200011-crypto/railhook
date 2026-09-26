@@ -14,6 +14,7 @@ import com.webhook.platform.api.dto.IncomingSourceRequest;
 import com.webhook.platform.api.dto.IncomingSourceResponse;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -27,26 +28,15 @@ import com.webhook.platform.common.security.SecureTokens;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class IncomingSourceService {
 
     private final IncomingSourceRepository sourceRepository;
     private final ProjectRepository projectRepository;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final WebhookVerifierFactory verifierFactory;
+    @Value("${webhook.ingress-base-url:}")
     private final String ingressBaseUrl;
-
-    public IncomingSourceService(
-            IncomingSourceRepository sourceRepository,
-            ProjectRepository projectRepository,
-            EncryptionKeyRegistry encryptionKeyRegistry,
-            WebhookVerifierFactory verifierFactory,
-            @Value("${webhook.ingress-base-url:}") String ingressBaseUrl) {
-        this.sourceRepository = sourceRepository;
-        this.projectRepository = projectRepository;
-        this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.verifierFactory = verifierFactory;
-        this.ingressBaseUrl = ingressBaseUrl;
-    }
 
     /** A secret with no mode means verify with it. Saving that as NONE accepted forged requests. */
     private VerificationMode defaultVerificationMode(IncomingSourceRequest request) {

@@ -16,28 +16,20 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/auth/email-change")
 @Tag(name = "Authentication")
+@RequiredArgsConstructor
 public class EmailChangeController {
 
     private final EmailChangeService emailChangeService;
     private final AuthRateLimiterService authRateLimiterService;
     private final VerificationMailBudget budget;
     private final TrustedProxyResolver trustedProxyResolver;
-
-    public EmailChangeController(EmailChangeService emailChangeService,
-                                 AuthRateLimiterService authRateLimiterService,
-                                 VerificationMailBudget budget,
-                                 TrustedProxyResolver trustedProxyResolver) {
-        this.emailChangeService = emailChangeService;
-        this.authRateLimiterService = authRateLimiterService;
-        this.budget = budget;
-        this.trustedProxyResolver = trustedProxyResolver;
-    }
 
     @Operation(operationId = "getEmailChange", summary = "Get the email change state",
             description = "The account's address, and the change waiting for confirmation if there is one")

@@ -19,6 +19,7 @@ import java.util.UUID;
 public class DeliveryDispatch {
 
     /** Stored on the row for humans only; nothing reads it. */
+    @RequiredArgsConstructor
     public enum Reason {
         CREATED("DeliveryCreated"),
         RETRY("DeliveryRetry"),
@@ -28,10 +29,6 @@ public class DeliveryDispatch {
         WORKFLOW_CREATED("WorkflowDeliveryCreated");
 
         private final String eventType;
-
-        Reason(String eventType) {
-            this.eventType = eventType;
-        }
     }
 
     private final OutboxMessageRepository outboxMessageRepository;

@@ -11,6 +11,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +33,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class PortalSessionAuthenticationFilter extends OncePerRequestFilter {
 
     static final String PORTAL_PATH_PREFIX = "/api/v1/portal/";
@@ -41,20 +43,8 @@ public class PortalSessionAuthenticationFilter extends OncePerRequestFilter {
     private final ProjectRepository projectRepository;
     private final RedisRateLimiterService rateLimiterService;
     private final Clock clock;
+    @Value("${portal.rate-limit.requests-per-second:20}")
     private final int requestsPerSecond;
-
-    public PortalSessionAuthenticationFilter(
-            PortalSessionRepository portalSessionRepository,
-            ProjectRepository projectRepository,
-            RedisRateLimiterService rateLimiterService,
-            Clock clock,
-            @Value("${portal.rate-limit.requests-per-second:20}") int requestsPerSecond) {
-        this.portalSessionRepository = portalSessionRepository;
-        this.projectRepository = projectRepository;
-        this.rateLimiterService = rateLimiterService;
-        this.clock = clock;
-        this.requestsPerSecond = requestsPerSecond;
-    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

@@ -7,6 +7,7 @@ import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.McpOAuthService;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -34,20 +35,13 @@ import java.util.Map;
  */
 @Hidden
 @RestController
+@RequiredArgsConstructor
 public class McpOAuthController {
 
     private final McpOAuthService oauthService;
     private final McpOAuthSettings settings;
     private final AuthRateLimiterService rateLimiter;
     private final TrustedProxyResolver trustedProxyResolver;
-
-    public McpOAuthController(McpOAuthService oauthService, McpOAuthSettings settings,
-                              AuthRateLimiterService rateLimiter, TrustedProxyResolver trustedProxyResolver) {
-        this.oauthService = oauthService;
-        this.settings = settings;
-        this.rateLimiter = rateLimiter;
-        this.trustedProxyResolver = trustedProxyResolver;
-    }
 
     /**
      * The 401 challenge names this path-suffixed address. The root one describes the origin,

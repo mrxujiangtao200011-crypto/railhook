@@ -20,6 +20,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -34,15 +35,12 @@ import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
 @RequestMapping("/ingress")
 @Slf4j
 @Tag(name = "Ingress", description = "Public incoming webhook ingress endpoint")
+@RequiredArgsConstructor
 public class IngressController {
 
     static final String QUOTA_RETRY_AFTER_SECONDS = "3600";
 
     private final IngressService ingressService;
-
-    public IngressController(IngressService ingressService) {
-        this.ingressService = ingressService;
-    }
 
     @Operation(summary = "Receive incoming webhook",
             description = "Public endpoint for third-party providers to send webhooks. " +

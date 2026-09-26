@@ -9,6 +9,8 @@ import com.webhook.platform.worker.service.ProjectRateLimiterService;
 import com.webhook.platform.worker.service.RedisConcurrencyControlService;
 import com.webhook.platform.worker.service.RedisRateLimiterService;
 import com.sun.net.httpserver.HttpServer;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -942,6 +944,7 @@ class AttemptRunnerTest {
         }
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     private static final class FakeStore implements AttemptStore<String> {
 
         private final String url;
@@ -970,10 +973,6 @@ class AttemptRunnerTest {
         int succeededCalls;
         int terminallyFailedCalls;
         int cancelledCalls;
-
-        FakeStore(String url) {
-            this.url = url;
-        }
 
         @Override
         public ClaimResult<String> claim() {

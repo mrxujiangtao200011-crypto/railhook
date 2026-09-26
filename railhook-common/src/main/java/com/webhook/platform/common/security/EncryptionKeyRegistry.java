@@ -1,5 +1,6 @@
 package com.webhook.platform.common.security;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -33,6 +34,7 @@ public class EncryptionKeyRegistry {
     private String salt;
 
     private Map<Integer, String> keyMap;
+    @Getter
     private int activeVersion;
 
     @PostConstruct
@@ -78,10 +80,6 @@ public class EncryptionKeyRegistry {
         this.keyMap = Collections.unmodifiableMap(keys);
         log.info("Encryption key registry initialized: {} key version(s), active version={}",
                 keyMap.size(), activeVersion);
-    }
-
-    public int getActiveVersion() {
-        return activeVersion;
     }
 
     public String getActiveKey() {

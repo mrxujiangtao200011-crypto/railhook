@@ -25,6 +25,7 @@ import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.security.UrlValidator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -42,6 +43,7 @@ import java.util.UUID;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AlertService {
 
     private final AlertRuleRepository ruleRepository;
@@ -51,29 +53,10 @@ public class AlertService {
     private final IncidentTimelineRepository timelineRepository;
     private final AlertNotificationService notificationService;
     private final MembershipRepository membershipRepository;
+    @Value("${webhook.url-validation.allow-private-ips:false}")
     private final boolean allowPrivateIps;
+    @Value("${webhook.url-validation.allowed-hosts:}")
     private final List<String> allowedHosts;
-
-    public AlertService(
-            AlertRuleRepository ruleRepository,
-            AlertEventRepository eventRepository,
-            ProjectRepository projectRepository,
-            IncidentRepository incidentRepository,
-            IncidentTimelineRepository timelineRepository,
-            AlertNotificationService notificationService,
-            MembershipRepository membershipRepository,
-            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
-        this.ruleRepository = ruleRepository;
-        this.eventRepository = eventRepository;
-        this.projectRepository = projectRepository;
-        this.incidentRepository = incidentRepository;
-        this.timelineRepository = timelineRepository;
-        this.notificationService = notificationService;
-        this.membershipRepository = membershipRepository;
-        this.allowPrivateIps = allowPrivateIps;
-        this.allowedHosts = allowedHosts;
-    }
 
     /** Resolving the open alerts re-arms the rule for the next crossing. */
     @Transactional

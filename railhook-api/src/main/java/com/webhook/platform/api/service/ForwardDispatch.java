@@ -15,6 +15,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ForwardDispatch {
 
+    @RequiredArgsConstructor
     public enum Reason {
         CREATED("IncomingForwardCreated"),
         REPLAY("IncomingForwardReplay"),
@@ -22,10 +23,6 @@ public class ForwardDispatch {
         DLQ_RETRY("IncomingForwardDlqRetry");
 
         private final String eventType;
-
-        Reason(String eventType) {
-            this.eventType = eventType;
-        }
     }
 
     private final ObjectMapper objectMapper;

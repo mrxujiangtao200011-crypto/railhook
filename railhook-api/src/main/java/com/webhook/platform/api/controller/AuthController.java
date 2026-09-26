@@ -41,6 +41,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -52,6 +53,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Authentication", description = "User registration and login")
+@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
@@ -63,27 +65,6 @@ public class AuthController {
     private final ExternalSignInService externalSignInService;
     private final PlatformAdminAccessService platformAdminAccessService;
     private final AuthCookies authCookies;
-
-    public AuthController(
-            AuthService authService,
-            UserSessionService userSessionService,
-            AccountErasureService accountErasureService,
-            AuthRateLimiterService authRateLimiterService,
-            TrustedProxyResolver trustedProxyResolver,
-            CaptchaVerifier captchaVerifier,
-            ExternalSignInService externalSignInService,
-            PlatformAdminAccessService platformAdminAccessService,
-            AuthCookies authCookies) {
-        this.authService = authService;
-        this.userSessionService = userSessionService;
-        this.accountErasureService = accountErasureService;
-        this.authRateLimiterService = authRateLimiterService;
-        this.trustedProxyResolver = trustedProxyResolver;
-        this.captchaVerifier = captchaVerifier;
-        this.externalSignInService = externalSignInService;
-        this.platformAdminAccessService = platformAdminAccessService;
-        this.authCookies = authCookies;
-    }
 
     @Operation(summary = "Register new user", description = "Creates a new user account and organization")
     @ApiResponses({

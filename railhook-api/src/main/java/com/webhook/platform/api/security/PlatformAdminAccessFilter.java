@@ -11,6 +11,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -31,6 +32,7 @@ import java.util.regex.Pattern;
  * <p>Not a {@code @Component}: Spring Boot would also register it as a servlet filter.
  */
 @Slf4j
+@RequiredArgsConstructor
 public class PlatformAdminAccessFilter extends OncePerRequestFilter {
 
     static final String ADMIN_PREFIX = "/api/v1/admin/";
@@ -45,15 +47,6 @@ public class PlatformAdminAccessFilter extends OncePerRequestFilter {
     private final AuditLogAspect audit;
     private final TrustedProxyResolver proxyResolver;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    public PlatformAdminAccessFilter(PlatformAdminAccessService access, JwtTokenService jwtTokenService,
-            AuthRateLimiterService rateLimiter, AuditLogAspect audit, TrustedProxyResolver proxyResolver) {
-        this.access = access;
-        this.jwtTokenService = jwtTokenService;
-        this.rateLimiter = rateLimiter;
-        this.audit = audit;
-        this.proxyResolver = proxyResolver;
-    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

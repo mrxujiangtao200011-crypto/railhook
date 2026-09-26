@@ -15,6 +15,7 @@ import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ import java.util.UUID;
 // and the audit log is kept under GDPR Article 17(3)(b).
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class AccountErasureService {
 
     // Reserved by RFC 2606 and resolves nowhere, so nothing can be delivered to it.
@@ -42,26 +44,6 @@ public class AccountErasureService {
     private final EmailChangeRequestRepository emailChangeRequestRepository;
     private final VerificationEmailSendRepository verificationEmailSendRepository;
     private final TunnelService tunnelService;
-
-    public AccountErasureService(UserRepository userRepository,
-                                 MembershipRepository membershipRepository,
-                                 OrganizationService organizationService,
-                                 UserSessionService userSessionService,
-                                 TokenBlacklistService tokenBlacklistService,
-                                 UserIdentityRepository userIdentityRepository,
-                                 EmailChangeRequestRepository emailChangeRequestRepository,
-                                 VerificationEmailSendRepository verificationEmailSendRepository,
-                                 TunnelService tunnelService) {
-        this.userRepository = userRepository;
-        this.membershipRepository = membershipRepository;
-        this.organizationService = organizationService;
-        this.userSessionService = userSessionService;
-        this.tokenBlacklistService = tokenBlacklistService;
-        this.userIdentityRepository = userIdentityRepository;
-        this.emailChangeRequestRepository = emailChangeRequestRepository;
-        this.verificationEmailSendRepository = verificationEmailSendRepository;
-        this.tunnelService = tunnelService;
-    }
 
     // Refusals happen before anything is written, so a refused caller has lost nothing.
     @SystemTenant("erasing a person spans every organization they belong to, not the request's own")

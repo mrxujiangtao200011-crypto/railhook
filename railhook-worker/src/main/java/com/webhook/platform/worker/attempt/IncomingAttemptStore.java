@@ -17,6 +17,7 @@ import com.webhook.platform.worker.exception.PayloadTransformException;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
 import com.webhook.platform.common.transform.TransformRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -37,6 +38,7 @@ import java.util.UUID;
  * <p>One instance per Attempt; thread-confined.
  */
 @Slf4j
+@RequiredArgsConstructor
 public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.Claim> {
 
     private static final int REQUEST_BODY_SNIPPET_LIMIT = 10240;
@@ -81,35 +83,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     private final IncomingForwardMessage message;
     private final IncomingEvent event;
     private final IncomingDestination destination;
-
-    public IncomingAttemptStore(
-            IncomingForwardAttemptRepository attemptRepository,
-            ProjectStatusLookup projectStatusLookup,
-            TransactionTemplate transactionTemplate,
-            TransformationCacheService transformationCacheService,
-            PayloadTransformService payloadTransformService,
-            EncryptionKeyRegistry encryptionKeyRegistry,
-            ObjectMapper objectMapper,
-            WebClient webClient,
-            KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate,
-            TargetFailureRecorder targetFailureRecorder,
-            IncomingForwardMessage message,
-            IncomingEvent event,
-            IncomingDestination destination) {
-        this.attemptRepository = attemptRepository;
-        this.projectStatusLookup = projectStatusLookup;
-        this.transactionTemplate = transactionTemplate;
-        this.transformationCacheService = transformationCacheService;
-        this.payloadTransformService = payloadTransformService;
-        this.encryptionKeyRegistry = encryptionKeyRegistry;
-        this.objectMapper = objectMapper;
-        this.webClient = webClient;
-        this.kafkaTemplate = kafkaTemplate;
-        this.targetFailureRecorder = targetFailureRecorder;
-        this.message = message;
-        this.event = event;
-        this.destination = destination;
-    }
 
     /**
      * First dispatch and replay claim a PENDING row outright. A retry CASes on the token the
