@@ -40,13 +40,14 @@ A post-install hook creates the topics: `deliveries.dispatch`,
 
 ### Retry ladder vs. DLQ hard-cap
 
-Outgoing deliveries make up to 7 attempts with waits of 1m, 5m, 15m, 1h, 6h, 24h: about 31h
-nominal, 47h worst case with jitter. Incoming forwards stop after 5 attempts (1m, 5m, 15m, 1h):
-about 1h20m nominal, 2h worst case. The two ladders differ on purpose and live in `RetryLadderDefaults`, not in env vars.
+Outgoing deliveries make up to 7 attempts with waits of 1m, 5m, 15m, 1h, 6h, 24h, about 31h from
+first to last attempt. Incoming forwards stop after 5 attempts (1m, 5m, 15m, 1h), about 1h20m.
+The two ladders differ on purpose and live in `RetryLadderDefaults`, not in env vars.
 
 `StaleDeliveryEscalationService` moves any `PENDING` delivery older than
 `DELIVERY_ESCALATION_HARD_CAP_HOURS` (default 96) to the DLQ. The worker refuses to start if a
-ladder's worst case does not fit inside that cap. If that check fails, raise the cap.
+ladder's worst case does not fit inside that cap: one wait per attempt, each at the top of the
+jitter range, about 83h for the default outgoing ladder. If that check fails, raise the cap.
 
 Per-subscription and per-destination ladders are set through the API. A malformed `retryDelays`
 gets a `400`. A stored one that does not parse fails the delivery with `INVALID_RETRY_LADDER`.

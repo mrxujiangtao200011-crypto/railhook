@@ -1467,7 +1467,7 @@
     "apiReference": "API reference",
     "cloud": "Cloud",
     "community": "Community",
-    "connect": "Connect with us",
+    "connect": "Contact",
     "connectEmail": "Email support",
     "connectGithub": "Railhook on GitHub",
     "copyright": "© {{year}} Railhook · MIT",
@@ -1885,7 +1885,7 @@
     },
     "product": {
       "label": "Product",
-      "title": "Send webhooks to customers and <hl>receive</hl><br/>them from anyone, in one place.",
+      "title": "Send webhooks to your customers and <hl>receive</hl><br/>them from Stripe, GitHub and others.",
       "out": {
         "tag": "Delivery your customers can check",
         "title": "Outgoing webhooks",
@@ -1911,7 +1911,7 @@
         "forwardTitle": "Forward with retries",
         "forwardBody": "If your app is down, the request waits in Railhook and is forwarded when it comes back.",
         "replayTitle": "Replay + Time Machine",
-        "replayBody": "Fixed a bug? Resend a past time range to your app as new deliveries.",
+        "replayBody": "Resend a past time range to your app as new deliveries, for example after fixing a bug in your handler.",
         "source": "Source",
         "signature": "Signature",
         "forwardedTo": "Forwarded to",
@@ -1924,7 +1924,7 @@
       }
     },
     "reliability": {
-      "label": "Built to survive failures",
+      "label": "Delivery",
       "title": "Their server was down for an hour.",
       "titleMuted": "The webhook still arrived.",
       "how": "How delivery works",
@@ -1943,7 +1943,7 @@
     },
     "selfHost": {
       "label": "Self-hosting",
-      "tag": "Your server, your data",
+      "tag": "PostgreSQL, Kafka and Redis in one Compose file",
       "title": "Runs on <hl>your server.</hl>",
       "body": "The self-hosted version is the whole product: every feature, no event limits, no licence key.",
       "deployLabel": "Deploy",
@@ -1953,7 +1953,7 @@
       "httpsLabel": "HTTPS",
       "https": "Caddy + Let’s Encrypt with <c>--domain</c>",
       "opsLabel": "Ops",
-      "ops": "Prometheus metrics, optional Grafana stack",
+      "ops": "Prometheus metrics, optional Grafana stack with alerts",
       "guide": "Read the self-hosting guide",
       "termComment": "one command: writes .env with generated secrets,\ngets a certificate and starts the stack",
       "termDayTwo": "day two",
@@ -1961,7 +1961,7 @@
       "termAria": "The install command and the three day-two commands: status, upgrade and backup."
     },
     "final": {
-      "title": "Free in our cloud,<br/>unlimited on <hl>your server.</hl>",
+      "title": "Start in our cloud,<br/>or run it on <hl>your server.</hl>",
       "body": "Railhook Cloud: {{events}} events a month, {{projects}} projects, {{retention}} days of history. Self-hosted: everything, MIT."
     }
   },
