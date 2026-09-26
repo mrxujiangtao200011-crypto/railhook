@@ -1,5 +1,8 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.DemoSessions;
 import com.webhook.platform.api.security.AllowedInDemo;
 import com.webhook.platform.api.domain.enums.SessionClient;
@@ -42,7 +45,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -94,12 +96,12 @@ public class AuthController {
             HttpServletResponse httpResponse) {
         String clientIp = getClientIp(httpRequest);
         if (!authRateLimiterService.allowRegister(clientIp)) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED,
                     "Too many registration attempts. Try again later.");
         }
         // Unconfigured, the verifier accepts everything, so self-hosting is unaffected.
         if (!captchaVerifier.verify(request.getCaptchaToken(), clientIp)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new DomainException(ErrorCode.CAPTCHA_FAILED,
                     "CAPTCHA verification failed. Please try again.");
         }
         AuthResponse response = authService.register(request, originOf(httpRequest));
@@ -118,7 +120,7 @@ public class AuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
         if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), request.getEmail())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED,
                     "Too many login attempts. Try again later.");
         }
         AuthResponse response = authService.login(request, originOf(httpRequest));
@@ -143,7 +145,7 @@ public class AuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getCode())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         // Good for one attempt, whatever its outcome.
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, authCookies.clearedSignInHandoff().toString());
@@ -168,10 +170,10 @@ public class AuthController {
                 (request != null ? request.getRefreshToken() : null);
         // Its own bucket: refresh runs on every page load.
         if (!authRateLimiterService.allowRefresh(getClientIp(httpRequest), refreshToken)) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         if (refreshToken == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token missing");
+            throw new UnauthorizedException("Refresh token missing");
         }
         AuthResponse response = authService.refreshToken(refreshToken, originOf(httpRequest));
         setRefreshTokenCookie(httpResponse, response.getRefreshToken());
@@ -234,7 +236,7 @@ public class AuthController {
     public ResponseEntity<Void> resendVerification(@RequestParam("email") String email,
             HttpServletRequest httpRequest) {
         if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), email)) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many requests. Try again later.");
         }
         authService.resendVerification(email);
         return ResponseEntity.ok().build();
@@ -395,7 +397,7 @@ public class AuthController {
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
             HttpServletRequest httpRequest) {
         if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), request.getEmail())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED,
                     "Too many requests. Try again later.");
         }
         authService.forgotPassword(request.getEmail());
@@ -411,7 +413,7 @@ public class AuthController {
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request,
             HttpServletRequest httpRequest) {
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getToken())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED,
                     "Too many requests. Try again later.");
         }
         authService.resetPassword(request.getToken(), request.getNewPassword());

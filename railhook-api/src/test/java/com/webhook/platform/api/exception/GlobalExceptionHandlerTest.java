@@ -1,7 +1,6 @@
 package com.webhook.platform.api.exception;
 
 import com.webhook.platform.common.exception.InvalidUrlException;
-import com.webhook.platform.common.security.UrlValidator;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.TypeInformation;
@@ -11,10 +10,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
+
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -57,6 +56,29 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getStatus()).isEqualTo(404);
         assertThat(response.getBody().getError()).isEqualTo("not_found");
+    }
+
+    @Test
+    @DisplayName("a domain exception answers with its code's status, its code and its message")
+    void domainExceptionCarriesItsCode() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleDomainException(new DomainException(ErrorCode.GONE, "Device code has expired"), null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.GONE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getStatus()).isEqualTo(410);
+        assertThat(response.getBody().getError()).isEqualTo("gone");
+        assertThat(response.getBody().getMessage()).isEqualTo("Device code has expired");
+    }
+
+    @Test
+    @DisplayName("the demo's refusal is a 403 with its own code")
+    void demoReadOnlyKeepsItsCode() {
+        ResponseEntity<ErrorResponse> response = handler.handleDomainException(new DemoReadOnlyException(), null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getError()).isEqualTo("demo_read_only");
     }
 
     @RestController

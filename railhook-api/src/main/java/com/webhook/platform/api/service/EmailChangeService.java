@@ -11,16 +11,19 @@ import com.webhook.platform.api.domain.repository.EmailChangeRequestRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.ChangeEmailRequest;
 import com.webhook.platform.api.dto.EmailChangeResponse;
+import com.webhook.platform.api.exception.ConflictException;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Duration;
@@ -82,18 +85,18 @@ public class EmailChangeService {
         User user = requireUser(userId);
         String newEmail = EmailAddresses.normalize(request.getNewEmail());
         if (newEmail.equalsIgnoreCase(user.getEmail())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "That is already your email address");
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "That is already your email address");
         }
 
         boolean verified = Boolean.TRUE.equals(user.getEmailVerified());
         if (!verified) {
             if (!captchaVerifier.verify(request.getCaptchaToken(), clientIp)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CAPTCHA verification failed. Please try again.");
+                throw new DomainException(ErrorCode.CAPTCHA_FAILED, "CAPTCHA verification failed. Please try again.");
             }
         } else if (user.getPasswordHash() != null) {
             if (request.getCurrentPassword() == null
                     || !passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+                throw new DomainException(ErrorCode.INVALID_REQUEST, "Current password is incorrect");
             }
         } else {
             requireRecentSignIn(userId, refreshToken);
@@ -111,7 +114,7 @@ public class EmailChangeService {
     public EmailChangeResponse resend(UUID userId) {
         User user = requireUser(userId);
         EmailChangeRequest pending = livePending(userId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "No email change is waiting for confirmation"));
+                new NotFoundException("No email change is waiting for confirmation"));
         budget.requireSendAllowance(user);
 
         String token = SecureTokens.generate(32);
@@ -138,10 +141,10 @@ public class EmailChangeService {
     public void confirm(String token) {
         EmailChangeRequest pending = changeRepository
                 .findByTokenHashAndStatus(SecureTokens.hash(token), EmailChangeStatus.PENDING)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                .orElseThrow(() -> new DomainException(ErrorCode.INVALID_REQUEST,
                         "This confirmation link is invalid or has already been used."));
         if (pending.getExpiresAt() == null || pending.getExpiresAt().isBefore(Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new DomainException(ErrorCode.INVALID_REQUEST,
                     "This confirmation link has expired. Ask for the change again.");
         }
         User user = requireUser(pending.getUserId());
@@ -160,7 +163,7 @@ public class EmailChangeService {
     public void cancelByToken(String cancelToken) {
         EmailChangeRequest pending = changeRepository
                 .findByCancelTokenHashAndStatus(SecureTokens.hash(cancelToken), EmailChangeStatus.PENDING)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                .orElseThrow(() -> new DomainException(ErrorCode.INVALID_REQUEST,
                         "This link is invalid or the change was already settled."));
         settle(pending, EmailChangeStatus.CANCELLED);
         // Whoever asked held a session; the owner disowning it is the reason to end it.
@@ -224,7 +227,7 @@ public class EmailChangeService {
                 .flatMap(token -> userSessionService.findByRefreshJti(jwtTokenService.getJtiFromToken(token)))
                 .filter(s -> userId.equals(s.getUserId()) && s.getRevokedAt() == null);
         if (session.isEmpty() || session.get().getCreatedAt().isBefore(Instant.now().minus(RECENT_SIGN_IN))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+            throw new ForbiddenException(
                     "Sign in with Google again, then change your email within 10 minutes.");
         }
     }
@@ -234,7 +237,7 @@ public class EmailChangeService {
         userRepository.findByEmail(EmailAddresses.normalize(email))
                 .filter(other -> !other.getId().equals(userId))
                 .ifPresent(other -> {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+                    throw new ConflictException("Email already exists");
                 });
     }
 
@@ -242,7 +245,7 @@ public class EmailChangeService {
         try {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+            throw new ConflictException("Email already exists");
         }
     }
 
@@ -259,7 +262,7 @@ public class EmailChangeService {
 
     private User requireUser(UUID userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
     private static EmailChangeResponse describe(User user, EmailChangeRequest pending) {

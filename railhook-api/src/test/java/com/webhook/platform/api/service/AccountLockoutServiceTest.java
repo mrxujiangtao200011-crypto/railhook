@@ -10,6 +10,7 @@ import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.LoginRequest;
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.security.JwtTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +21,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -261,14 +261,14 @@ class AccountLockoutServiceTest {
 
             for (int i = 0; i < 3; i++) {
                 assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN))
-                        .isInstanceOf(ResponseStatusException.class)
-                        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                        .isInstanceOf(DomainException.class)
+                        .extracting(e -> ((DomainException) e).getStatusCode())
                         .isEqualTo(HttpStatus.UNAUTHORIZED);
             }
 
             assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.LOCKED);
         }
 
@@ -293,8 +293,8 @@ class AccountLockoutServiceTest {
             }
 
             assertThatThrownBy(() -> authService.login(attempt(PASSWORD), ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.LOCKED);
             verify(userSessionService, never()).open(any());
         }
@@ -347,8 +347,8 @@ class AccountLockoutServiceTest {
             request.setPassword("whatever");
 
             assertThatThrownBy(() -> authService.login(request, ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.UNAUTHORIZED);
         }
     }

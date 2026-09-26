@@ -1,5 +1,7 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.AllowedInDemo;
 import com.webhook.platform.api.dto.PublicContactRequest;
 import com.webhook.platform.api.security.ProjectScopeExempt;
@@ -48,26 +50,23 @@ public class PublicContactController {
     public ResponseEntity<Map<String, String>> send(@Valid @RequestBody PublicContactRequest body,
                                                     HttpServletRequest request) {
         if (!emailService.isContactAvailable()) {
-            return error(HttpStatus.SERVICE_UNAVAILABLE, "contact_unavailable", "This deployment has no support address.");
+            throw new DomainException(ErrorCode.CONTACT_UNAVAILABLE, "This deployment has no support address.");
         }
         String ip = trustedProxyResolver.resolve(request);
         if (!authRateLimiterService.allowContactMessage(ip)) {
-            return error(HttpStatus.TOO_MANY_REQUESTS, "rate_limit_exceeded", "Too many messages. Try again in a minute.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many messages. Try again in a minute.");
         }
         if (!captchaVerifier.verify(body.getCaptchaToken(), ip)) {
-            return error(HttpStatus.BAD_REQUEST, "captcha_failed", "Challenge verification failed. Please try again.");
+            throw new DomainException(ErrorCode.CAPTCHA_FAILED, "Challenge verification failed. Please try again.");
         }
         // Last, so refused requests don't spend it: this ceiling keeps the mail quota for
         // verification and password-reset mails.
         if (!contactMessageBudget.tryAcquire()) {
-            return error(HttpStatus.TOO_MANY_REQUESTS, "contact_busy", "The form has taken all the messages it can today. Please write to support by email.");
+            throw new DomainException(ErrorCode.CONTACT_BUSY, "The form has taken all the messages it can today. Please write to support by email.");
         }
         String topic = body.getTopic() == null || body.getTopic().isEmpty() ? "other" : body.getTopic();
         emailService.sendContactMessage(body.getEmail().strip(), body.getName(), topic, body.getMessage().strip(), body.getPage());
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("status", "sent"));
     }
 
-    private static ResponseEntity<Map<String, String>> error(HttpStatus status, String code, String message) {
-        return ResponseEntity.status(status).body(Map.of("error", code, "message", message));
-    }
 }

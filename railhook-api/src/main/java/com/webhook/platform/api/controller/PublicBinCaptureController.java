@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.ProjectScopeExempt;
 import com.webhook.platform.api.service.PublicBinService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
@@ -51,7 +52,7 @@ public class PublicBinCaptureController {
         byte[] body = rawBody(request);
         if (!rateLimiterService.tryAcquireForSlug(RATE_KEY_PREFIX + slug, RATE_LIMIT_PER_SECOND)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(Map.of("ok", false, "error", "rate_limit_exceeded"));
+                    .body(Map.of("ok", false, "error", ErrorCode.RATE_LIMIT_EXCEEDED.getValue()));
         }
         long id = publicBinService.capture(slug, body, request);
         return ResponseEntity.ok(Map.of("ok", true, "requestId", id));

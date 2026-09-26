@@ -14,6 +14,7 @@ import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.exception.ConflictException;
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
@@ -32,7 +33,6 @@ import org.mockito.quality.Strictness;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
 import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Instant;
@@ -361,8 +361,8 @@ class MembershipServiceTest {
             assertThatThrownBy(() -> membershipService.addMember(
                     AddMemberRequest.builder().email("new@example.com").role(role).build(),
                     MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             verify(membershipRepository, never()).save(any());
@@ -377,8 +377,8 @@ class MembershipServiceTest {
             Membership membership = existingMember(memberId, MembershipRole.DEVELOPER, MembershipStatus.ACTIVE);
 
             assertThatThrownBy(() -> membershipService.changeMemberRole(memberId, role, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             assertThat(membership.getRole()).isEqualTo(MembershipRole.DEVELOPER);
@@ -447,8 +447,8 @@ class MembershipServiceTest {
         @DisplayName("only an owner can suspend")
         void suspendRequiresOwner() {
             assertThatThrownBy(() -> membershipService.suspendMember(memberId, ownerId, MembershipRole.DEVELOPER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.FORBIDDEN);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
@@ -462,8 +462,8 @@ class MembershipServiceTest {
                     .thenReturn(Optional.of(membership));
 
             assertThatThrownBy(() -> membershipService.suspendMember(ownerId, ownerId, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
@@ -478,8 +478,8 @@ class MembershipServiceTest {
                     organizationId, MembershipRole.OWNER, MembershipStatus.DISABLED)).thenReturn(1L);
 
             assertThatThrownBy(() -> membershipService.suspendMember(memberId, ownerId, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
@@ -503,8 +503,8 @@ class MembershipServiceTest {
             membership.setStatus(MembershipStatus.INVITED);
 
             assertThatThrownBy(() -> membershipService.suspendMember(memberId, ownerId, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
         }
 
@@ -526,7 +526,7 @@ class MembershipServiceTest {
             membership.setStatus(MembershipStatus.DISABLED);
 
             assertThatThrownBy(() -> membershipService.reinstateMember(memberId, MembershipRole.VIEWER))
-                    .isInstanceOfAny(ResponseStatusException.class, ForbiddenException.class);
+                    .isInstanceOf(ForbiddenException.class);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.DISABLED);
         }
@@ -537,8 +537,8 @@ class MembershipServiceTest {
             membership.setStatus(MembershipStatus.INVITED);
 
             assertThatThrownBy(() -> membershipService.reinstateMember(memberId, MembershipRole.OWNER))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.CONFLICT);
 
             assertThat(membership.getStatus()).isEqualTo(MembershipStatus.INVITED);

@@ -16,7 +16,9 @@ import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.LoginRequest;
 import com.webhook.platform.api.dto.SwitchOrganizationRequest;
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +32,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
 import com.webhook.platform.common.security.SecureTokens;
 
 import java.time.Instant;
@@ -198,8 +199,7 @@ class AuthServiceTest {
                     .thenReturn(Optional.of(session));
 
             assertThatThrownBy(() -> authService.switchOrganization(userId, to(clientOrgId), refreshToken))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .hasMessageContaining("401");
+                    .isInstanceOf(UnauthorizedException.class);
 
             verify(membershipRepository, never()).findByUserIdAndOrganizationId(any(), any());
         }
@@ -212,8 +212,7 @@ class AuthServiceTest {
                     .thenReturn(Optional.of(session));
 
             assertThatThrownBy(() -> authService.switchOrganization(userId, to(clientOrgId), refreshToken))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .hasMessageContaining("401");
+                    .isInstanceOf(UnauthorizedException.class);
         }
 
         @Test
@@ -222,8 +221,7 @@ class AuthServiceTest {
             String accessToken = realJwt.generateAccessToken(userId, homeOrgId, MembershipRole.OWNER, sessionId, true);
 
             assertThatThrownBy(() -> authService.switchOrganization(userId, to(clientOrgId), accessToken))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .hasMessageContaining("401");
+                    .isInstanceOf(UnauthorizedException.class);
         }
 
         @Test
@@ -307,8 +305,7 @@ class AuthServiceTest {
 
             assertThatThrownBy(() -> authService.refreshToken(
                     refreshToken, SessionOrigin.of(SessionClient.WEB, "a-browser", "198.51.100.4")))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .hasMessageContaining("401");
+                    .isInstanceOf(UnauthorizedException.class);
 
             verify(tokenBlacklistService, never()).blacklist(eq(realJwt.getJtiFromToken(refreshToken)), any());
         }
@@ -494,8 +491,8 @@ class AuthServiceTest {
 
             assertThatThrownBy(() -> authService.login(
                     LoginRequest.builder().email(user.getEmail()).password("correct-password").build(), WEB_ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.FORBIDDEN);
 
             verify(jwtTokenService, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
@@ -508,8 +505,8 @@ class AuthServiceTest {
                     .thenReturn(List.of(membership(suspendedOrgId, MembershipRole.DEVELOPER, MembershipStatus.DISABLED)));
 
             assertThatThrownBy(() -> authService.refreshToken("refresh-token", WEB_ORIGIN))
-                    .isInstanceOf(ResponseStatusException.class)
-                    .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                    .isInstanceOf(DomainException.class)
+                    .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.FORBIDDEN);
 
             verify(jwtTokenService, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());

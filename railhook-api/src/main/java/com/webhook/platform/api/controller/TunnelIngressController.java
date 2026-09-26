@@ -1,5 +1,8 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ErrorResponse;
+import com.webhook.platform.api.exception.ErrorResponseWriter;
 import com.webhook.platform.api.service.HopByHopHeaders;
 import com.webhook.platform.api.service.TunnelIngressService;
 import com.webhook.platform.common.dto.tunnel.TunnelBody;
@@ -13,13 +16,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -56,27 +57,15 @@ public class TunnelIngressController {
             return relay(answered.response());
         }
         if (outcome instanceof TunnelIngressService.Outcome.Refused refused) {
-            return problem(statusFor(refused), refused.error(), refused.message());
+            return problem(refused.error(), refused.message());
         }
         if (outcome instanceof TunnelIngressService.Outcome.TimedOut) {
-            return problem(HttpStatus.GATEWAY_TIMEOUT, "tunnel_timeout",
-                    "Tunnel request timed out or tunnel disconnected");
+            return problem(ErrorCode.TUNNEL_TIMEOUT, "Tunnel request timed out or tunnel disconnected");
         }
         if (outcome instanceof TunnelIngressService.Outcome.Failed failed) {
-            return problem(HttpStatus.BAD_GATEWAY, "tunnel_error", failed.detail());
+            return problem(ErrorCode.TUNNEL_ERROR, failed.detail());
         }
         throw new IllegalStateException("Unhandled tunnel outcome: " + outcome);
-    }
-
-    private static HttpStatus statusFor(TunnelIngressService.Outcome.Refused refused) {
-        return switch (refused.error()) {
-            case "rate_limit_exceeded" -> HttpStatus.TOO_MANY_REQUESTS;
-            case "payload_too_large" -> HttpStatus.PAYLOAD_TOO_LARGE;
-            // A CDN replaces a 502 with its own page, and providers retry a 503.
-            case "tunnel_offline" -> HttpStatus.SERVICE_UNAVAILABLE;
-            case "tunnel_suspended" -> HttpStatus.FORBIDDEN;
-            default -> HttpStatus.BAD_GATEWAY;
-        };
     }
 
     private TunnelRequestMessage asTunnelRequest(String slug, byte[] body, HttpServletRequest request) {
@@ -123,10 +112,10 @@ public class TunnelIngressController {
         return ResponseEntity.status(response.getStatusCode()).headers(headers).body(response.bodyBytes());
     }
 
-    private ResponseEntity<byte[]> problem(HttpStatus status, String error, String message) {
-        return ResponseEntity.status(status)
+    private ResponseEntity<byte[]> problem(ErrorCode code, String message) {
+        return ResponseEntity.status(code.getStatus())
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(("{\"error\":\"" + error + "\",\"message\":\"" + message + "\"}")
-                        .getBytes(StandardCharsets.UTF_8));
+                .body(ErrorResponseWriter.toJsonBytes(
+                        ErrorResponse.builder().error(code.getValue()).message(message).build()));
     }
 }

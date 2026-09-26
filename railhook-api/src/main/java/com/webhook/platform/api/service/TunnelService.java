@@ -1,5 +1,8 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
@@ -12,13 +15,11 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.web.server.ResponseStatusException;
 import com.webhook.platform.common.security.SecureTokens;
 
 import java.security.SecureRandom;
@@ -57,7 +58,7 @@ public class TunnelService {
         UUID organizationId = TenantContext.require();
         if (projectId != null) {
             projectRepository.findById(projectId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    .orElseThrow(() -> new NotFoundException(
                             "Project not found"));
         }
         enforceActiveTunnelLimit(organizationId);
@@ -100,7 +101,7 @@ public class TunnelService {
     @Transactional
     public void closeSession(UUID sessionId) {
         TunnelSession session = tunnelSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
+                .orElseThrow(() -> new NotFoundException("Tunnel session not found"));
         close(session);
     }
 
@@ -168,21 +169,21 @@ public class TunnelService {
 
     public TunnelSession getActiveBySlug(String slug) {
         TunnelSession session = tunnelSessionRepository.findByPublicSlug(slug)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel not found"));
+                .orElseThrow(() -> new NotFoundException("Tunnel not found"));
         if (session.getStatus() != TunnelStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.GONE, "Tunnel is no longer active");
+            throw new DomainException(ErrorCode.GONE, "Tunnel is no longer active");
         }
         return session;
     }
 
     public TunnelSession getBySessionAndOrg(UUID sessionId) {
         return tunnelSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
+                .orElseThrow(() -> new NotFoundException("Tunnel session not found"));
     }
 
     public TunnelSession getByToken(String tunnelToken) {
         return tunnelSessionRepository.findByTunnelToken(tunnelToken)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
+                .orElseThrow(() -> new NotFoundException("Tunnel session not found"));
     }
 
     public List<TunnelSessionResponse> listActive() {

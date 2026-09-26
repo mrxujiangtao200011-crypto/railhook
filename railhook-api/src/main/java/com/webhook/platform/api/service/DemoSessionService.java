@@ -1,14 +1,14 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.dto.DemoSessionResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.JwtTokenService;
 import com.webhook.platform.common.demo.DemoTenant;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -51,7 +51,7 @@ public class DemoSessionService {
                         + "AND role = 'VIEWER' AND status = 'ACTIVE'",
                 Integer.class, DemoTenant.USER_ID, DemoTenant.ORGANIZATION_ID);
         if (members == null || members == 0) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+            throw new DomainException(ErrorCode.SERVICE_UNAVAILABLE,
                     "The demo is being prepared. Try again in a minute.");
         }
         String token = jwtTokenService.generateDemoAccessToken(DemoTenant.USER_ID, DemoTenant.ORGANIZATION_ID, sessionTtl);

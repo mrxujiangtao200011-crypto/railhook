@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.Project;
@@ -17,7 +18,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -158,7 +158,7 @@ class TunnelServiceTest {
 
         when(tunnelSessionRepository.findByPublicSlug("tun-closed")).thenReturn(Optional.of(session));
 
-        assertThrows(ResponseStatusException.class, () -> tunnelService.getActiveBySlug("tun-closed"));
+        assertThrows(DomainException.class, () -> tunnelService.getActiveBySlug("tun-closed"));
     }
 
     // A slug cut out of base64 came up short when enough '-' and '_' were stripped, and creation threw.

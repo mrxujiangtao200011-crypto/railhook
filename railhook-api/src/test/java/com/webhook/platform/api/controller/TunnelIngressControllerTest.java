@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.filter.IngressRawBodyFilter;
 import com.webhook.platform.api.service.TunnelIngressService;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
@@ -36,7 +37,7 @@ class TunnelIngressControllerTest {
     void setUp() {
         tunnelIngressService = mock(TunnelIngressService.class);
         when(tunnelIngressService.forward(anyString(), any(), any()))
-                .thenReturn(new TunnelIngressService.Outcome.Refused("rate_limit_exceeded", "stop here"));
+                .thenReturn(new TunnelIngressService.Outcome.Refused(ErrorCode.RATE_LIMIT_EXCEEDED, "stop here"));
         mockMvc = MockMvcBuilders.standaloneSetup(new TunnelIngressController(tunnelIngressService))
                 .addFilters(new IngressRawBodyFilter())
                 .build();
@@ -60,7 +61,7 @@ class TunnelIngressControllerTest {
     @Test
     void anOfflineTunnelAnswers503() throws Exception {
         when(tunnelIngressService.forward(anyString(), any(), any()))
-                .thenReturn(new TunnelIngressService.Outcome.Refused("tunnel_offline", "Tunnel is not connected"));
+                .thenReturn(new TunnelIngressService.Outcome.Refused(ErrorCode.TUNNEL_OFFLINE, "Tunnel is not connected"));
 
         mockMvc.perform(post("/tunnel/tun-abc123/webhooks/stripe").contentType("application/json").content("{}"))
                 .andExpect(status().isServiceUnavailable());

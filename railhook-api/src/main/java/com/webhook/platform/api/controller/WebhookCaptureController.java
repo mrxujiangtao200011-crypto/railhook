@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.repository.TestEndpointRepository;
 import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.WebhookCaptureResponse;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.TestEndpointService;
 import com.webhook.platform.api.tenancy.TenantContext;
@@ -67,7 +68,7 @@ public class WebhookCaptureController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(WebhookCaptureResponse.builder()
                             .success(false)
-                            .error("not_found")
+                            .error(ErrorCode.NOT_FOUND.getValue())
                             .message("Test endpoint not found")
                             .build());
         }
@@ -77,7 +78,7 @@ public class WebhookCaptureController {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(WebhookCaptureResponse.builder()
                             .success(false)
-                            .error("rate_limit_exceeded")
+                            .error(ErrorCode.RATE_LIMIT_EXCEEDED.getValue())
                             .message("Too many requests to this test endpoint")
                             .build());
         }

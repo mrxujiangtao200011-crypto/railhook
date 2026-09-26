@@ -2,6 +2,8 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.DemoSessionRequest;
 import com.webhook.platform.api.dto.DemoSessionResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.AllowedInDemo;
 import com.webhook.platform.api.security.ProjectScopeExempt;
 import com.webhook.platform.api.security.TrustedProxyResolver;
@@ -15,14 +17,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/public/demo")
@@ -54,16 +54,13 @@ public class PublicDemoController {
         demoSessionService.requireEnabled();
         String ip = trustedProxyResolver.resolve(request);
         if (!authRateLimiterService.allowDemoSession(ip)) {
-            return error(HttpStatus.TOO_MANY_REQUESTS, "rate_limit_exceeded", "Too many demo sessions. Try again in a minute.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many demo sessions. Try again in a minute.");
         }
         if (!captchaVerifier.verify(body == null ? null : body.getCaptchaToken(), ip)) {
-            return error(HttpStatus.BAD_REQUEST, "captcha_failed", "Challenge verification failed. Please try again.");
+            throw new DomainException(ErrorCode.CAPTCHA_FAILED, "Challenge verification failed. Please try again.");
         }
         DemoSessionResponse session = demoSessionService.open();
         return ResponseEntity.ok(session);
     }
 
-    private static ResponseEntity<Map<String, String>> error(HttpStatus status, String code, String message) {
-        return ResponseEntity.status(status).body(Map.of("error", code, "message", message));
-    }
 }

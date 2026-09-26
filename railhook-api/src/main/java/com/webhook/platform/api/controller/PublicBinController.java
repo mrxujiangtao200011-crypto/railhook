@@ -1,6 +1,7 @@
 package com.webhook.platform.api.controller;
 
-import com.webhook.platform.api.exception.PublicBinLimitException;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.security.AllowedInDemo;
 import com.webhook.platform.api.dto.PublicBinCreateRequest;
 import com.webhook.platform.api.dto.PublicBinResponse;
@@ -23,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
 
 /** The public webhook tester, no account needed. Captured requests land on PublicBinCaptureController. */
 @RestController
@@ -52,23 +52,13 @@ public class PublicBinController {
                                     HttpServletRequest request) {
         String ip = trustedProxyResolver.resolve(request);
         if (!authRateLimiterService.allowPublicBin(ip)) {
-            return error(HttpStatus.TOO_MANY_REQUESTS, "rate_limit_exceeded", "Too many tester URLs. Try again in a minute.");
+            throw new DomainException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many tester URLs. Try again in a minute.");
         }
         // Per-address limits alone do not stop a script with many addresses.
         if (!captchaVerifier.verify(body == null ? null : body.getCaptchaToken(), ip)) {
-            return error(HttpStatus.BAD_REQUEST, "captcha_failed", "Challenge verification failed. Please try again.");
+            throw new DomainException(ErrorCode.CAPTCHA_FAILED, "Challenge verification failed. Please try again.");
         }
-        try {
-            return ResponseEntity.status(HttpStatus.CREATED).body(publicBinService.create(ip));
-        } catch (PublicBinLimitException e) {
-            return e.isOverall()
-                    ? error(HttpStatus.SERVICE_UNAVAILABLE, "tester_busy", e.getMessage())
-                    : error(HttpStatus.TOO_MANY_REQUESTS, "too_many_active_urls", e.getMessage());
-        }
-    }
-
-    private static ResponseEntity<Map<String, String>> error(HttpStatus status, String code, String message) {
-        return ResponseEntity.status(status).body(Map.of("error", code, "message", message));
+        return ResponseEntity.status(HttpStatus.CREATED).body(publicBinService.create(ip));
     }
 
     @Operation(operationId = "getPublicBin", summary = "Read a tester URL",

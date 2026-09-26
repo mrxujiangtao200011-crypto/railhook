@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.DeviceAuthCode;
@@ -24,7 +25,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -150,7 +150,7 @@ class DeviceAuthServiceTest {
                 .thenReturn(Optional.of(code));
         when(deviceAuthCodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThrows(ResponseStatusException.class, () ->
+        assertThrows(DomainException.class, () ->
                 deviceAuthService.approveDeviceCode(userCode, UUID.randomUUID()));
     }
 
@@ -189,7 +189,7 @@ class DeviceAuthServiceTest {
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
-        ResponseStatusException thrown = assertThrows(ResponseStatusException.class, () ->
+        DomainException thrown = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(403, thrown.getStatusCode().value());
         verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
@@ -257,7 +257,7 @@ class DeviceAuthServiceTest {
         when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId))
                 .thenReturn(Optional.of(membership));
 
-        ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
+        DomainException thrown = assertThrows(DomainException.class,
                 () -> deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(HttpStatus.FORBIDDEN, thrown.getStatusCode());
 
@@ -324,7 +324,7 @@ class DeviceAuthServiceTest {
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
         when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId)).thenReturn(Optional.empty());
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(403, ex.getStatusCode().value());
         verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
@@ -343,7 +343,7 @@ class DeviceAuthServiceTest {
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
         verify(membershipRepository, never()).findByUserIdAndOrganizationId(any(), any());
@@ -372,7 +372,7 @@ class DeviceAuthServiceTest {
         when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId)).thenReturn(Optional.of(membership));
         when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(0);
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
         verify(jwtTokenService, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
@@ -390,7 +390,7 @@ class DeviceAuthServiceTest {
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(202, ex.getStatusCode().value());
     }
@@ -407,7 +407,7 @@ class DeviceAuthServiceTest {
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+        DomainException ex = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
     }

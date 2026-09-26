@@ -3,6 +3,8 @@ package com.webhook.platform.api.security;
 import com.webhook.platform.api.domain.entity.PortalSession;
 import com.webhook.platform.api.domain.repository.PortalSessionRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.exception.ErrorCode;
+import com.webhook.platform.api.exception.ErrorResponseWriter;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.servlet.FilterChain;
@@ -12,7 +14,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -75,11 +76,9 @@ public class PortalSessionAuthenticationFilter extends OncePerRequestFilter {
                 PortalSession live = session.get();
                 if (!rateLimiterService.tryAcquireForPortalSession(live.getId(), requestsPerSecond)) {
                     log.warn("Portal session {} exceeded its rate limit ({}/sec)", live.getId(), requestsPerSecond);
-                    response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-                    response.setContentType("application/json");
                     response.setHeader("Retry-After", "1");
-                    response.getWriter().write("{\"error\":\"portal_rate_limit\","
-                            + "\"message\":\"Too many requests. Please retry shortly.\",\"status\":429}");
+                    ErrorResponseWriter.write(response, ErrorCode.PORTAL_RATE_LIMIT,
+                            "Too many requests. Please retry shortly.");
                     return;
                 }
                 // Replaces any other authentication: an API key sent alongside grants nothing here.

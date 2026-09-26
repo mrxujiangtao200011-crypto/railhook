@@ -9,7 +9,6 @@ import com.webhook.platform.api.domain.entity.Incident;
 import com.webhook.platform.api.domain.entity.IncidentTimeline;
 import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
-import com.webhook.platform.api.domain.enums.AlertType;
 import com.webhook.platform.api.domain.enums.IncidentStatus;
 import com.webhook.platform.api.domain.enums.IncidentTimelineType;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
@@ -21,6 +20,8 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertEventResponse;
 import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.dto.AlertRuleResponse;
+import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.security.UrlValidator;
@@ -28,18 +29,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -111,14 +110,14 @@ public class AlertService {
         List<String> addresses = EmailAddresses.splitList(recipients).stream().distinct().toList();
         if (addresses.size() > AlertRuleRequest.MAX_EMAIL_RECIPIENTS
                 || !addresses.stream().allMatch(EmailAddresses::isPlausible)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new DomainException(ErrorCode.INVALID_REQUEST,
                     "Email recipients must be at most " + AlertRuleRequest.MAX_EMAIL_RECIPIENTS
                             + " addresses, separated by commas");
         }
         Set<String> members = new HashSet<>(membershipRepository.findVerifiedMemberEmailsIn(addresses));
         List<String> outsiders = addresses.stream().filter(address -> !members.contains(address)).toList();
         if (!outsiders.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new DomainException(ErrorCode.INVALID_REQUEST,
                     "Alert emails can only go to members of this organization who have verified their "
                             + "address. Not a verified member: " + String.join(", ", outsiders));
         }
