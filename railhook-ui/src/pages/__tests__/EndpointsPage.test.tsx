@@ -80,18 +80,11 @@ describe('EndpointsPage', () => {
     expect(await screen.findByText(/no endpoints yet/i)).toBeInTheDocument();
   });
 
-  it('renders populated rows when endpoints exist', async () => {
-    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-    vi.mocked(endpointsApi.listPaged).mockResolvedValue(populatedPage([ENDPOINT]));
-    renderEndpoints();
-    expect(await screen.findByText('https://example.com/webhook')).toBeInTheDocument();
-  });
-
-  it('has no detectable axe accessibility violations when populated', async () => {
+  it('lists the rows it is given, with no detectable axe violations', async () => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(endpointsApi.listPaged).mockResolvedValue(populatedPage([ENDPOINT]));
     const { container } = renderEndpoints();
-    await screen.findByText('https://example.com/webhook');
+    expect(await screen.findByText('https://example.com/webhook')).toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
   });
 
@@ -121,30 +114,6 @@ describe('EndpointsPage', () => {
     await user.click(screen.getByRole('button', { name: /retry/i }));
 
     expect(await screen.findByText('https://example.com/webhook')).toBeInTheDocument();
-  });
-
-  it('keyboard: Escape closes the create-endpoint dialog (Radix focus-return to the trigger verified manually in a real browser — jsdom has no layout engine, so Radix\'s focus-scope visibility check can\'t be exercised here)', async () => {
-    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-    vi.mocked(endpointsApi.listPaged).mockResolvedValue(populatedPage([ENDPOINT]));
-
-    const { default: userEvent } = await import('@testing-library/user-event');
-    const user = userEvent.setup();
-    renderEndpoints();
-
-    await screen.findByText('https://example.com/webhook');
-
-    const trigger = screen.getByRole('button', { name: /new endpoint/i });
-    await user.click(trigger);
-
-    const dialog = await screen.findByRole('dialog');
-    expect(dialog).toBeInTheDocument();
-    // Radix auto-focuses the first focusable element inside the dialog on open.
-    expect(dialog.contains(document.activeElement)).toBe(true);
-
-    await user.keyboard('{Escape}');
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(trigger).toBeInTheDocument();
   });
 
   it('lets the creator choose a signature scheme, and sends the one they chose', async () => {

@@ -100,18 +100,11 @@ describe('IncomingEventsPage', () => {
     expect(await screen.findByText(/no incoming events/i)).toBeInTheDocument();
   });
 
-  it('renders populated rows when incoming events exist', async () => {
-    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-    vi.mocked(incomingEventsApi.list).mockResolvedValue(populatedEventsPage([INCOMING_EVENT]));
-    renderIncomingEvents();
-    expect(await screen.findByText(/req-12345678/)).toBeInTheDocument();
-  });
-
-  it('has no detectable axe accessibility violations when populated', async () => {
+  it('lists the rows it is given, with no detectable axe violations', async () => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(incomingEventsApi.list).mockResolvedValue(populatedEventsPage([INCOMING_EVENT]));
     const { container } = renderIncomingEvents();
-    await screen.findByText(/req-12345678/);
+    expect(await screen.findByText(/req-12345678/)).toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
   });
 

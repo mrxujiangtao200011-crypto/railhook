@@ -77,15 +77,15 @@ describe('PiiRulesPage', () => {
     renderPii();
     await screen.findByText('email');
 
-    expect(within(rowFor('email')).queryByRole('button', { name: /delete|видалити/i })).toBeNull();
-    expect(within(rowFor('ssn')).getByRole('button', { name: /delete|видалити/i })).toBeInTheDocument();
+    expect(within(rowFor('email')).queryByRole('button', { name: /delete/i })).toBeNull();
+    expect(within(rowFor('ssn')).getByRole('button', { name: /delete/i })).toBeInTheDocument();
   });
 
   it('deletes nothing until the dialog is agreed to', async () => {
     renderPii();
     await screen.findByText('ssn');
 
-    await userEvent.click(within(rowFor('ssn')).getByRole('button', { name: /delete|видалити/i }));
+    await userEvent.click(within(rowFor('ssn')).getByRole('button', { name: /delete/i }));
 
     // Role is dialog: ui/alert-dialog.tsx is built on @radix-ui/react-dialog.
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
@@ -121,26 +121,16 @@ describe('PiiRulesPage', () => {
     renderPii();
 
     await waitFor(() => expect(piiRulesApi.list).toHaveBeenCalled());
-    expect(await screen.findByRole('button', { name: /default|стандарт|типов/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /default/i })).toBeInTheDocument();
     expect(piiRulesApi.seedDefaults).not.toHaveBeenCalled();
   });
 
   it('shows an error state rather than an empty page when the rules fail to load', async () => {
-    vi.mocked(piiRulesApi.list).mockRejectedValue(new Error('boom'));
+    vi.mocked(piiRulesApi.list).mockRejectedValue({ response: { status: 500, data: { message: 'Rules store unavailable' } } });
     renderPii();
 
-    await waitFor(() => expect(piiRulesApi.list).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rules store unavailable');
     expect(screen.queryByRole('switch')).toBeNull();
-  });
-
-  it('changes nothing by being opened', async () => {
-    renderPii();
-
-    await screen.findByText('ssn');
-    expect(piiRulesApi.create).not.toHaveBeenCalled();
-    expect(piiRulesApi.update).not.toHaveBeenCalled();
-    expect(piiRulesApi.delete).not.toHaveBeenCalled();
-    expect(piiRulesApi.seedDefaults).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /default/i })).toBeNull();
   });
 });

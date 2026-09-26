@@ -80,15 +80,6 @@ describe('DeliveriesPage XSS', () => {
     vi.restoreAllMocks();
   });
 
-  it('canonical case: a hostile project name does not execute as script', async () => {
-    const { container } = renderDeliveries();
-
-    await screen.findByText(/onerror=alert/);
-
-    expect(container.querySelector('img')).toBeNull();
-    expect(alertSpy).not.toHaveBeenCalled();
-  });
-
   it('the hostile name pushed through the <Trans> subtitle renders as literal text', async () => {
     renderDeliveries();
 

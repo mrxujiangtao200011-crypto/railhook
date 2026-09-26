@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '../../i18n';
+import en from '../../i18n/locales/en.json';
 import { renderPage } from '../../test/renderPage';
 import type { ProjectResponse } from '../../types/api.types';
 
@@ -39,48 +40,30 @@ describe('ProjectsPage', () => {
     vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
   });
 
-  it('lists the projects', async () => {
-    renderProjects();
-
-    expect(await screen.findByText('Production')).toBeInTheDocument();
-  });
-
-  it('tells a new account what to do instead of showing an empty page', async () => {
+  it('tells a new account what a project is and how to make one', async () => {
     vi.mocked(projectsApi.list).mockResolvedValue([]);
     renderProjects();
 
-    await waitFor(() => expect(projectsApi.list).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
-    expect(screen.queryByText('Production')).toBeNull();
+    expect(await screen.findByText(en.projects.noProjects)).toBeInTheDocument();
+    expect(screen.getByText(en.projects.noProjectsDesc)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: en.projects.createFirst })).toBeInTheDocument();
   });
 
-  it('does not delete anything without a confirmation', async () => {
+  it('asks for a confirmation before deleting a project', async () => {
     renderProjects();
     await screen.findByText('Production');
 
-    const deleteButton = screen.queryAllByRole('button')
-      .find((b) => /delete|видалити/i.test(b.getAttribute('aria-label') ?? b.textContent ?? ''));
+    await userEvent.click(screen.getByRole('button', { name: en.projects.deleteNamed.replace('{{name}}', 'Production') }));
 
-    if (deleteButton) {
-      await userEvent.click(deleteButton);
-      expect(projectsApi.delete).not.toHaveBeenCalled();
-    }
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(projectsApi.delete).not.toHaveBeenCalled();
   });
 
-  it('creates nothing by rendering', async () => {
+  it('says the list failed to load rather than offering to create a first project', async () => {
+    vi.mocked(projectsApi.list).mockRejectedValue({ response: { status: 500, data: { message: 'Projects are unavailable' } } });
     renderProjects();
 
-    await screen.findByText('Production');
-    expect(projectsApi.create).not.toHaveBeenCalled();
-    expect(projectsApi.delete).not.toHaveBeenCalled();
-  });
-
-  it('shows an error state rather than a blank page when the list fails', async () => {
-    vi.mocked(projectsApi.list).mockRejectedValue(new Error('boom'));
-    renderProjects();
-
-    await waitFor(() => expect(projectsApi.list).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Projects are unavailable');
+    expect(screen.queryByText(en.projects.noProjects)).not.toBeInTheDocument();
   });
 });

@@ -82,28 +82,23 @@ describe('ReplayPage', () => {
     expect(replayApi.estimate).not.toHaveBeenCalled();
   });
 
-  it('shows a running session with its progress', async () => {
-    vi.mocked(replayApi.list).mockResolvedValue(page([RUNNING]));
+  it.each([
+    ['a running session with its progress', RUNNING, 'Running', /300\/1\D?200/],
+    ['a completed session', COMPLETED, 'Completed', /1\D?200\/1\D?200/],
+  ])('shows %s', async (_, session, status, progress) => {
+    vi.mocked(replayApi.list).mockResolvedValue(page([session]));
     renderReplay();
 
-    await waitFor(() => expect(replayApi.list).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent).toMatch(/300|1[,.\s]?200|25/));
+    const row = (await screen.findByText(status)).closest('tr')!;
+    expect(row).toHaveTextContent(progress);
   });
 
-  it('shows a completed session', async () => {
-    vi.mocked(replayApi.list).mockResolvedValue(page([COMPLETED]));
+  it('says the history failed to load rather than showing no sessions', async () => {
+    vi.mocked(replayApi.list).mockRejectedValue({ response: { status: 500, data: { message: 'Replay history unavailable' } } });
     renderReplay();
 
-    await waitFor(() => expect(replayApi.list).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent).toMatch(/complete/i));
-  });
-
-  it('renders something when the session list fails to load', async () => {
-    vi.mocked(replayApi.list).mockRejectedValue(new Error('boom'));
-    renderReplay();
-
-    await waitFor(() => expect(replayApi.list).toHaveBeenCalled());
-    await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Replay history unavailable');
+    expect(screen.queryByText('No replay sessions')).not.toBeInTheDocument();
   });
 
   it('renders an empty history without breaking', async () => {
