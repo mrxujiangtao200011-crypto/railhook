@@ -90,6 +90,9 @@ Two rules carry the rest: **never commit or push directly to `main`**, and **nev
   ancestry, so `main` and `develop` lose their common base and every later merge conflicts on
   byte-identical files. This has happened twice; a ruleset on `main` now blocks squash and rebase.
 
+Commits and PRs are authored by the owner alone: no `Co-Authored-By` trailer for an AI model and
+no "Generated with …" line in commit messages or PR descriptions.
+
 `main` requires a PR with green checks and merge commits only; reviews are a convention, not a
 gate. `develop` blocks only force-push and deletion. Commit prefixes: `feat:`, `fix:`, `docs:`,
 `test:`, `refactor:`, `chore:` (`CONTRIBUTING.md` has the policy).
