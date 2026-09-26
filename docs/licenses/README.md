@@ -7,8 +7,8 @@ component this repo used to carry was removed rather than argued for).
 
 | File | What | Tool |
 |---|---|---|
-| `backend-THIRD-PARTY.txt` | License per Maven dependency (common/api/worker/cli, 230 entries) | [license-maven-plugin](https://www.mojohaus.org/license-maven-plugin/) |
-| `backend-sbom.json` | CycloneDX 1.5 SBOM, 191 components | [cyclonedx-maven-plugin](https://github.com/CycloneDX/cyclonedx-maven-plugin) |
+| `backend-THIRD-PARTY.txt` | License per Maven dependency (common/api/worker/cli, 307 entries) | [license-maven-plugin](https://www.mojohaus.org/license-maven-plugin/) |
+| `backend-sbom.json` | CycloneDX 1.5 SBOM, 263 components | [cyclonedx-maven-plugin](https://github.com/CycloneDX/cyclonedx-maven-plugin) |
 | `frontend-licenses.json` | License per npm dependency (`railhook-ui`, 654 packages) | [license-checker](https://github.com/davglass/license-checker) |
 | `frontend-sbom.json` | CycloneDX 1.6 SBOM, 619 components | [@cyclonedx/cyclonedx-npm](https://github.com/CycloneDX/cyclonedx-node-npm) |
 
