@@ -9,10 +9,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -122,64 +126,34 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
 
         JsonNode captured = objectMapper.readTree(result.getResponse().getContentAsString());
         JsonNode first = captured.isArray() ? captured.get(0) : captured.path("content").get(0);
-        org.junit.jupiter.api.Assertions.assertEquals("{\"hello\":\"world\"}", first.get("body").asText());
+        assertThat(first.get("body").asText()).isEqualTo("{\"hello\":\"world\"}");
+    }
+
+    // Not found rather than forbidden: 403 would confirm the id exists.
+    @Test
+    void anotherOrganizationGetsNotFoundOnEveryRoute() throws Exception {
+        String base = "/api/v1/projects/" + projectAId + "/test-endpoints";
+        String one = base + "/" + testEndpointAId;
+        List<MockHttpServletRequestBuilder> requests = List.of(
+                post(base).contentType(MediaType.APPLICATION_JSON).content("{}"),
+                get(base),
+                get(one),
+                delete(one),
+                get(one + "/requests"),
+                delete(one + "/requests"));
+        for (MockHttpServletRequestBuilder request : requests) {
+            MockHttpServletResponse response = mockMvc.perform(request.header("Authorization", "Bearer " + orgBJwt))
+                    .andReturn().getResponse();
+            assertThat(response.getStatus()).as(request.toString()).isEqualTo(404);
+        }
     }
 
     @Test
-    public void orgB_create_onOrgAProject_forbidden() throws Exception {
-        mockMvc.perform(post("/api/v1/projects/" + projectAId + "/test-endpoints")
-                        .header("Authorization", "Bearer " + orgBJwt)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                // Not found rather than forbidden: 403 would confirm the id exists.
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void orgB_list_onOrgAProject_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints")
-                        .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void orgB_get_onOrgAProject_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
-                        .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void orgB_delete_onOrgAProject_forbidden() throws Exception {
-        mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
-                        .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void orgB_getRequests_onOrgAProject_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
-                        .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void orgB_clearRequests_onOrgAProject_forbidden() throws Exception {
-        mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
-                        .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void apiKey_crossProjectSameOrg_list_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectA2Id + "/test-endpoints")
-                        .header("X-API-Key", apiKeyForProjectA))
+    void apiKeyIsForbiddenOnAnotherProjectOfTheSameOrganization() throws Exception {
+        String otherProject = "/api/v1/projects/" + projectA2Id + "/test-endpoints";
+        mockMvc.perform(get(otherProject).header("X-API-Key", apiKeyForProjectA))
                 .andExpect(status().isForbidden());
-    }
-
-    @Test
-    public void apiKey_crossProjectSameOrg_create_forbidden() throws Exception {
-        mockMvc.perform(post("/api/v1/projects/" + projectA2Id + "/test-endpoints")
+        mockMvc.perform(post(otherProject)
                         .header("X-API-Key", apiKeyForProjectA)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -187,49 +161,27 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    public void orgA_list_ok() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints")
-                        .header("Authorization", "Bearer " + orgAJwt))
+    void ownerManagesTheTestEndpoint() throws Exception {
+        String base = "/api/v1/projects/" + projectAId + "/test-endpoints";
+        String one = base + "/" + testEndpointAId;
+        String auth = "Bearer " + orgAJwt;
+
+        mockMvc.perform(get(base).header("Authorization", auth))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
-    }
-
-    @Test
-    public void orgA_get_ok() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
-                        .header("Authorization", "Bearer " + orgAJwt))
+        mockMvc.perform(get(one).header("Authorization", auth))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(testEndpointAId.toString()));
-    }
-
-    @Test
-    public void orgA_getRequests_ok() throws Exception {
-        mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
-                        .header("Authorization", "Bearer " + orgAJwt))
+        mockMvc.perform(get(one + "/requests").header("Authorization", auth))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1));
-    }
-
-    @Test
-    public void orgA_clearRequests_ok() throws Exception {
-        mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
-                        .header("Authorization", "Bearer " + orgAJwt))
+        mockMvc.perform(delete(one + "/requests").header("Authorization", auth))
                 .andExpect(status().isNoContent());
-    }
-
-    @Test
-    public void orgA_create_ok() throws Exception {
-        mockMvc.perform(post("/api/v1/projects/" + projectAId + "/test-endpoints")
-                        .header("Authorization", "Bearer " + orgAJwt)
+        mockMvc.perform(post(base).header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
-    }
-
-    @Test
-    public void orgA_delete_ok() throws Exception {
-        mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
-                        .header("Authorization", "Bearer " + orgAJwt))
+        mockMvc.perform(delete(one).header("Authorization", auth))
                 .andExpect(status().isNoContent());
     }
 }

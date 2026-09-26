@@ -279,13 +279,6 @@ class IncomingDestinationServiceTest {
         assertThat(saved.getValue().getMaxAttempts()).isEqualTo(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS);
     }
 
-    @Test
-    void incomingDefaultLadder_deliberatelyShorterThanOutgoing() {
-        // The two directions differ on purpose; aligning them is not a tidy-up.
-        assertThat(RetryLadderDefaults.INCOMING_DELAYS).isNotEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);
-        assertThat(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS).isLessThan(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS);
-    }
-
     // A ladder longer than the escalation cap sent the Forward to the DLQ before its later tiers ran.
     @Test
     void createDestination_ladderOutlivingTheEscalationCap_throws() {

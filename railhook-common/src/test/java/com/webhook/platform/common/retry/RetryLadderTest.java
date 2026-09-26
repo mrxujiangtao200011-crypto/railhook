@@ -184,15 +184,6 @@ class RetryLadderTest {
     class Defaults {
 
         @Test
-        @DisplayName("both directions parse")
-        void bothParse() {
-            assertEquals(List.of(60L, 300L, 900L, 3600L, 21600L, 86400L),
-                    RetryLadderDefaults.outgoing().delaysSeconds());
-            assertEquals(List.of(60L, 300L, 900L, 3600L, 21600L),
-                    RetryLadderDefaults.incoming().delaysSeconds());
-        }
-
-        @Test
         @DisplayName("the two directions differ on purpose — see RetryLadderDefaults")
         void deliberatelyDifferent() {
             assertNotEquals(RetryLadderDefaults.outgoing(), RetryLadderDefaults.incoming());

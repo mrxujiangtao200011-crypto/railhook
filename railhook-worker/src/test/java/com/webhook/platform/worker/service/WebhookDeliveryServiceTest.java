@@ -9,6 +9,7 @@ import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
 import com.webhook.platform.worker.attempt.ProjectStatusLookup;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
@@ -671,13 +672,9 @@ class WebhookDeliveryServiceTest {
                 .build();
     }
 
-    @Test
-    void attemptDelivery_2xxResponse_marksSuccess_noRetryScheduled() throws Exception {
+    private UUID deliverAgainst(HttpHandler receiver, int timeoutSeconds) throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        httpServer.createContext("/hook", exchange -> {
-            exchange.sendResponseHeaders(200, 0);
-            exchange.getResponseBody().close();
-        });
+        httpServer.createContext("/hook", receiver);
         httpServer.start();
         try {
             UUID endpointId = UUID.randomUUID();
@@ -692,148 +689,76 @@ class WebhookDeliveryServiceTest {
             stubHappyPathPrerequisites(endpoint);
 
             Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
+            delivery.setTimeoutSeconds(timeoutSeconds);
             when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            service.processDelivery(message, true);
-
-            verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
-            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
-            verify(circuitBreakerService).recordSuccess(eq(endpointId), anyLong());
-            verify(concurrencyControlService).releaseForTarget(endpointId);
+            service.processDelivery(DeliveryMessage.builder()
+                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build(), true);
+            return endpointId;
         } finally {
             httpServer.stop(0);
         }
+    }
+
+    private static HttpHandler answering(int status) {
+        return exchange -> {
+            exchange.sendResponseHeaders(status, 0);
+            exchange.getResponseBody().close();
+        };
+    }
+
+    @Test
+    void attemptDelivery_2xxResponse_marksSuccess_noRetryScheduled() throws Exception {
+        UUID endpointId = deliverAgainst(answering(200), 5);
+
+        verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
+        verify(circuitBreakerService).recordSuccess(eq(endpointId), anyLong());
+        verify(concurrencyControlService).releaseForTarget(endpointId);
     }
 
     @Test
     void attemptDelivery_4xxNonRetryable_goesToDlq_noRetryScheduled() throws Exception {
-        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        httpServer.createContext("/hook", exchange -> {
-            exchange.sendResponseHeaders(404, 0);
-            exchange.getResponseBody().close();
-        });
-        httpServer.start();
-        try {
-            UUID endpointId = UUID.randomUUID();
-            UUID eventId = UUID.randomUUID();
-            UUID deliveryId = UUID.randomUUID();
+        UUID endpointId = deliverAgainst(answering(404), 5);
 
-            Endpoint endpoint = verifiedEndpoint(endpointId,
-                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
-            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
-            Event event = stubEvent(eventId, endpoint.getProjectId());
-            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
-            stubHappyPathPrerequisites(endpoint);
-
-            Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
-            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            service.processDelivery(message, true);
-
-            // Into Failed Messages, where a person can retry it; never FAILED, which that list omits.
-            verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.DLQ));
-            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
-            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED));
-            verify(circuitBreakerService).recordFailure(eq(endpointId), any());
-        } finally {
-            httpServer.stop(0);
-        }
+        // Into Failed Messages, where a person can retry it; never FAILED, which that list omits.
+        verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.DLQ));
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED));
+        verify(circuitBreakerService).recordFailure(eq(endpointId), any());
     }
 
     @Test
     void attemptDelivery_5xxResponse_schedulesRetryAtFirstTier() throws Exception {
-        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        httpServer.createContext("/hook", exchange -> {
-            exchange.sendResponseHeaders(503, 0);
-            exchange.getResponseBody().close();
-        });
-        httpServer.start();
-        try {
-            UUID endpointId = UUID.randomUUID();
-            UUID eventId = UUID.randomUUID();
-            UUID deliveryId = UUID.randomUUID();
+        Instant before = Instant.now();
+        // The pre-HTTP increment makes this attempt 1: the ladder's first tier (60s, jittered 30-90s).
+        UUID endpointId = deliverAgainst(answering(503), 5);
 
-            Endpoint endpoint = verifiedEndpoint(endpointId,
-                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
-            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
-            Event event = stubEvent(eventId, endpoint.getProjectId());
-            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
-            stubHappyPathPrerequisites(endpoint);
-
-            // The pre-HTTP increment makes this attempt 1: the ladder's first tier (60s, jittered 30-90s).
-            Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
-            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            Instant before = Instant.now();
-            service.processDelivery(message, true);
-
-            ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
-            verify(deliveryRepository).save(captor.capture());
-            Delivery saved = captor.getValue();
-            assertEquals(Delivery.DeliveryStatus.PENDING, saved.getStatus());
-            long secondsFromNow = saved.getNextRetryAt().getEpochSecond() - before.getEpochSecond();
-            assertTrue(secondsFromNow >= 29 && secondsFromNow <= 91,
-                    "expected first-tier retry (~30-90s jittered) but was " + secondsFromNow + "s");
-            verify(circuitBreakerService).recordFailure(eq(endpointId), any());
-        } finally {
-            httpServer.stop(0);
-        }
+        ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(captor.capture());
+        Delivery saved = captor.getValue();
+        assertEquals(Delivery.DeliveryStatus.PENDING, saved.getStatus());
+        long secondsFromNow = saved.getNextRetryAt().getEpochSecond() - before.getEpochSecond();
+        assertTrue(secondsFromNow >= 29 && secondsFromNow <= 91,
+                "expected first-tier retry (~30-90s jittered) but was " + secondsFromNow + "s");
+        verify(circuitBreakerService).recordFailure(eq(endpointId), any());
     }
 
     @Test
     void attemptDelivery_httpTimeout_schedulesRetry() throws Exception {
-        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        httpServer.createContext("/hook", exchange -> {
+        UUID endpointId = deliverAgainst(exchange -> {
             try {
-                Thread.sleep(2000); // longer than the 1s delivery timeout below
+                Thread.sleep(2000);
             } catch (InterruptedException ignored) {
                 Thread.currentThread().interrupt();
             }
-            exchange.sendResponseHeaders(200, 0);
-            exchange.getResponseBody().close();
-        });
-        httpServer.start();
-        try {
-            UUID endpointId = UUID.randomUUID();
-            UUID eventId = UUID.randomUUID();
-            UUID deliveryId = UUID.randomUUID();
+            answering(200).handle(exchange);
+        }, 1);
 
-            Endpoint endpoint = verifiedEndpoint(endpointId,
-                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
-            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
-            Event event = stubEvent(eventId, endpoint.getProjectId());
-            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
-            stubHappyPathPrerequisites(endpoint);
-
-            Delivery delivery = Delivery.builder()
-                    .id(deliveryId).eventId(eventId).endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PROCESSING)
-                    .attemptCount(0).maxAttempts(5).timeoutSeconds(1)
-                    .updatedAt(Instant.now())
-                    .build();
-            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            service.processDelivery(message, true);
-
-            verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
-            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
-            verify(circuitBreakerService).recordFailure(eq(endpointId), any());
-            verify(concurrencyControlService).releaseForTarget(endpointId);
-        } finally {
-            httpServer.stop(0);
-        }
+        verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
+        verify(circuitBreakerService).recordFailure(eq(endpointId), any());
+        verify(concurrencyControlService).releaseForTarget(endpointId);
     }
 
     @Test
