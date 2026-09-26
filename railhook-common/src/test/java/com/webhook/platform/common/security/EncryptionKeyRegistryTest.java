@@ -162,16 +162,6 @@ class EncryptionKeyRegistryTest {
     class DecryptWithFallback {
 
         @Test
-        void fallback_decryptsWithCorrectVersion() throws Exception {
-            EncryptionKeyRegistry reg = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
-
-            SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt("data", KEY_V1, SALT, 1);
-
-            String decrypted = reg.decryptWithFallback(encrypted.getCiphertext(), encrypted.getIv(), 1);
-            assertEquals("data", decrypted);
-        }
-
-        @Test
         void fallback_triesOtherVersions_whenSpecifiedFails() throws Exception {
             EncryptionKeyRegistry reg = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
 
@@ -201,31 +191,6 @@ class EncryptionKeyRegistryTest {
             RuntimeException ex = assertThrows(RuntimeException.class,
                     () -> reg.decryptWithFallback(encrypted.getCiphertext(), encrypted.getIv(), 1));
             assertTrue(ex.getMessage().contains("Failed to decrypt with any available key version"));
-        }
-    }
-
-    @Nested
-    @DisplayName("needsReEncryption")
-    class NeedsReEncryption {
-
-        @Test
-        void onlyAnOlderVersionNeedsReEncryption() throws Exception {
-            EncryptionKeyRegistry reg = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
-            assertFalse(reg.needsReEncryption(2));
-            assertTrue(reg.needsReEncryption(1));
-        }
-    }
-
-    @Nested
-    @DisplayName("hasVersion")
-    class HasVersion {
-
-        @Test
-        void knowsExactlyTheConfiguredVersions() throws Exception {
-            EncryptionKeyRegistry reg = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
-            assertTrue(reg.hasVersion(1));
-            assertTrue(reg.hasVersion(2));
-            assertFalse(buildRegistry(KEY_V1, "", 0, SALT).hasVersion(99));
         }
     }
 

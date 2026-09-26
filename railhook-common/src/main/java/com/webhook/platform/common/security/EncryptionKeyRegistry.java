@@ -97,10 +97,6 @@ public class EncryptionKeyRegistry {
         return keyMap.get(version);
     }
 
-    public boolean hasVersion(int version) {
-        return keyMap.containsKey(version);
-    }
-
     public Set<Integer> getVersions() {
         return keyMap.keySet();
     }
@@ -140,9 +136,5 @@ public class EncryptionKeyRegistry {
 
         throw new RuntimeException("Failed to decrypt with any available key version. " +
                 "Available versions: " + keyMap.keySet());
-    }
-
-    public boolean needsReEncryption(int keyVersion) {
-        return keyVersion != activeVersion;
     }
 }
