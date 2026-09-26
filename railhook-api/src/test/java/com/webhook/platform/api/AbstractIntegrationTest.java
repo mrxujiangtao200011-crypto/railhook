@@ -110,6 +110,8 @@ public abstract class AbstractIntegrationTest {
         registry.add("jwt.secret", () -> "test_jwt_secret_key_minimum_32_chars_required_here");
         registry.add("jwt.expiration-ms", () -> "3600000");
         registry.add("platform.admin.token", () -> PLATFORM_ADMIN_TEST_TOKEN);
+        // Tests call the sweep themselves; a scheduled run in between would take their stuck rows.
+        registry.add("workflow.execution.recovery-interval-ms", () -> "86400000");
     }
 
     protected static final String PLATFORM_ADMIN_TEST_TOKEN = "test_platform_admin_operator_token";
