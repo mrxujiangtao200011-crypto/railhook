@@ -783,29 +783,32 @@ class WebhookVerifierTest {
     static Stream<Arguments> missingHeader() throws Exception {
         String sendGridKey = Base64.getEncoder().encodeToString(generateEcKeyPair().getPublic().getEncoded());
         return Stream.of(
-                Arguments.of(new GenericHmacVerifier("X-Signature", ""), SECRET, BODY, Map.of(), "Missing signature header"),
-                Arguments.of(new GitHubVerifier(), SECRET, BODY, Map.of(), "Missing header"),
-                Arguments.of(new StripeVerifier(), SECRET, BODY, Map.of(), "Missing header"),
-                Arguments.of(new SlackVerifier(), SECRET, BODY,
+                Arguments.of(new GenericHmacVerifier("X-Signature", ""), SECRET, BODY, "X-Signature", Map.of(), "Missing signature header"),
+                Arguments.of(new GitHubVerifier(), SECRET, BODY, "X-Hub-Signature-256", Map.of(), "Missing header"),
+                Arguments.of(new StripeVerifier(), SECRET, BODY, "Stripe-Signature", Map.of(), "Missing header"),
+                Arguments.of(new SlackVerifier(), SECRET, BODY, "X-Slack-Signature",
                         Map.of("X-Slack-Request-Timestamp", "12345"), "Missing header: X-Slack-Signature"),
-                Arguments.of(new SlackVerifier(), SECRET, BODY,
+                Arguments.of(new SlackVerifier(), SECRET, BODY, "X-Slack-Request-Timestamp",
                         Map.of("X-Slack-Signature", "v0=abc"), "Missing header: X-Slack-Request-Timestamp"),
-                Arguments.of(new ShopifyVerifier(), SECRET, BODY, Map.of(), "Missing header"),
-                Arguments.of(new TwilioVerifier(TWILIO_URL), SECRET, "To=x", Map.of(), "X-Twilio-Signature"),
-                Arguments.of(new SquareVerifier(SQUARE_URL), SECRET, SQUARE_BODY, Map.of(), "x-square-hmacsha256-signature"),
-                Arguments.of(new SendGridVerifier(), sendGridKey, SENDGRID_BODY,
+                Arguments.of(new ShopifyVerifier(), SECRET, BODY, "X-Shopify-Hmac-SHA256", Map.of(), "Missing header"),
+                Arguments.of(new TwilioVerifier(TWILIO_URL), SECRET, "To=x", "X-Twilio-Signature", Map.of(), "X-Twilio-Signature"),
+                Arguments.of(new SquareVerifier(SQUARE_URL), SECRET, SQUARE_BODY, "x-square-hmacsha256-signature",
+                        Map.of(), "x-square-hmacsha256-signature"),
+                Arguments.of(new SendGridVerifier(), sendGridKey, SENDGRID_BODY, "X-Twilio-Email-Event-Webhook-Timestamp",
                         Map.of("X-Twilio-Email-Event-Webhook-Signature", "sig"), "X-Twilio-Email-Event-Webhook-Timestamp"),
-                Arguments.of(new HubSpotVerifier(SQUARE_URL), SECRET, HUBSPOT_BODY, Map.of(), "X-HubSpot-Signature-v3"),
-                Arguments.of(new HubSpotVerifier(SQUARE_URL), SECRET, HUBSPOT_BODY,
+                Arguments.of(new HubSpotVerifier(SQUARE_URL), SECRET, HUBSPOT_BODY, "X-HubSpot-Signature-v3",
+                        Map.of(), "X-HubSpot-Signature-v3"),
+                Arguments.of(new HubSpotVerifier(SQUARE_URL), SECRET, HUBSPOT_BODY, "X-HubSpot-Request-Timestamp",
                         Map.of("X-HubSpot-Signature-v3", "sig"), "X-HubSpot-Request-Timestamp"),
-                Arguments.of(new GitLabVerifier(), SECRET, BODY, Map.of(), "X-Gitlab-Token"));
+                Arguments.of(new GitLabVerifier(), SECRET, BODY, "X-Gitlab-Token", Map.of(), "X-Gitlab-Token"));
     }
 
     @ParameterizedTest
     @MethodSource
-    void missingHeader(WebhookVerificationStrategy verifier, String secret, String body,
-                       Map<String, String> headers, String expectedError) {
-        headers.forEach((name, value) -> when(request.getHeader(name)).thenReturn(value));
+    void missingHeader(WebhookVerificationStrategy verifier, String secret, String body, String missing,
+                       Map<String, String> present, String expectedError) {
+        when(request.getHeader(missing)).thenReturn(null);
+        present.forEach((name, value) -> when(request.getHeader(name)).thenReturn(value));
 
         var result = verifier.verify(secret, body.getBytes(StandardCharsets.UTF_8), request);
 
