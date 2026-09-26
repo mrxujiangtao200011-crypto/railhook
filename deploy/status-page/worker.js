@@ -84,7 +84,7 @@ async function runChecks(env) {
         db.prepare('INSERT INTO incidents (component, title, body, started_at) VALUES (?1, ?2, ?3, ?4)').bind(
           component.id,
           `${component.name} is not responding`,
-          'Detected automatically: several checks in a row failed. We are looking into it.',
+          'Opened automatically: several checks in a row failed.',
           now - (DOWN_AFTER - 1) * 60000,
         ),
       );
