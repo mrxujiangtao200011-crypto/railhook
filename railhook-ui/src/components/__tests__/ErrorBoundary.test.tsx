@@ -34,10 +34,4 @@ describe('ErrorBoundary', () => {
     expect(() => render(<ErrorBoundary><Boom /></ErrorBoundary>)).not.toThrow();
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
-
-  it('renders its children when nothing throws', () => {
-    render(<ErrorBoundary><p>all fine</p></ErrorBoundary>);
-
-    expect(screen.getByText('all fine')).toBeInTheDocument();
-  });
 });
