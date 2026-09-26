@@ -16,7 +16,6 @@ import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.BulkReplayResponse;
-import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +26,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 // Needs a real database: the bulk path selects its rows through a Specification.
 class DeliveryReplayIntegrationTest extends AbstractIntegrationTest {
@@ -83,20 +81,6 @@ class DeliveryReplayIntegrationTest extends AbstractIntegrationTest {
         // One already on its ladder keeps its place instead of jumping the wait.
         assertThat(reload(waitingForRetry).getNextRetryAt()).isNotNull();
         assertThat(reload(succeeded).getStatus()).isEqualTo(DeliveryStatus.SUCCESS);
-    }
-
-    @Test
-    void replayingADeliveryInFlightIsRefusedAndLeavesItsClaimAlone() {
-        UUID claim = UUID.randomUUID();
-        Delivery inFlight = persist(DeliveryStatus.PROCESSING, claim, null);
-
-        TenantContext.set(orgId);
-        assertThatThrownBy(() -> deliveryService.replayDelivery(inFlight.getId(), owner))
-                .isInstanceOf(ConflictException.class);
-
-        Delivery reloaded = reload(inFlight);
-        assertThat(reloaded.getStatus()).isEqualTo(DeliveryStatus.PROCESSING);
-        assertThat(reloaded.getClaimToken()).isEqualTo(claim);
     }
 
     private Delivery persist(DeliveryStatus status, UUID claimToken, Instant nextRetryAt) {

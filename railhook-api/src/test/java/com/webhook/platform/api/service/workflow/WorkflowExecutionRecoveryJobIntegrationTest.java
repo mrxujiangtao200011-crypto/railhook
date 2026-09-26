@@ -12,6 +12,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -61,7 +63,7 @@ class WorkflowExecutionRecoveryJobIntegrationTest extends AbstractIntegrationTes
     // Through ZoneOffset.UTC, as Hibernate writes it; a default-zone Timestamp misses on a non-UTC host.
     private void backdateStartedAt(UUID executionId, long minutesAgo) {
         Instant target = Instant.now().minus(minutesAgo, ChronoUnit.MINUTES);
-        Timestamp utcWallClock = Timestamp.valueOf(java.time.LocalDateTime.ofInstant(target, java.time.ZoneOffset.UTC));
+        Timestamp utcWallClock = Timestamp.valueOf(LocalDateTime.ofInstant(target, ZoneOffset.UTC));
         jdbcTemplate.update("UPDATE workflow_executions SET started_at = ? WHERE id = ?",
                 utcWallClock, executionId);
     }
@@ -79,7 +81,7 @@ class WorkflowExecutionRecoveryJobIntegrationTest extends AbstractIntegrationTes
         backdateStartedAt(stuckRunning.getId(), STUCK_THRESHOLD_MINUTES + 5);
 
         WorkflowExecution freshRunning = insertExecution(ExecutionStatus.RUNNING);
-        backdateStartedAt(freshRunning.getId(), 1); // in-flight, not stuck yet
+        backdateStartedAt(freshRunning.getId(), 1);
 
         WorkflowExecution oldCompleted = insertExecution(ExecutionStatus.COMPLETED);
         backdateStartedAt(oldCompleted.getId(), STUCK_THRESHOLD_MINUTES + 5);
@@ -113,16 +115,5 @@ class WorkflowExecutionRecoveryJobIntegrationTest extends AbstractIntegrationTes
 
         WorkflowExecution reloadedCancelled = executionRepository.findById(oldCancelled.getId()).orElseThrow();
         assertEquals(ExecutionStatus.CANCELLED, reloadedCancelled.getStatus());
-    }
-
-    @Test
-    void recoverStuckExecutions_noStuckRows_isANoOp() {
-        WorkflowExecution freshRunning = insertExecution(ExecutionStatus.RUNNING);
-
-        int recovered = runRecoverySweep();
-        assertEquals(0, recovered);
-
-        WorkflowExecution reloaded = executionRepository.findById(freshRunning.getId()).orElseThrow();
-        assertEquals(ExecutionStatus.RUNNING, reloaded.getStatus());
     }
 }

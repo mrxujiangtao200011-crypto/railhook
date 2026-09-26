@@ -103,7 +103,7 @@ class TunnelServiceTest {
     }
 
     @Test
-    void shouldCloseSessionByToken() {
+    void closingASessionByTokenMarksItClosedAndDisconnectsItEverywhere() {
         TunnelSession session = TunnelSession.builder()
                 .id(UUID.randomUUID())
                 .tunnelToken("test-token")
@@ -120,6 +120,7 @@ class TunnelServiceTest {
         verify(tunnelSessionRepository).save(captor.capture());
         assertEquals(TunnelStatus.CLOSED, captor.getValue().getStatus());
         assertNotNull(captor.getValue().getClosedAt());
+        verify(redisTunnelCoordinator).disconnect("tun-abc123");
     }
 
     // Deleting a tunnel only marked its row CLOSED, and the socket kept forwarding unmetered.
@@ -134,18 +135,6 @@ class TunnelServiceTest {
         tunnelService.closeSession(sessionId);
 
         verify(redisTunnelCoordinator).disconnect("tun-closeme");
-    }
-
-    @Test
-    void closingASessionByTokenDisconnectsItsTunnelEverywhere() {
-        TunnelSession session = TunnelSession.builder()
-                .id(UUID.randomUUID()).tunnelToken("tok").publicSlug("tun-bytoken").status(TunnelStatus.ACTIVE).build();
-        when(tunnelSessionRepository.findByTunnelToken("tok")).thenReturn(Optional.of(session));
-        when(tunnelSessionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        tunnelService.closeSession("tok");
-
-        verify(redisTunnelCoordinator).disconnect("tun-bytoken");
     }
 
     @Test

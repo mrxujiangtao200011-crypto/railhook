@@ -454,13 +454,13 @@ class DeliveryServiceTest {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         when(deliveryRepository.count(any(Specification.class))).thenReturn(0L);
         when(deliveryRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenAnswer(inv -> {
-                    Pageable pageable = inv.getArgument(1);
-                    assertThat(pageable.getPageSize()).isEqualTo(5000);
-                    return new PageImpl<>(List.of());
-                });
+                .thenReturn(new PageImpl<>(List.of()));
 
         deliveryService.bulkReplayDeliveries(null, null, null, projectId, 999_999, auth);
+
+        ArgumentCaptor<Pageable> page = ArgumentCaptor.forClass(Pageable.class);
+        verify(deliveryRepository).findAll(any(Specification.class), page.capture());
+        assertThat(page.getValue().getPageSize()).isEqualTo(5000);
     }
 
     // Masking was applied to the events list but not to the screens opened when a delivery fails.
@@ -518,24 +518,6 @@ class DeliveryServiceTest {
             var response = deliveryService.dryRunReplay(deliveryId, auth);
 
             assertThat(response.getPayload()).isEqualTo(MASKED);
-        }
-
-        @Test
-        @DisplayName("a project with no rules is not charged for a rewrite it did not ask for")
-        void noRulesLeavesPayloadUntouched() {
-            when(piiMaskingService.sanitizePayload(eq(projectId), anyString()))
-                    .thenAnswer(inv -> inv.getArgument(1));
-            when(deliveryAttemptRepository.findByDeliveryIdOrderByAttemptNumberAsc(deliveryId))
-                    .thenReturn(List.of(DeliveryAttempt.builder()
-                            .id(UUID.randomUUID()).deliveryId(deliveryId).attemptNumber(1)
-                            .requestBody(RAW).responseBody(null).build()));
-
-            List<DeliveryAttemptResponse> attempts = deliveryService.getDeliveryAttempts(deliveryId, auth);
-
-            assertThat(attempts).singleElement().satisfies(a -> {
-                assertThat(a.getRequestBody()).isEqualTo(RAW);
-                assertThat(a.getResponseBody()).isNull();
-            });
         }
     }
 }

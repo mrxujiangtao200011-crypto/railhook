@@ -57,15 +57,6 @@ class QuotaCounterServiceTest {
     }
 
     @Test
-    void countsAFallbackWhenRedisRefusesTheIncrement() {
-        when(counter.incrementAndGet()).thenThrow(new IllegalStateException("Redis is down"));
-
-        service.increment();
-
-        assertThat(fallbackCount()).isEqualTo(1.0);
-    }
-
-    @Test
     void countsAFallbackWhenRedisRefusesTheRead() {
         when(counter.isExists()).thenThrow(new IllegalStateException("Redis is down"));
         when(eventRepository.countEventsAndIncomingEventsBetween(any(), any(), any())).thenReturn(41L);
@@ -93,9 +84,10 @@ class QuotaCounterServiceTest {
     }
 
     @Test
-    void aDroppedIncrementForcesTheNextReadToReseedFromTheDatabase() {
+    void aDroppedIncrementIsCountedAndForcesTheNextReadToReseedFromTheDatabase() {
         when(counter.incrementAndGet()).thenThrow(new IllegalStateException("Redis is down"));
         service.increment();
+        assertThat(fallbackCount()).isEqualTo(1.0);
 
         // Redis is back, and holding a value that is short by every increment it missed.
         when(counter.isExists()).thenReturn(true);
@@ -128,6 +120,7 @@ class QuotaCounterServiceTest {
         UUID orgB = UUID.randomUUID();
         when(counter.incrementAndGet()).thenThrow(new IllegalStateException("Redis is down"));
         service.increment();
+        assertThat(fallbackCount()).isEqualTo(1.0);
 
         // Redis is back. B holds a trustworthy value; A's is short by the increment it missed.
         when(counter.isExists()).thenReturn(true);

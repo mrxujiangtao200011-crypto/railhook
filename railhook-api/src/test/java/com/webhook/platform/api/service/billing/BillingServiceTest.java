@@ -477,8 +477,9 @@ class BillingServiceTest {
         verify(lifecycleService).activate(SUB_ID, start, end);
     }
 
-    @Test
-    void processWebhook_refunded_updatesPayment() {
+    @ParameterizedTest
+    @CsvSource({"2900, REFUNDED", "1000, PARTIALLY_REFUNDED"})
+    void processWebhook_refund_updatesPaymentAndSaysHowMuchOnTheStatus(long refundedCents, PaymentStatus expected) {
         BillingPayment payment = BillingPayment.builder()
                 .id(UUID.randomUUID()).amountCents(2900)
                 .status(PaymentStatus.SUCCEEDED)
@@ -490,34 +491,13 @@ class BillingServiceTest {
 
         stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
                 "payment.refunded", null, null, "pi_ref", null,
-                2900L, "USD", null, null, null, null, null, null, null, Map.of()));
+                refundedCents, "USD", null, null, null, null, null, null, null, Map.of()));
 
         service.processWebhook("stripe", "{}", Map.of());
 
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
-        assertThat(payment.getRefundedCents()).isEqualTo(2900L);
+        assertThat(payment.getStatus()).isEqualTo(expected);
+        assertThat(payment.getRefundedCents()).isEqualTo(refundedCents);
         verify(paymentRepository).save(payment);
-    }
-
-    @Test
-    void processWebhook_partiallyRefunded_saysSoOnTheStatus() {
-        BillingPayment payment = BillingPayment.builder()
-                .id(UUID.randomUUID()).amountCents(2900)
-                .status(PaymentStatus.SUCCEEDED)
-                .externalPaymentId("pi_part").build();
-        when(subscriptionRepository.findByExternalSubscriptionId(any())).thenReturn(Optional.empty());
-        when(subscriptionRepository.findFirstByExternalCustomerIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
-        when(paymentRepository.findFirstByProviderCodeAndExternalPaymentIdAndStatusInOrderByCreatedAtDesc(eq("stripe"), eq("pi_part"), any()))
-                .thenReturn(Optional.of(payment));
-
-        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
-                "payment.refunded", null, null, "pi_part", null,
-                1000L, "USD", null, null, null, null, null, null, null, Map.of()));
-
-        service.processWebhook("stripe", "{}", Map.of());
-
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
-        assertThat(payment.getRefundedCents()).isEqualTo(1000L);
     }
 
     @Test

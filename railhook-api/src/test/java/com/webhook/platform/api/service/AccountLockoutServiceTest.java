@@ -128,23 +128,8 @@ class AccountLockoutServiceTest {
     }
 
     @Test
-    @DisplayName("a success clears the count, so a correct password never accumulates a lockout")
-    void successClearsTheCount() {
-        AccountLockoutService service = service(true);
-        User user = user();
-        service.recordFailure(user);
-        service.recordFailure(user);
-
-        service.clearFailures(user);
-
-        assertThat(user.getFailedLoginAttempts()).isZero();
-        assertThat(user.getLastFailedLoginAt()).isNull();
-        assertThat(user.getLockoutExpiresAt()).isNull();
-    }
-
-    @Test
-    @DisplayName("a password reset lifts an active lockout — the way out that needs nobody's help")
-    void resetLiftsAnActiveLockout() {
+    @DisplayName("clearing (a success or a password reset) forgets the count and lifts an active lockout")
+    void clearingForgetsTheCountAndLiftsTheLockout() {
         AccountLockoutService service = service(true);
         User user = user();
         for (int i = 0; i < 6; i++) {
@@ -155,6 +140,9 @@ class AccountLockoutServiceTest {
         service.clearFailures(user);
 
         assertThat(service.isLocked(user)).isFalse();
+        assertThat(user.getFailedLoginAttempts()).isZero();
+        assertThat(user.getLastFailedLoginAt()).isNull();
+        assertThat(user.getLockoutExpiresAt()).isNull();
     }
 
     @Test
@@ -254,6 +242,7 @@ class AccountLockoutServiceTest {
             when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         }
 
+        // A lockout with no exit is an outage, so the 423 names the way out.
         @Test
         @DisplayName("the threshold-th wrong password locks the account, and the next try is 423")
         void wrongPasswordsEventuallyLock() {
@@ -268,20 +257,9 @@ class AccountLockoutServiceTest {
 
             assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN))
                     .isInstanceOf(DomainException.class)
+                    .hasMessageContaining("reset your password")
                     .extracting(e -> ((DomainException) e).getStatusCode())
                     .isEqualTo(HttpStatus.LOCKED);
-        }
-
-        @Test
-        @DisplayName("the message names the way out, because a lockout with no exit is an outage")
-        void lockoutMessageNamesTheUnlockPath() {
-            expectLookup();
-            for (int i = 0; i < 3; i++) {
-                assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN)).isNotNull();
-            }
-
-            assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN))
-                    .hasMessageContaining("reset your password");
         }
 
         @Test

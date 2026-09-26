@@ -17,6 +17,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -71,20 +73,13 @@ class TransformationTemplateValidationTest {
                 .hasMessageContaining("not a valid JSONPath");
     }
 
-    @Test
-    @DisplayName("an ordinary template still saves")
-    void validTemplateIsAccepted() {
-        assertThatCode(() -> service.create(projectId,
-                request("{\"id\":\"${$.id}\",\"email\":\"${$.data.customer.email}\"}"), null))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("a filter expression is a valid path, not a syntax error")
-    void filterExpressionIsAccepted() {
-        assertThatCode(() -> service.create(projectId,
-                request("{\"first\":\"${$.items[?(@.active == true)].name}\"}"), null))
-                .doesNotThrowAnyException();
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"id\":\"${$.id}\",\"email\":\"${$.data.customer.email}\"}",
+            "{\"first\":\"${$.items[?(@.active == true)].name}\"}"})
+    @DisplayName("an ordinary template, filter expressions included, still saves")
+    void validTemplateIsAccepted(String template) {
+        assertThatCode(() -> service.create(projectId, request(template), null)).doesNotThrowAnyException();
     }
 
     @Test

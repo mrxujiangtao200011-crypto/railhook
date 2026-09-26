@@ -125,39 +125,19 @@ class EventIngestServiceTest {
     }
 
     @Test
-    void ingestEvent_noIdempotencyKey_createsEvent() {
-        EventIngestRequest request = buildRequest("order.created");
-
-        when(eventRepository.saveAndFlush(any(Event.class))).thenAnswer(inv -> {
-            Event e = inv.getArgument(0);
-            e.setId(eventId);
-            e.setCreatedAt(Instant.now());
-            return e;
-        });
-        stubTransactionTemplate();
-
-        EventIngestResponse response = service.ingestEvent(projectId, request, null);
-
-        assertThat(response.getEventId()).isEqualTo(eventId);
-        assertThat(response.getType()).isEqualTo("order.created");
-        verify(eventRepository).saveAndFlush(any(Event.class));
-    }
-
-    @Test
-    void ingestEvent_withIdempotencyKey_existingEvent_returnsDuplicate() {
-        EventIngestRequest request = buildRequest("order.created");
-        Event existing = buildEvent("order.created", "idem-123");
-
+    void ingestEvent_withIdempotencyKey_existingEvent_returnsDuplicateWithoutChargingQuota() {
+        Project project = Project.builder().id(projectId).organizationId(UUID.randomUUID()).build();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(eventRepository.findByProjectIdAndIdempotencyKey(projectId, "idem-123"))
-                .thenReturn(Optional.of(existing));
-
+                .thenReturn(Optional.of(buildEvent("order.created", "idem-123")));
         stubTransactionTemplate();
 
-        EventIngestResponse response = service.ingestEvent(projectId, request, "idem-123");
+        EventIngestResponse response = service.ingestEvent(projectId, buildRequest("order.created"), "idem-123");
 
         assertThat(response.getEventId()).isEqualTo(eventId);
         assertThat(response.getDeliveriesCreated()).isEqualTo(0);
         verify(eventRepository, never()).saveAndFlush(any());
+        verify(quotaCounterService, never()).increment();
     }
 
     // The retry of an accepted Event once got a quota error for it.
@@ -189,23 +169,22 @@ class EventIngestServiceTest {
     }
 
     @Test
-    void ingestEvent_idempotencyRace_catchesConstraintViolation_returnsExistingEvent() {
-        EventIngestRequest request = buildRequest("order.created");
-        Event existing = buildEvent("order.created", "race-key");
-
-        stubTransactionTemplate();
-
+    void ingestEvent_idempotencyRace_returnsTheWinnersEventWithoutChargingQuota() {
+        Project project = Project.builder().id(projectId).organizationId(UUID.randomUUID()).build();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(eventRepository.findByProjectIdAndIdempotencyKey(projectId, "race-key"))
-                .thenReturn(Optional.empty())     // inside doIngestEvent (pre-insert check)
-                .thenReturn(Optional.of(existing)); // retry lookup after DataIntegrityViolationException
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(buildEvent("order.created", "race-key")));
         when(eventRepository.saveAndFlush(any(Event.class)))
                 .thenThrow(new DataIntegrityViolationException("unique constraint violation"));
+        stubTransactionTemplate();
 
-        EventIngestResponse response = service.ingestEvent(projectId, request, "race-key");
+        EventIngestResponse response = service.ingestEvent(projectId, buildRequest("order.created"), "race-key");
 
         assertThat(response.getEventId()).isEqualTo(eventId);
         assertThat(response.getType()).isEqualTo("order.created");
         assertThat(response.getDeliveriesCreated()).isEqualTo(0);
+        verify(quotaCounterService, never()).increment();
     }
 
     @Test
@@ -215,8 +194,8 @@ class EventIngestServiceTest {
         stubTransactionTemplate();
 
         when(eventRepository.findByProjectIdAndIdempotencyKey(projectId, "ghost-key"))
-                .thenReturn(Optional.empty())   // pre-insert check
-                .thenReturn(Optional.empty());  // retry lookup — still not found
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.empty());
         when(eventRepository.saveAndFlush(any(Event.class)))
                 .thenThrow(new DataIntegrityViolationException("unique constraint violation"));
 
@@ -381,39 +360,6 @@ class EventIngestServiceTest {
     }
 
     @Test
-    void ingestEvent_idempotencyRaceRollsBack_doesNotChargeQuota() {
-        UUID organizationId = UUID.randomUUID();
-        Project project = Project.builder().id(projectId).organizationId(organizationId).build();
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-
-        Event existing = buildEvent("order.created", "idem-race");
-        when(eventRepository.findByProjectIdAndIdempotencyKey(projectId, "idem-race"))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(existing));
-        when(eventRepository.saveAndFlush(any(Event.class)))
-                .thenThrow(new DataIntegrityViolationException("unique constraint violation"));
-        stubTransactionTemplate();
-
-        service.ingestEvent(projectId, buildRequest("order.created"), "idem-race");
-
-        verify(quotaCounterService, never()).increment();
-    }
-
-    @Test
-    void ingestEvent_duplicateResolvedByIdempotency_doesNotChargeQuota() {
-        UUID organizationId = UUID.randomUUID();
-        Project project = Project.builder().id(projectId).organizationId(organizationId).build();
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(eventRepository.findByProjectIdAndIdempotencyKey(projectId, "idem-123"))
-                .thenReturn(Optional.of(buildEvent("order.created", "idem-123")));
-        stubTransactionTemplate();
-
-        service.ingestEvent(projectId, buildRequest("order.created"), "idem-123");
-
-        verify(quotaCounterService, never()).increment();
-    }
-
-    @Test
     void ingestEvent_quotaCounterUnavailable_doesNotFailAnAcceptedIngest() {
         UUID organizationId = UUID.randomUUID();
         Project project = Project.builder().id(projectId).organizationId(organizationId).build();
@@ -430,6 +376,7 @@ class EventIngestServiceTest {
         EventIngestResponse response = service.ingestEvent(projectId, buildRequest("order.created"), null);
 
         assertThat(response.getEventId()).isEqualTo(eventId);
+        assertThat(response.getType()).isEqualTo("order.created");
     }
 
     // Counters registered on first increment read "No data" on a quiet deployment.

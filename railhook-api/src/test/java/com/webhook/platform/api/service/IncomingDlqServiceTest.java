@@ -149,7 +149,7 @@ class IncomingDlqServiceTest {
 
     // Incoming cannot raise maxAttempts, so continuing at N+1 would be exhausted on its first claim.
     @Test
-    void aRetryStartsAFreshLadderInsteadOfReusingAnAttemptNumber() {
+    void aRetryStartsAFreshLadderAndLeavesTheOldRecordIntactOutOfTheBacklog() {
         when(attemptRepository.findByIdInAndStatus(List.of(attemptId), ForwardAttemptStatus.DLQ))
                 .thenReturn(List.of(dlqAttempt()));
 
@@ -162,17 +162,7 @@ class IncomingDlqServiceTest {
         assertThat(successor.getStatus()).isEqualTo(ForwardAttemptStatus.PENDING);
         assertThat(successor.getReplaySessionId()).isNotNull();
         assertThat(successor.getDestinationId()).isEqualTo(destinationId);
-    }
 
-    @Test
-    void aRetriedForwardLeavesTheActionableBacklogWithItsRecordIntact() {
-        when(attemptRepository.findByIdInAndStatus(List.of(attemptId), ForwardAttemptStatus.DLQ))
-                .thenReturn(List.of(dlqAttempt()));
-
-        service.retryForwards(projectId, List.of(attemptId));
-
-        ArgumentCaptor<IncomingForwardAttempt> saved = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
-        verify(attemptRepository, times(2)).save(saved.capture());
         IncomingForwardAttempt abandoned = saved.getAllValues().get(1);
         assertThat(abandoned.getId()).isEqualTo(attemptId);
         assertThat(abandoned.getStatus()).isEqualTo(ForwardAttemptStatus.FAILED);

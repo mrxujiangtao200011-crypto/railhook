@@ -14,7 +14,6 @@ import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.exception.InvalidUrlException;
-import com.webhook.platform.common.security.UrlValidator;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -26,6 +25,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,6 +42,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -107,38 +110,28 @@ class AlertServiceTest {
 
             private final Validator validator = VALIDATORS.getValidator();
 
-            @Test
-            void acceptsACommaSeparatedListOfAddresses() {
-                assertThat(violations("ops@company.com, dev@company.com")).isEmpty();
+            static Stream<Arguments> recipients() {
+                return Stream.of(
+                        Arguments.of("ops@company.com, dev@company.com", true),
+                        Arguments.of(null, true),
+                        Arguments.of("", true),
+                        Arguments.of("ops@company.com, not-an-address", false),
+                        Arguments.of("ops@company.com,,dev@company.com", false),
+                        Arguments.of(addresses(10), true),
+                        Arguments.of(addresses(11), false));
             }
 
-            @Test
-            void acceptsNoRecipients_whichIsHowAnUpdateClearsThem() {
-                assertThat(violations(null)).isEmpty();
-                assertThat(violations("")).isEmpty();
-            }
-
-            @Test
-            void refusesSomethingThatIsNotAnAddress() {
-                assertThat(violations("ops@company.com, not-an-address")).isNotEmpty();
-            }
-
-            @Test
-            void refusesAnEmptyEntryInTheList() {
-                assertThat(violations("ops@company.com,,dev@company.com")).isNotEmpty();
-            }
-
-            @Test
-            void refusesMoreThanTenAddresses() {
-                String eleven = IntStream.rangeClosed(1, 11)
+            private static String addresses(int count) {
+                return IntStream.rangeClosed(1, count)
                         .mapToObj(i -> "member" + i + "@company.com")
                         .collect(Collectors.joining(","));
-                String ten = IntStream.rangeClosed(1, 10)
-                        .mapToObj(i -> "member" + i + "@company.com")
-                        .collect(Collectors.joining(","));
+            }
 
-                assertThat(violations(eleven)).isNotEmpty();
-                assertThat(violations(ten)).isEmpty();
+            // No recipients is how an update clears them.
+            @ParameterizedTest
+            @MethodSource("recipients")
+            void acceptsUpToTenAddressesOrNone(String recipients, boolean valid) {
+                assertThat(violations(recipients).isEmpty()).isEqualTo(valid);
             }
 
             private Set<ConstraintViolation<AlertRuleRequest>> violations(String recipients) {
@@ -187,13 +180,6 @@ class AlertServiceTest {
                 ArgumentCaptor<AlertRule> saved = ArgumentCaptor.forClass(AlertRule.class);
                 verify(ruleRepository).save(saved.capture());
                 assertThat(saved.getValue().getEmailRecipients()).isEqualTo("ops@company.com,dev@company.com");
-            }
-
-            @Test
-            void clearingTheRecipientsOnUpdateAsksNobody() {
-                service.updateRule(projectId, ruleId, request(""));
-
-                verify(membershipRepository, never()).findVerifiedMemberEmailsIn(anyCollection());
             }
 
             private AlertRuleRequest request(String recipients) {

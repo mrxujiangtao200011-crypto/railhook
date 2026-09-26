@@ -33,7 +33,7 @@ class FilterNodeExecutorTest {
     }
 
     @Test
-    void matchingCondition_passesThrough() throws Exception {
+    void aMatchingEventPassesThroughAndAnotherIsSkipped() throws Exception {
         JsonNode config = json("""
                 {
                   "conditions": {
@@ -45,34 +45,16 @@ class FilterNodeExecutorTest {
                   }
                 }
                 """);
-        JsonNode input = json("{\"status\":\"active\"}");
+        JsonNode active = json("{\"status\":\"active\"}");
 
-        StepResult result = executor.execute(config, input);
+        StepResult passed = executor.execute(config, active);
+        StepResult skipped = executor.execute(config, json("{\"status\":\"inactive\"}"));
 
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(result.output()).isEqualTo(input);
-    }
-
-    @Test
-    void nonMatchingCondition_isSkipped() throws Exception {
-        JsonNode config = json("""
-                {
-                  "conditions": {
-                    "type": "predicate",
-                    "field": "status",
-                    "operator": "EQ",
-                    "value": "active",
-                    "valueType": "STRING"
-                  }
-                }
-                """);
-        JsonNode input = json("{\"status\":\"inactive\"}");
-
-        StepResult result = executor.execute(config, input);
-
-        assertThat(result.status()).isEqualTo(StepStatus.SKIPPED);
-        assertThat(result.errorMessage()).isEqualTo("Filter conditions not matched");
-        assertThat(result.output()).isNull();
+        assertThat(passed.status()).isEqualTo(StepStatus.SUCCESS);
+        assertThat(passed.output()).isEqualTo(active);
+        assertThat(skipped.status()).isEqualTo(StepStatus.SKIPPED);
+        assertThat(skipped.errorMessage()).isEqualTo("Filter conditions not matched");
+        assertThat(skipped.output()).isNull();
     }
 
     @Test

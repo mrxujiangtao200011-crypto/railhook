@@ -126,10 +126,12 @@ class MembershipServiceTest {
         }
 
         @Test
-        void invitingAnExistingUserCarriesNoLinkBecauseThereIsNoInvite() {
-            User existing = new User();
-            existing.setId(UUID.randomUUID());
-            existing.setEmail("known@example.com");
+        void invitingAnExistingUserCarriesNoLinkAndNoTemporaryPassword() {
+            User existing = User.builder()
+                    .id(UUID.randomUUID())
+                    .email("known@example.com")
+                    .passwordHash("$2a$10$existinghash")
+                    .build();
             when(userRepository.existsByEmail("known@example.com")).thenReturn(true);
             when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(existing));
 
@@ -140,6 +142,7 @@ class MembershipServiceTest {
             assertThat(response.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
             assertThat(response.getInviteUrl()).isNull();
             assertThat(response.getInviteExpiresAt()).isNull();
+            verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
         }
 
         // Whoever registered the address first became the invited member without proving it.
@@ -202,14 +205,6 @@ class MembershipServiceTest {
             ArgumentCaptor<String> token = ArgumentCaptor.forClass(String.class);
             verify(emailService).sendInviteEmail(eq("pending@example.com"), eq(organizationId.toString()), token.capture());
             assertThat(response.getInviteUrl()).contains(token.getValue());
-        }
-
-        @Test
-        void reissuingAnInviteNeverMintsAnotherTemporaryPassword() {
-            Membership pending = pendingInvite();
-
-            membershipService.reissueInvite(pending.getUserId(), MembershipRole.OWNER);
-
             verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
         }
 
@@ -229,7 +224,8 @@ class MembershipServiceTest {
             accepted.setInviteExpiresAt(null);
 
             assertThatThrownBy(() -> membershipService.reissueInvite(accepted.getUserId(), MembershipRole.OWNER))
-                    .isInstanceOf(ConflictException.class);
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessageContaining("no pending invite");
         }
 
         @Test
@@ -307,24 +303,6 @@ class MembershipServiceTest {
             assertThat(logAppender.list)
                     .extracting(ILoggingEvent::getFormattedMessage)
                     .noneMatch(message -> message.contains(tempPassword));
-        }
-
-        @Test
-        void existingUserInvite_doesNotSendTemporaryPasswordEmail() {
-            String email = "existing-user@example.com";
-            User existingUser = User.builder()
-                    .id(UUID.randomUUID())
-                    .email(email)
-                    .passwordHash("$2a$10$existinghash")
-                    .build();
-            when(userRepository.existsByEmail(email)).thenReturn(true);
-            when(userRepository.findByEmail(email)).thenReturn(Optional.of(existingUser));
-
-            membershipService.addMember(
-                    AddMemberRequest.builder().email(email).role(MembershipRole.VIEWER).build(),
-                    MembershipRole.OWNER);
-
-            verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
         }
     }
 
@@ -529,16 +507,6 @@ class MembershipServiceTest {
     // These used to throw IllegalStateException, which the error handler answers with a 500.
     @Nested
     class StateConflicts {
-
-        @Test
-        void reissuingAnInviteThatIsNoLongerPendingIsAConflict() {
-            UUID userId = UUID.randomUUID();
-            existingMember(userId, MembershipRole.DEVELOPER, MembershipStatus.ACTIVE);
-
-            assertThatThrownBy(() -> membershipService.reissueInvite(userId, MembershipRole.OWNER))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessageContaining("no pending invite");
-        }
 
         @Test
         void acceptingAnInviteAlreadyAcceptedIsAConflict() {

@@ -126,26 +126,8 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("mints a token for the target organization and moves the session onto it")
+        @DisplayName("mints a token for the target organization, with the target's role, on the same session")
         void switchesToASecondOrganization() {
-            when(userSessionService.findByRefreshJti(session.getRefreshTokenJti()))
-                    .thenReturn(Optional.of(session));
-            when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
-                    .thenReturn(Optional.of(membership(clientOrgId, MembershipRole.DEVELOPER)));
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
-
-            AuthResponse response = authService.switchOrganization(userId, to(clientOrgId), refreshToken);
-
-            assertThat(realJwt.getOrganizationIdFromToken(response.getAccessToken())).isEqualTo(clientOrgId);
-            assertThat(session.getOrganizationId())
-                    .as("the session remembers, or the next refresh would snap back to the old organization")
-                    .isEqualTo(clientOrgId);
-            verify(userSessionService).save(session);
-        }
-
-        @Test
-        @DisplayName("the role comes from the target membership, never from the token being replaced")
-        void roleIsNotCarriedAcross() {
             when(userSessionService.findByRefreshJti(session.getRefreshTokenJti()))
                     .thenReturn(Optional.of(session));
             when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
@@ -154,7 +136,17 @@ class AuthServiceTest {
 
             AuthResponse response = authService.switchOrganization(userId, to(clientOrgId), refreshToken);
 
-            assertThat(realJwt.getRoleFromToken(response.getAccessToken())).isEqualTo(MembershipRole.VIEWER);
+            assertThat(realJwt.getOrganizationIdFromToken(response.getAccessToken())).isEqualTo(clientOrgId);
+            assertThat(realJwt.getRoleFromToken(response.getAccessToken()))
+                    .as("the role comes from the target membership, never from the token being replaced")
+                    .isEqualTo(MembershipRole.VIEWER);
+            assertThat(realJwt.getSessionIdFromToken(response.getAccessToken()))
+                    .as("the new access token stays on the same session, so it is still revocable")
+                    .isEqualTo(sessionId);
+            assertThat(session.getOrganizationId())
+                    .as("the session remembers, or the next refresh would snap back to the old organization")
+                    .isEqualTo(clientOrgId);
+            verify(userSessionService).save(session);
         }
 
         @Test
@@ -242,20 +234,6 @@ class AuthServiceTest {
             verify(tokenBlacklistService, never()).blacklist(any(), any());
             verify(tokenBlacklistService, never()).revokeAllUserTokens(any());
             verify(tokenBlacklistService, never()).revokeSession(any(), any());
-        }
-
-        @Test
-        @DisplayName("the new access token stays on the same session, so it is still revocable")
-        void keepsTheSessionId() {
-            when(userSessionService.findByRefreshJti(session.getRefreshTokenJti()))
-                    .thenReturn(Optional.of(session));
-            when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
-                    .thenReturn(Optional.of(membership(clientOrgId, MembershipRole.OWNER)));
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
-
-            AuthResponse response = authService.switchOrganization(userId, to(clientOrgId), refreshToken);
-
-            assertThat(realJwt.getSessionIdFromToken(response.getAccessToken())).isEqualTo(sessionId);
         }
 
         @Test

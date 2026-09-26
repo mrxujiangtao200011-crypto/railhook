@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 import java.util.ArrayList;
@@ -158,8 +160,9 @@ class WorkflowEngineTest {
                 """;
     }
 
-    @Test
-    void branchNode_matchingCondition_routesOnlyToTrueHandle() {
+    @ParameterizedTest
+    @CsvSource({"200, true", "10, false"})
+    void branchNode_routesOnlyToTheHandleTheConditionPicks(int amount, boolean matches) {
         RecordingExecutor trigger = RecordingExecutor.passthrough("trigger");
         BranchNodeExecutor branch = new BranchNodeExecutor(mapper);
         RecordingExecutor onTrue = RecordingExecutor.passthrough("sinkTrue");
@@ -168,33 +171,16 @@ class WorkflowEngineTest {
         WorkflowEngine engine = newEngine(List.of(trigger, branch, onTrue, onFalse));
         UUID executionId = UUID.randomUUID();
 
-        engine.execute(executionId, branchWorkflowDefinition(), json("{\"amount\":200}"));
+        engine.execute(executionId, branchWorkflowDefinition(), json("{\"amount\":" + amount + "}"));
 
-        assertThat(onTrue.invocationCount.get()).isEqualTo(1);
-        assertThat(onFalse.invocationCount.get()).isEqualTo(0);
+        assertThat(onTrue.invocationCount.get()).isEqualTo(matches ? 1 : 0);
+        assertThat(onFalse.invocationCount.get()).isEqualTo(matches ? 0 : 1);
 
         ArgumentCaptor<StepResult> resultCaptor = ArgumentCaptor.forClass(StepResult.class);
         verify(persistence, times(4)).saveStep(eq(executionId), anyString(), anyString(), any(), resultCaptor.capture(), anyInt());
         long skippedCount = resultCaptor.getAllValues().stream().filter(r -> r.status() == StepStatus.SKIPPED).count();
         assertThat(skippedCount).isEqualTo(1);
 
-        verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), isNull(), anyLong());
-    }
-
-    @Test
-    void branchNode_nonMatchingCondition_routesOnlyToFalseHandle() {
-        RecordingExecutor trigger = RecordingExecutor.passthrough("trigger");
-        BranchNodeExecutor branch = new BranchNodeExecutor(mapper);
-        RecordingExecutor onTrue = RecordingExecutor.passthrough("sinkTrue");
-        RecordingExecutor onFalse = RecordingExecutor.passthrough("sinkFalse");
-
-        WorkflowEngine engine = newEngine(List.of(trigger, branch, onTrue, onFalse));
-        UUID executionId = UUID.randomUUID();
-
-        engine.execute(executionId, branchWorkflowDefinition(), json("{\"amount\":10}"));
-
-        assertThat(onTrue.invocationCount.get()).isEqualTo(0);
-        assertThat(onFalse.invocationCount.get()).isEqualTo(1);
         verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), isNull(), anyLong());
     }
 

@@ -49,12 +49,6 @@ class RawBodyVerificationTest {
     }
 
     @Test
-    @DisplayName("the test's own premise: decoding as the wrong charset really does change the bytes")
-    void theRoundTripIsLossy() {
-        assertThat(reEncoded()).isNotEqualTo(BODY);
-    }
-
-    @Test
     @DisplayName("GitHub: a signature over the sent bytes verifies, whatever charset was declared")
     void gitHub() {
         HttpServletRequest r = request("application/json; charset=iso-8859-1");
@@ -122,6 +116,7 @@ class RawBodyVerificationTest {
     @Test
     @DisplayName("a signature over the re-encoded bytes is now correctly rejected")
     void theOldBehaviourIsNotQuietlyStillAccepted() {
+        assertThat(reEncoded()).as("decoding as the wrong charset really does change the bytes").isNotEqualTo(BODY);
         HttpServletRequest r = request("application/json; charset=iso-8859-1");
         ((MockHttpServletRequest) r).addHeader("X-Hub-Signature-256", "sha256=" + hmacHex(SECRET, reEncoded()));
 

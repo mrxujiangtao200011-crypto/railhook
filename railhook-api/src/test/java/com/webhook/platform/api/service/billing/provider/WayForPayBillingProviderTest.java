@@ -69,7 +69,8 @@ class WayForPayBillingProviderTest {
     }
 
     @Test
-    void aCallbackWithoutClientAccountIdStillResolvesTheOrganizationFromTheSignedReference() throws Exception {
+    void aCallbackWithoutClientAccountIdStillResolvesTheOrganizationAndSubscriptionFromTheSignedReference()
+            throws Exception {
         UUID orgId = UUID.randomUUID();
         String orderRef = "railhook_" + orgId + "_1726000000000";
 
@@ -77,6 +78,9 @@ class WayForPayBillingProviderTest {
 
         assertThat(event).isNotNull();
         assertThat(event.externalCustomerId()).isEqualTo(orgId.toString());
+        // The purchase's orderReference is the only thing WayForPay echoes back that the checkout
+        // could have stored, so it is what the pending subscription is found by.
+        assertThat(event.externalSubscriptionId()).isEqualTo(orderRef);
     }
 
     @Test
@@ -96,18 +100,6 @@ class WayForPayBillingProviderTest {
         body.put("merchantSignature", "0".repeat(32));
 
         assertThat(provider.parseWebhook(objectMapper.writeValueAsString(body), Map.of())).isNull();
-    }
-
-    @Test
-    void aCheckoutCallbackCarriesItsOrderReferenceAsTheSubscriptionReference() throws Exception {
-        UUID orgId = UUID.randomUUID();
-        String orderRef = "railhook_" + orgId + "_1726000000000";
-
-        BillingProvider.BillingWebhookEvent event = provider.parseWebhook(callback(orderRef, null), Map.of());
-
-        // The purchase's orderReference is the only thing WayForPay echoes back that the checkout
-        // could have stored, so it is what the pending subscription is found by.
-        assertThat(event.externalSubscriptionId()).isEqualTo(orderRef);
     }
 
     @Test

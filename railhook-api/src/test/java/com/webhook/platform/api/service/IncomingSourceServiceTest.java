@@ -14,6 +14,8 @@ import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -98,24 +100,15 @@ class IncomingSourceServiceTest {
     }
 
     // A secret with no mode once saved as NONE, so a Stripe source accepted forged webhooks in production.
-    @Test
-    void createSource_secretWithoutMode_verifiesWithTheProviderPreset() {
+    @ParameterizedTest
+    @CsvSource({"STRIPE, PROVIDER", "GENERIC, HMAC_GENERIC"})
+    void createSource_secretWithoutMode_verifiesAnyway(ProviderType provider, VerificationMode expected) {
         stubSave();
 
         IncomingSourceResponse response = service.createSource(projectId, IncomingSourceRequest.builder()
-                .name("Stripe").providerType(ProviderType.STRIPE).hmacSecret("whsec_test").build());
+                .name("Source").providerType(provider).hmacSecret("whsec_test").build());
 
-        assertThat(response.getVerificationMode()).isEqualTo(VerificationMode.PROVIDER);
-    }
-
-    @Test
-    void createSource_secretWithoutMode_onGenericVerifiesWithHmac() {
-        stubSave();
-
-        IncomingSourceResponse response = service.createSource(projectId, IncomingSourceRequest.builder()
-                .name("Custom").providerType(ProviderType.GENERIC).hmacSecret("shared-secret").build());
-
-        assertThat(response.getVerificationMode()).isEqualTo(VerificationMode.HMAC_GENERIC);
+        assertThat(response.getVerificationMode()).isEqualTo(expected);
     }
 
     private void stubSave() {

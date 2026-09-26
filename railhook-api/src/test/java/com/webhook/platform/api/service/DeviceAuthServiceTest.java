@@ -19,6 +19,8 @@ import com.webhook.platform.api.security.JwtTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -176,23 +178,29 @@ class DeviceAuthServiceTest {
         assertNull(code.getOrganizationId());
     }
 
-    @Test
-    void shouldRefusePollingADeniedCode() {
-        String deviceCode = "dev-denied";
+    // The RFC 8628 poll states: still pending, expired, already used, denied.
+    @ParameterizedTest
+    @CsvSource({
+            "PENDING, 5, 202",
+            "PENDING, -1, 410",
+            "CONSUMED, 5, 410",
+            "DENIED, 5, 403"})
+    void pollingACodeThatIsNotApprovedMintsNothing(DeviceAuthStatus status, int expiresInMinutes, int httpStatus) {
+        String deviceCode = "dev-" + status;
         DeviceAuthCode code = DeviceAuthCode.builder()
                 .id(UUID.randomUUID())
                 .deviceCode(deviceCode)
-                .userCode("DENY-0003")
-                .status(DeviceAuthStatus.DENIED)
-                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .status(status)
+                .expiresAt(Instant.now().plus(expiresInMinutes, ChronoUnit.MINUTES))
                 .build();
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
         DomainException thrown = assertThrows(DomainException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
-        assertEquals(403, thrown.getStatusCode().value());
+        assertEquals(httpStatus, thrown.getStatusCode().value());
         verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
+        verify(membershipRepository, never()).findByUserIdAndOrganizationId(any(), any());
     }
 
     @Test
@@ -332,24 +340,6 @@ class DeviceAuthServiceTest {
     }
 
     @Test
-    void shouldFailWhenPollingAlreadyConsumedCode() {
-        String deviceCode = "dev-consumed";
-        DeviceAuthCode code = DeviceAuthCode.builder()
-                .id(UUID.randomUUID())
-                .deviceCode(deviceCode)
-                .status(DeviceAuthStatus.CONSUMED)
-                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
-                .build();
-
-        when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
-
-        DomainException ex = assertThrows(DomainException.class, () ->
-                deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
-        assertEquals(410, ex.getStatusCode().value());
-        verify(membershipRepository, never()).findByUserIdAndOrganizationId(any(), any());
-    }
-
-    @Test
     void shouldFailWhenLosingTheConsumeRace() {
         // A concurrent second poll already flipped the row to CONSUMED.
         UUID userId = UUID.randomUUID();
@@ -376,39 +366,5 @@ class DeviceAuthServiceTest {
                 deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
         verify(jwtTokenService, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
-    }
-
-    @Test
-    void shouldThrow202WhenPollingPendingCode() {
-        String deviceCode = "dev-pending";
-        DeviceAuthCode code = DeviceAuthCode.builder()
-                .id(UUID.randomUUID())
-                .deviceCode(deviceCode)
-                .status(DeviceAuthStatus.PENDING)
-                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
-                .build();
-
-        when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
-
-        DomainException ex = assertThrows(DomainException.class, () ->
-                deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
-        assertEquals(202, ex.getStatusCode().value());
-    }
-
-    @Test
-    void shouldThrow410WhenPollingExpiredCode() {
-        String deviceCode = "dev-expired";
-        DeviceAuthCode code = DeviceAuthCode.builder()
-                .id(UUID.randomUUID())
-                .deviceCode(deviceCode)
-                .status(DeviceAuthStatus.PENDING)
-                .expiresAt(Instant.now().minus(1, ChronoUnit.MINUTES))
-                .build();
-
-        when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
-
-        DomainException ex = assertThrows(DomainException.class, () ->
-                deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
-        assertEquals(410, ex.getStatusCode().value());
     }
 }

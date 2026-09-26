@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -110,7 +111,7 @@ class WebhookVerifierTest {
     @Test
     void stripe_expiredTimestamp() {
         StripeVerifier verifier = new StripeVerifier();
-        long oldTimestamp = Instant.now().getEpochSecond() - 600; // 10 min ago
+        long oldTimestamp = Instant.now().getEpochSecond() - 600;
         String signedPayload = oldTimestamp + "." + BODY;
         String hmac = hmacSha256Hex(SECRET, signedPayload);
         when(request.getHeader("Stripe-Signature")).thenReturn("t=" + oldTimestamp + ",v1=" + hmac);
@@ -133,30 +134,21 @@ class WebhookVerifierTest {
     }
 
     // During a secret roll Stripe sends one v1 per secret; only the last was once kept.
-    @Test
-    void stripe_severalSignatures_theValidOneFirst_verifies() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void stripe_severalSignatures_verifiesWhereverTheValidOneSits(boolean validFirst) {
         StripeVerifier verifier = new StripeVerifier();
         long timestamp = Instant.now().getEpochSecond();
         String valid = hmacSha256Hex(SECRET, timestamp + "." + BODY);
-        String signedWithTheOtherSecret = hmacSha256Hex("whsec_the_other_secret", timestamp + "." + BODY);
-        String header = "t=" + timestamp + ",v1=" + valid + ",v1=" + signedWithTheOtherSecret;
+        String header = validFirst
+                ? "t=" + timestamp + ",v1=" + valid + ",v1=" + hmacSha256Hex("whsec_the_other_secret", timestamp + "." + BODY)
+                : "t=" + timestamp + ",v0=legacy,v1=" + "0".repeat(64) + ",v1=" + valid;
         when(request.getHeader("Stripe-Signature")).thenReturn(header);
 
         var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isTrue();
         assertThat(result.replayKey()).isEqualTo(header);
-    }
-
-    @Test
-    void stripe_severalSignatures_theValidOneLast_verifies() {
-        StripeVerifier verifier = new StripeVerifier();
-        long timestamp = Instant.now().getEpochSecond();
-        String valid = hmacSha256Hex(SECRET, timestamp + "." + BODY);
-        when(request.getHeader("Stripe-Signature"))
-                .thenReturn("t=" + timestamp + ",v0=legacy,v1=" + "0".repeat(64) + ",v1=" + valid);
-
-        assertThat(verifier.verify(SECRET, BODY_BYTES, request).verified()).isTrue();
     }
 
     @Test
@@ -742,18 +734,8 @@ class WebhookVerifierTest {
 
         assertThat(result.verified()).isTrue();
         assertThat(result.error()).isNull();
-    }
-
-    @Test
-    void gitlab_replayKeyIsTheEventUuidNotTheToken() {
-        GitLabVerifier verifier = new GitLabVerifier();
-        when(request.getHeader("X-Gitlab-Token")).thenReturn(SECRET);
-        when(request.getHeader("X-Gitlab-Event-UUID")).thenReturn("event-uuid-1");
-
-        var result = verifier.verify(SECRET, BODY_BYTES, request);
-
         // The token is identical on every GitLab request, so it cannot be the replay key.
-        assertThat(result.replayKey()).isEqualTo("event-uuid-1");
+        assertThat(result.replayKey()).isEqualTo("d9c1f0a2-1111-2222-3333-444455556666");
         assertThat(result.replayKey()).isNotEqualTo(SECRET);
     }
 

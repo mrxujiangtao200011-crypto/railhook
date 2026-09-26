@@ -7,6 +7,8 @@ import com.webhook.platform.api.service.rules.RuleEngineService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
 import java.util.List;
@@ -116,25 +118,18 @@ class IntakePlannerTest {
             assertThat(plan.deliveries()).isEmpty();
         }
 
-        @Test
-        @DisplayName("DROP short-circuits: a ROUTE in a later rule is never applied")
-        void dropShortCircuitsLaterRules() {
-            UUID routed = UUID.randomUUID();
+        @ParameterizedTest
+        @ValueSource(booleans = {true, false})
+        @DisplayName("a DROP wins wherever it sits: a ROUTE before or after it is never applied")
+        void dropWinsOverARouteInEitherOrder(boolean dropFirst) {
+            List<RuleEngineService.RuleMatch> rules = dropFirst
+                    ? List.of(dropRule(), routeRule(UUID.randomUUID()))
+                    : List.of(routeRule(UUID.randomUUID()), dropRule());
 
-            IntakePlan plan = IntakePlanner.plan(
-                    List.of(), List.of(dropRule(), routeRule(routed)), 10);
+            IntakePlan plan = IntakePlanner.plan(List.of(), rules, 10);
 
             assertThat(plan.dropped()).isTrue();
             assertThat(plan.deliveries()).isEmpty();
-        }
-
-        @Test
-        @DisplayName("a DROP after a ROUTE still drops")
-        void dropAfterRouteStillDrops() {
-            IntakePlan plan = IntakePlanner.plan(
-                    List.of(), List.of(routeRule(UUID.randomUUID()), dropRule()), 10);
-
-            assertThat(plan.dropped()).isTrue();
         }
     }
 

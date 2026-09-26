@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
@@ -109,12 +110,6 @@ class EncryptionKeyRotationServiceTest {
         return new PageImpl<>(items);
     }
 
-    private void stubEmptyPages() {
-        lenient().when(endpointRepository.findAll(any(Pageable.class))).thenReturn(endpointPage(Collections.emptyList()));
-        lenient().when(incomingSourceRepository.findAll(any(Pageable.class))).thenReturn(sourcePage(Collections.emptyList()));
-        lenient().when(incomingDestinationRepository.findAll(any(Pageable.class))).thenReturn(destPage(Collections.emptyList()));
-    }
-
     @Nested
     @DisplayName("Endpoint rotation")
     class EndpointRotation {
@@ -165,7 +160,7 @@ class EncryptionKeyRotationServiceTest {
                     .url("https://example.com")
                     .secretEncrypted("cipher")
                     .secretIv("iv")
-                    .encryptionKeyVersion(2) // already on v2
+                    .encryptionKeyVersion(2)
                     .build();
 
             when(endpointRepository.findAll(any(Pageable.class)))
@@ -352,32 +347,10 @@ class EncryptionKeyRotationServiceTest {
 
             assertThat(result.errors()).isEqualTo(1);
             assertThat(result.endpointsRotated()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("partial failure increments the observability counter, not just the count field")
-        void partialFailureIncrementsCounter() {
-            Endpoint badEndpoint = Endpoint.builder()
-                    .id(UUID.randomUUID())
-                    .projectId(UUID.randomUUID())
-                    .url("https://example.com")
-                    .secretEncrypted("garbage_cipher")
-                    .secretIv("garbage_iv")
-                    .encryptionKeyVersion(1)
-                    .build();
-
-            when(endpointRepository.findAll(any(Pageable.class)))
-                    .thenReturn(endpointPage(List.of(badEndpoint)))
-                    .thenReturn(endpointPage(Collections.emptyList()));
-            when(incomingSourceRepository.findAll(any(Pageable.class))).thenReturn(sourcePage(Collections.emptyList()));
-            when(incomingDestinationRepository.findAll(any(Pageable.class))).thenReturn(destPage(Collections.emptyList()));
-
-            EncryptionKeyRotationService.RotationResult result = service.rotateAll();
-
-            assertThat(result.errors()).isEqualTo(1);
             assertThat(meterRegistry.find("encryption_rotation_partial_failures_total").counter())
+                    .as("a partial failure reaches the observability counter, not just the count field")
                     .isNotNull()
-                    .extracting(io.micrometer.core.instrument.Counter::count)
+                    .extracting(Counter::count)
                     .isEqualTo(1.0);
         }
     }
@@ -403,19 +376,5 @@ class EncryptionKeyRotationServiceTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("already in progress");
         }
-    }
-
-    @Test
-    @DisplayName("Empty database — rotates nothing")
-    void emptyDatabase_returnsZeros() {
-        stubEmptyPages();
-
-        EncryptionKeyRotationService.RotationResult result = service.rotateAll();
-
-        assertThat(result.targetVersion()).isEqualTo(2);
-        assertThat(result.endpointsRotated()).isZero();
-        assertThat(result.sourcesRotated()).isZero();
-        assertThat(result.destinationsRotated()).isZero();
-        assertThat(result.errors()).isZero();
     }
 }

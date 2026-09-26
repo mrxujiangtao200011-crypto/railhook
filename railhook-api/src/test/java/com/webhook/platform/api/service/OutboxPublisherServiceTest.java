@@ -10,6 +10,8 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -74,7 +77,7 @@ class OutboxPublisherServiceTest {
     }
 
     @Test
-    void shouldMarkAsSendingDuringClaimPhase() throws Exception {
+    void claimedRowsAreSavedBeforeTheyArePublished() throws Exception {
         stubClaim(List.of(createTestMessage()));
         when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(acked());
 
@@ -84,24 +87,30 @@ class OutboxPublisherServiceTest {
         verify(outboxMessageRepository).batchMarkPublished(anyList(), any(Instant.class));
     }
 
-    @Test
-    void shouldMarkAsFailedOnException() throws Exception {
+    static Stream<RuntimeException> failures() {
+        return Stream.of(new RuntimeException("Parse error"), new NullPointerException());
+    }
+
+    @ParameterizedTest
+    @MethodSource("failures")
+    void shouldMarkAsFailedWhenPreparingTheMessageThrows(RuntimeException failure) throws Exception {
         when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(List.of(createTestMessage()));
         when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenThrow(new RuntimeException("Parse error"));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class))).thenThrow(failure);
 
-        service.publishPendingMessages();
+        assertThatNoException().isThrownBy(() -> service.publishPendingMessages());
 
         verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
     }
 
-    @Test
-    void shouldMarkAsFailedOnKafkaSendFailure() throws Exception {
+    // A null exception message made ConcurrentHashMap.put throw and left the row SENDING.
+    @ParameterizedTest
+    @MethodSource("failures")
+    void shouldMarkAsFailedOnKafkaSendFailure(RuntimeException failure) throws Exception {
         stubClaim(List.of(createTestMessage()));
         CompletableFuture<SendResult<String, Object>> future = new CompletableFuture<>();
-        future.completeExceptionally(new RuntimeException("Broker unavailable"));
+        future.completeExceptionally(failure);
         when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
 
         service.publishPendingMessages();
@@ -233,32 +242,6 @@ class OutboxPublisherServiceTest {
         service.retryFailedMessages();
 
         verify(outboxMessageRepository).batchMarkPublished(eq(List.of(message.getId())), any(Instant.class));
-    }
-
-    // A null exception message made ConcurrentHashMap.put throw and left the row SENDING.
-    @Test
-    void shouldMarkAsFailedWhenTheKafkaErrorCarriesNoMessage() throws Exception {
-        stubClaim(List.of(createTestMessage()));
-        CompletableFuture<SendResult<String, Object>> future = new CompletableFuture<>();
-        future.completeExceptionally(new NullPointerException());
-        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
-
-        service.publishPendingMessages();
-
-        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
-    }
-
-    @Test
-    void shouldSurviveAPreparationErrorThatCarriesNoMessage() throws Exception {
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(List.of(createTestMessage()));
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenThrow(new NullPointerException());
-
-        assertThatNoException().isThrownBy(() -> service.publishPendingMessages());
-
-        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
     }
 
     // Handing over the live synchronizedList risked a ConcurrentModificationException while binding.
