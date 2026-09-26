@@ -67,6 +67,15 @@ export default function LandingNav() {
           </ul>
 
           <div className="ml-auto flex flex-none items-center gap-4 min-[901px]:ml-0">
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t('landing.nav.github')}
+              className="hidden h-9 w-9 place-items-center text-muted-foreground transition-colors hover:text-foreground min-[901px]:grid"
+            >
+              <Github className="h-[19px] w-[19px]" aria-hidden="true" />
+            </a>
             <LanguageSwitcher className="hidden h-9 min-[901px]:inline-flex" />
             {!isAuthenticated && (
               <Link to="/login" className="hidden text-[15px] text-[#333] transition-colors hover:text-foreground dark:text-muted-foreground min-[1101px]:block">

@@ -26,11 +26,6 @@ GitHub and others, with retries, signatures and a record of every attempt. Self-
 
 </div>
 
-Sending webhooks yourself means a retry queue, signing, per-customer endpoints and a way to
-answer "did you send it?". Receiving them means verifying each provider's signature and not losing
-events while your app is down. Railhook does both and keeps the request and response of every
-attempt.
-
 ## Install
 
 With Docker and Compose (about 4 GiB of RAM):
