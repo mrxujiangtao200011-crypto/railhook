@@ -71,6 +71,8 @@ class IncomingForwardAttemptRepositoryTest {
         UUID replay = persist(eventId, destinationId, 1, UUID.randomUUID(), ForwardAttemptStatus.PROCESSING,
                 now.minusSeconds(1));
         persist(eventId, destinationId, 2, null, ForwardAttemptStatus.PENDING, now.plusSeconds(300));
+        entityManager.flush();
+        entityManager.clear();
 
         List<IncomingForwardAttempt> claimed = attemptRepository.claimDue(now, now.plusSeconds(300),
                 new UUID(0L, 0L), 10, 10, 10);
@@ -90,6 +92,8 @@ class IncomingForwardAttemptRepositoryTest {
             persist(UUID.randomUUID(), busy, 1, null, ForwardAttemptStatus.PENDING, now.minusSeconds(60 + i));
         }
         UUID quietRow = persist(eventId, quiet, 1, null, ForwardAttemptStatus.PENDING, now.minusSeconds(1));
+        entityManager.flush();
+        entityManager.clear();
 
         List<IncomingForwardAttempt> claimed = attemptRepository.claimDue(now, now.plusSeconds(300),
                 new UUID(0L, 0L), 10, 2, 10);

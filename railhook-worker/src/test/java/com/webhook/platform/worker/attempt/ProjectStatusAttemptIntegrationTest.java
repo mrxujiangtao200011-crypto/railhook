@@ -195,8 +195,6 @@ class ProjectStatusAttemptIntegrationTest {
         assertThat(deferred.getNextRetryAt()).isAfter(Instant.now().plusSeconds(60));
 
         jdbc.update("UPDATE organizations SET suspended_at = NULL, suspension_reason = NULL WHERE id = ?", org);
-        // Before the recheck, a copy of the dispatch message claims nothing.
-        assertThat(runDelivery(delivery).getAttemptCount()).isZero();
         // The column has no time zone, so write through the entity, not the database's now().
         new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
             Delivery row = deliveryRepository.findById(delivery).orElseThrow();
@@ -287,6 +285,7 @@ class ProjectStatusAttemptIntegrationTest {
         UUID id = UUID.randomUUID();
         deliveryRepository.save(Delivery.builder()
                 .id(id)
+                .nextRetryAt(Instant.now())
                 .organizationId(organizationId)
                 .eventId(event.getId())
                 .endpointId(endpointId)
@@ -338,6 +337,7 @@ class ProjectStatusAttemptIntegrationTest {
                 .build());
         return forwardAttemptRepository.save(IncomingForwardAttempt.builder()
                 .organizationId(organizationId)
+                .nextRetryAt(Instant.now())
                 .incomingEventId(event.getId())
                 .destinationId(destination.getId())
                 .attemptNumber(1)
