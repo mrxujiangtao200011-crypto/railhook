@@ -456,7 +456,6 @@ case "${1:-help}" in
         for svc in postgres redis ui caddy; do up_one "$svc"; done
         # Only the API runs migrations, and a new worker validates the schema when it starts.
         roll_api || { echo "The API did not come up; the worker was left as it was." >&2; exit 1; }
-        # Removes containers of services the new compose file dropped, such as Kafka before 3.0.
         up_one worker --remove-orphans
         echo "Upgraded from ${from}. To roll the images back, set the *_IMAGE_TAG lines in .env to ${from}"
         echo "and run ./railhook start. The schema does not roll back; restore the backup for that." ;;
