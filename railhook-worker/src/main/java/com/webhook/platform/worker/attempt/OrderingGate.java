@@ -1,7 +1,5 @@
 package com.webhook.platform.worker.attempt;
 
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.service.OrderingBufferService;
@@ -9,8 +7,6 @@ import io.micrometer.core.instrument.Counter;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
@@ -25,13 +21,12 @@ class OrderingGate {
 
     private final OrderingBufferService orderingBufferService;
     private final DeliveryRepository deliveryRepository;
-    private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final TransactionTemplate transactionTemplate;
     private final Counter gapTimeoutCounter;
     private final long rescheduleDelaySeconds;
 
     /** Null if the Delivery may proceed now. Parking ends the Claim and clears its token. */
-    Instant holdUntil(Delivery delivery) {
+    Instant holdUntil(Delivery delivery, UUID fence) {
         UUID endpointId = delivery.getEndpointId();
         long sequenceNumber = delivery.getSequenceNumber();
 
@@ -66,7 +61,7 @@ class OrderingGate {
             return null;
         }
 
-        return park(delivery, endpointId, sequenceNumber, rangeStart, rangeEnd);
+        return park(delivery, fence, endpointId, sequenceNumber, rangeStart, rangeEnd);
     }
 
     /**
@@ -82,23 +77,19 @@ class OrderingGate {
                 now.minus(gapTimeout), now.plus(gapTimeout)) > 0;
     }
 
-    private Instant park(Delivery delivery, UUID endpointId, long sequenceNumber, long rangeStart, long rangeEnd) {
-        if (delivery.getOrderingFirstBufferedAt() == null) {
-            delivery.setOrderingFirstBufferedAt(Instant.now());
-        }
+    private Instant park(Delivery delivery, UUID fence, UUID endpointId, long sequenceNumber,
+            long rangeStart, long rangeEnd) {
         log.debug("Buffering delivery {} (seq={}) waiting for range [{}, {}]",
                 delivery.getId(), sequenceNumber, rangeStart, rangeEnd);
         orderingBufferService.bufferDelivery(endpointId, delivery.getId(), sequenceNumber);
 
-        Instant until = Instant.now().plusSeconds(rescheduleDelaySeconds);
-        delivery.handBackTo(until);
-        try {
-            deliveryRepository.save(delivery);
-        } catch (OptimisticLockingFailureException e) {
-            // The buffer entry is already in place, so nothing is lost. Propagating would stall
-            // the partition.
-            log.warn("Delivery {} (seq={}) was updated concurrently while being buffered; "
-                    + "leaving the other writer's state in place", delivery.getId(), sequenceNumber);
+        Instant now = Instant.now();
+        Instant until = now.plusSeconds(rescheduleDelaySeconds);
+        Integer parked = transactionTemplate.execute(tx ->
+                deliveryRepository.parkIfStillClaimed(delivery.getId(), fence, until, now));
+        if (parked == null || parked == 0) {
+            log.debug("Delivery {} (seq={}) was reclaimed before it could be buffered",
+                    delivery.getId(), sequenceNumber);
         }
         return until;
     }
@@ -119,38 +110,11 @@ class OrderingGate {
         }
     }
 
-    /**
-     * Makes each unblocked row due before republishing it. A dispatch claims only a due row, and
-     * parked rows are due a few seconds out, so these messages used to be dropped and an ordered
-     * endpoint drained one Delivery per poll interval. Only unclaimed rows are touched, so this
-     * cannot overtake an Attempt in flight.
-     */
+    /** Only unclaimed rows are touched, so this cannot overtake an Attempt in flight. */
     private void triggerBufferedDeliveries(UUID endpointId) {
         List<UUID> ready = orderingBufferService.getReadyDeliveries(endpointId);
-        if (ready.isEmpty()) {
-            return;
-        }
-        for (Delivery buffered : deliveryRepository.findAllById(ready)) {
-            Integer woken = transactionTemplate.execute(tx ->
-                    deliveryRepository.scheduleIfUnclaimed(buffered.getId(), Instant.now()));
-            if (woken == null || woken == 0) {
-                log.debug("Released delivery {} (seq={}) is not ours to wake — another attempt holds it, "
-                        + "or it is already done", buffered.getId(), buffered.getSequenceNumber());
-                continue;
-            }
-            kafkaTemplate.send(KafkaTopics.DELIVERIES_DISPATCH, endpointId.toString(),
-                    DeliveryMessage.builder()
-                            .deliveryId(buffered.getId())
-                            .eventId(buffered.getEventId())
-                            .endpointId(buffered.getEndpointId())
-                            .subscriptionId(buffered.getSubscriptionId())
-                            .status(buffered.getStatus().name())
-                            .attemptCount(buffered.getAttemptCount())
-                            .sequenceNumber(buffered.getSequenceNumber())
-                            .orderingEnabled(buffered.getOrderingEnabled())
-                            .build());
-            log.debug("Triggered buffered delivery {} (seq={}) for endpoint {}",
-                    buffered.getId(), buffered.getSequenceNumber(), endpointId);
+        for (UUID id : ready) {
+            transactionTemplate.execute(tx -> deliveryRepository.scheduleIfUnclaimed(id, Instant.now()));
         }
     }
 }

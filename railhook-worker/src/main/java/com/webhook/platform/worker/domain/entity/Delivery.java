@@ -121,16 +121,6 @@ public class Delivery {
     @Column(name = "version", nullable = false)
     private Long version;
 
-    /** A set token means "currently claimed", which is why handing the row back clears it. */
-    public void claim(UUID token) {
-        Instant now = Instant.now();
-        this.status = DeliveryStatus.PROCESSING;
-        this.nextRetryAt = null;
-        this.lastAttemptAt = now;
-        this.claimToken = token;
-        this.updatedAt = now;
-    }
-
     public void handBackTo(Instant retryAt) {
         this.status = DeliveryStatus.PENDING;
         this.claimToken = null;
@@ -142,6 +132,8 @@ public class Delivery {
         Instant now = Instant.now();
         this.status = DeliveryStatus.SUCCESS;
         this.succeededAt = now;
+        this.nextRetryAt = null;
+        this.claimToken = null;
         this.updatedAt = now;
     }
 
@@ -149,6 +141,8 @@ public class Delivery {
         Instant now = Instant.now();
         this.status = DeliveryStatus.DLQ;
         this.failedAt = now;
+        this.nextRetryAt = null;
+        this.claimToken = null;
         this.updatedAt = now;
     }
 
@@ -157,6 +151,8 @@ public class Delivery {
         Instant now = Instant.now();
         this.status = DeliveryStatus.CANCELLED;
         this.failedAt = now;
+        this.nextRetryAt = null;
+        this.claimToken = null;
         this.updatedAt = now;
     }
 
@@ -164,6 +160,8 @@ public class Delivery {
         Instant now = Instant.now();
         this.status = DeliveryStatus.FAILED;
         this.failedAt = now;
+        this.nextRetryAt = null;
+        this.claimToken = null;
         this.updatedAt = now;
     }
 

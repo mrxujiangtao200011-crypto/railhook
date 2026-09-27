@@ -1,7 +1,5 @@
 package com.webhook.platform.worker.attempt;
 
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
@@ -23,7 +21,6 @@ import com.webhook.platform.worker.service.TransformationCacheService;
 import com.webhook.platform.common.transform.TransformRequest;
 import io.micrometer.core.instrument.Counter;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.http.MediaType;
@@ -56,7 +53,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     private final EventRepository eventRepository;
     private final ProjectStatusLookup projectStatusLookup;
     private final TransactionTemplate transactionTemplate;
-    private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final OrderingGate orderingGate;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final MtlsWebClientCache mtlsWebClientCache;
@@ -67,8 +63,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     private final TargetFailureRecorder targetFailureRecorder;
     private final Clock clock;
 
-    private final DeliveryMessage message;
-    private final boolean isRetry;
+    private final Delivery claimed;
 
     private Endpoint endpoint;
     private Event event;
@@ -81,7 +76,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             ProjectStatusLookup projectStatusLookup,
             TransactionTemplate transactionTemplate,
             OrderingBufferService orderingBufferService,
-            KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             EncryptionKeyRegistry encryptionKeyRegistry,
             MtlsWebClientCache mtlsWebClientCache,
             TransformationCacheService transformationCacheService,
@@ -92,16 +86,14 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             Counter orderingGapTimeoutCounter,
             Clock clock,
             int orderingRescheduleDelaySeconds,
-            DeliveryMessage message,
-            boolean isRetry) {
+            Delivery claimed) {
         this.deliveryRepository = deliveryRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
         this.projectStatusLookup = projectStatusLookup;
         this.transactionTemplate = transactionTemplate;
-        this.kafkaTemplate = kafkaTemplate;
-        this.orderingGate = new OrderingGate(orderingBufferService, deliveryRepository, kafkaTemplate,
+        this.orderingGate = new OrderingGate(orderingBufferService, deliveryRepository,
                 transactionTemplate, orderingGapTimeoutCounter, orderingRescheduleDelaySeconds);
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.mtlsWebClientCache = mtlsWebClientCache;
@@ -111,54 +103,18 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         this.defaultWebClient = defaultWebClient;
         this.targetFailureRecorder = targetFailureRecorder;
         this.clock = clock;
-        this.message = message;
-        this.isRetry = isRetry;
+        this.claimed = claimed;
     }
 
-    /** A retry CASes on the published token: the scheduler already moved the row to PROCESSING. */
+    /** The row was claimed by {@code DeliveryRepository#claimDue}; its token is the fence. */
     @Override
     public ClaimResult<Claim> claim() {
-        Delivery delivery;
-        UUID fence;
-
-        if (isRetry) {
-            UUID expected = message.getClaimToken();
-            if (expected == null) {
-                // Message from an older producer. Trust the status rather than strand the retry.
-                delivery = deliveryRepository.findById(message.getDeliveryId()).orElse(null);
-                if (delivery == null || delivery.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
-                    return new ClaimResult.NotClaimed<>("retry delivery not found or not PROCESSING");
-                }
-                log.debug("Retry message for delivery {} carries no fencing token (older producer?), "
-                        + "proceeding without CAS", message.getDeliveryId());
-                fence = delivery.getClaimToken();
-            } else {
-                // Reading the fence out of the row let every copy of a redelivered message
-                // match, and the duplicate webhook went out unrecorded.
-                UUID token = UUID.randomUUID();
-                delivery = transactionTemplate.execute(tx ->
-                        deliveryRepository.claimRetryForProcessing(message.getDeliveryId(), expected, token));
-                if (delivery == null) {
-                    return new ClaimResult.NotClaimed<>(
-                            "retry delivery already claimed by a prior delivery of this Kafka message");
-                }
-                fence = token;
-            }
-        } else {
-            UUID token = UUID.randomUUID();
-            delivery = transactionTemplate.execute(tx ->
-                    deliveryRepository.claimForProcessingAndReturn(message.getDeliveryId(), token, clock.instant()));
-            if (delivery == null) {
-                return new ClaimResult.NotClaimed<>("delivery already claimed or not PENDING");
-            }
-            fence = token;
-        }
-
-        Claim claim = new Claim(delivery.getId(), fence, delivery);
+        Delivery delivery = claimed;
+        Claim claim = new Claim(delivery.getId(), delivery.getClaimToken(), delivery);
 
         // Before loading the Endpoint and Event: a parked Delivery is re-polled every few seconds.
         if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
-            Instant until = orderingGate.holdUntil(delivery);
+            Instant until = orderingGate.holdUntil(delivery, claim.fence());
             if (until != null) {
                 return new ClaimResult.Deferred<>(until, "waiting for an earlier sequence");
             }
@@ -431,27 +387,9 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return Boolean.TRUE.equals(applied);
     }
 
-    /** Only a notification; the DLQ state is already committed. */
     @Override
     public void onAbandoned(Claim claim) {
-        Delivery delivery = claim.delivery();
-        orderingGate.release(delivery, true);
-        try {
-            kafkaTemplate.send(KafkaTopics.DELIVERIES_DLQ, delivery.getEndpointId().toString(),
-                    DeliveryMessage.builder()
-                            .deliveryId(delivery.getId())
-                            .eventId(delivery.getEventId())
-                            .endpointId(delivery.getEndpointId())
-                            .subscriptionId(delivery.getSubscriptionId())
-                            .status(Delivery.DeliveryStatus.DLQ.name())
-                            .attemptCount(delivery.getAttemptCount())
-                            .sequenceNumber(delivery.getSequenceNumber())
-                            .orderingEnabled(delivery.getOrderingEnabled())
-                            .build());
-            log.debug("Published DLQ event for delivery {}", delivery.getId());
-        } catch (Exception e) {
-            log.error("Failed to publish DLQ event for delivery {}: {}", delivery.getId(), e.getMessage(), e);
-        }
+        orderingGate.release(claim.delivery(), true);
     }
 
     @Override

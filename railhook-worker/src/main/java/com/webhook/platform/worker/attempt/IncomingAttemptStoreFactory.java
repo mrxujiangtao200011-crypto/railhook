@@ -1,16 +1,15 @@
 package com.webhook.platform.worker.attempt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
 import com.webhook.platform.worker.domain.entity.IncomingEvent;
+import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -28,16 +27,14 @@ public class IncomingAttemptStoreFactory {
     private final ObjectMapper objectMapper;
     @Qualifier("incomingForwardWebClient")
     private final WebClient incomingForwardWebClient;
-    @Qualifier("incomingForwardKafkaTemplate")
-    private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
     private final TargetFailureRecorder targetFailureRecorder;
 
-    public IncomingAttemptStore create(IncomingForwardMessage message, IncomingEvent event,
+    public IncomingAttemptStore create(IncomingForwardAttempt claimed, IncomingEvent event,
             IncomingDestination destination) {
         return new IncomingAttemptStore(
                 attemptRepository, projectStatusLookup, transactionTemplate, transformationCacheService,
                 payloadTransformService, encryptionKeyRegistry, objectMapper,
-                incomingForwardWebClient, kafkaTemplate, targetFailureRecorder,
-                message, event, destination);
+                incomingForwardWebClient, targetFailureRecorder,
+                claimed, event, destination);
     }
 }

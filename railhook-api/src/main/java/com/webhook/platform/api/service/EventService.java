@@ -34,9 +34,7 @@ public class EventService {
     private final ProjectRepository projectRepository;
     private final EventIntake eventIntake;
     private final DeliveryRepository deliveryRepository;
-    private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
-    private final DeliveryDispatch deliveryDispatch;
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
     private final SchemaValidationGate schemaValidationGate;
@@ -127,12 +125,6 @@ public class EventService {
             }
         }
         List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
-
-        List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
-        for (Delivery delivery : savedDeliveries) {
-            outboxMessages.add(deliveryDispatch.outboxFor(delivery, projectId, DeliveryDispatch.Reason.CREATED));
-        }
-        outboxMessageRepository.saveAll(outboxMessages);
 
         int deliveriesCreated = savedDeliveries.size();
         log.debug("Created {} deliveries for test event: {}", deliveriesCreated, event.getId());

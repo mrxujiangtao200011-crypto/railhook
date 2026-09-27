@@ -173,13 +173,15 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
 
     /**
      * Runs outside the ingest transaction, so a rollback there cannot waste a generated number.
-     * Transactional itself because both callers have no transaction open and a JPQL update
-     * needs one.
+     * Makes an unclaimed row due, since ingest holds ordered rows back until they are numbered.
      */
     @Transactional
     @Modifying
-    @Query("UPDATE Delivery d SET d.sequenceNumber = :sequenceNumber WHERE d.id = :id")
-    int updateSequenceNumber(@Param("id") UUID id, @Param("sequenceNumber") long sequenceNumber);
+    @Query("UPDATE Delivery d SET d.sequenceNumber = :sequenceNumber, "
+            + "d.nextRetryAt = CASE WHEN d.status = 'PENDING' AND d.claimToken IS NULL THEN :now ELSE d.nextRetryAt END "
+            + "WHERE d.id = :id")
+    int updateSequenceNumber(@Param("id") UUID id, @Param("sequenceNumber") long sequenceNumber,
+            @Param("now") Instant now);
 
     /**
      * Ordered Deliveries left without a sequence number by a pod that died between commit and

@@ -39,9 +39,6 @@ public class ProductionSafetyValidator {
     @Value("${webhook.url-validation.allow-private-ips:false}")
     private boolean allowPrivateIps;
 
-    @Value("${spring.kafka.bootstrap-servers:}")
-    private String kafkaBootstrapServers;
-
     @PostConstruct
     public void validateProductionConfig() {
         if (!"production".equalsIgnoreCase(appEnv)) {
@@ -60,9 +57,6 @@ public class ProductionSafetyValidator {
         }
         if (allowPrivateIps) {
             violations.add("WEBHOOK_ALLOW_PRIVATE_IPS=true — must be false in production (SSRF risk)");
-        }
-        if (kafkaBootstrapServers.isBlank() || kafkaBootstrapServers.contains("localhost")) {
-            violations.add("KAFKA_BOOTSTRAP_SERVERS points to localhost — must use production broker in production");
         }
 
         if (!violations.isEmpty()) {

@@ -58,7 +58,6 @@ public class DeliveryService {
     private final EventRepository eventRepository;
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
-    private final DeliveryDispatch deliveryDispatch;
     private final PiiMaskingService piiMaskingService;
 
     // Same masking as every other screen: partial masking is trusted, so worse than none.
@@ -179,8 +178,6 @@ public class DeliveryService {
 
         delivery.returnToLadder(Delivery.MANUAL_RETRY_ATTEMPTS);
         deliveryRepository.save(delivery);
-
-        deliveryDispatch.announce(delivery, resolveProjectId(delivery), DeliveryDispatch.Reason.REPLAYED);
         log.debug("Replayed delivery: {}", delivery.getId());
     }
 
@@ -326,14 +323,7 @@ public class DeliveryService {
         }
         delivery.returnToLadder(Delivery.MANUAL_RETRY_ATTEMPTS);
         deliveryRepository.save(delivery);
-
-        try {
-            deliveryDispatch.announce(delivery, projectId, DeliveryDispatch.Reason.BULK_REPLAYED);
-            return true;
-        } catch (Exception e) {
-            log.error("Failed to create bulk replay outbox message for delivery {}", delivery.getId(), e);
-            return false;
-        }
+        return true;
     }
 
     private DeliveryAttemptResponse mapAttemptToResponse(DeliveryAttempt attempt, UUID projectId) {
@@ -425,9 +415,6 @@ public class DeliveryService {
         // Raises the cap rather than winding the count back, which reused attempt numbers.
         delivery.returnToLadder(Math.max(1, delivery.getMaxAttempts() - (fromAttempt - 1)));
         deliveryRepository.save(delivery);
-
-        deliveryDispatch.announce(delivery, resolveProjectId(delivery),
-                DeliveryDispatch.Reason.REPLAYED_FROM_STEP);
         log.debug("Replayed delivery {} from attempt {}", deliveryId, fromAttempt);
     }
 

@@ -12,7 +12,7 @@
 
     <artifactId>railhook-worker</artifactId>
     <name>Webhook Platform Worker</name>
-    <description>Kafka consumer for webhook delivery</description>
+    <description>Webhook delivery worker</description>
 
     <dependencies>
         <dependency>
@@ -75,18 +75,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-jackson2</artifactId>
-        </dependency>
-        <!--
-          The starter rather than bare spring-kafka: Boot 4 moved the Kafka
-          auto-configuration out of spring-boot-autoconfigure into its own
-          spring-boot-kafka module, which only the starter pulls in. Without it
-          the spring.kafka.* block in application.yml would bind to nothing and
-          the autoconfigure.exclude in the integration tests would name a class
-          that is not on the classpath, which Boot treats as a startup failure.
-        -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -203,12 +191,6 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>1.21.4</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>kafka</artifactId>
             <version>1.21.4</version>
             <scope>test</scope>
         </dependency>

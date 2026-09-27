@@ -65,18 +65,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
-        <!--
-          The starter rather than bare spring-kafka: Boot 4 moved the Kafka
-          auto-configuration out of spring-boot-autoconfigure into its own
-          spring-boot-kafka module, which only the starter pulls in. Without it
-          the spring.kafka.* block in application.yml would bind to nothing and
-          the autoconfigure.exclude in the integration tests would name a class
-          that is not on the classpath, which Boot treats as a startup failure.
-        -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-kafka</artifactId>
-        </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>

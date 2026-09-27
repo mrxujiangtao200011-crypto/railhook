@@ -10,7 +10,6 @@ import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.DlqStatsResponse;
 import com.webhook.platform.api.dto.IncomingDlqItemResponse;
@@ -46,9 +45,7 @@ public class IncomingDlqService {
     private final IncomingEventRepository eventRepository;
     private final IncomingSourceRepository sourceRepository;
     private final IncomingDestinationRepository destinationRepository;
-    private final OutboxMessageRepository outboxMessageRepository;
     private final ProjectRepository projectRepository;
-    private final ForwardDispatch forwardDispatch;
 
     public void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
@@ -140,10 +137,6 @@ public class IncomingDlqService {
                     .replaySessionId(replaySessionId)
                     .status(ForwardAttemptStatus.PENDING)
                     .build());
-
-            outboxMessageRepository.save(forwardDispatch.outboxFor(
-                    attempt.getIncomingEventId(), source.getId(), attempt.getDestinationId(),
-                    projectId, 1, replaySessionId, ForwardDispatch.Reason.DLQ_RETRY));
 
             attempt.setStatus(ForwardAttemptStatus.FAILED);
             attemptRepository.save(attempt);

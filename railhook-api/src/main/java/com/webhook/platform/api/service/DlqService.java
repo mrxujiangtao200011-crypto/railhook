@@ -46,7 +46,6 @@ public class DlqService {
     private final EventRepository eventRepository;
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
-    private final DeliveryDispatch deliveryDispatch;
 
     // Project carries @TenantId, so a foreign project id is indistinguishable from a missing one.
     public void validateProjectOwnership(UUID projectId) {
@@ -124,9 +123,7 @@ public class DlqService {
             // Another go at the ladder, without forgetting the attempts already made.
             delivery.returnToLadder(Delivery.MANUAL_RETRY_ATTEMPTS);
             deliveryRepository.save(delivery);
-            
-            deliveryDispatch.announce(delivery, projectId, DeliveryDispatch.Reason.RETRY);
-            
+
             log.info("Retrying DLQ delivery: {}", delivery.getId());
             retried++;
         }

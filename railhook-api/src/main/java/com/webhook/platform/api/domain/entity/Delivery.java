@@ -146,12 +146,18 @@ public class Delivery {
     public void returnToLadder(int additionalAttempts) {
         this.status = DeliveryStatus.PENDING;
         this.maxAttempts = Math.min(attemptCount + additionalAttempts, RetryLadder.MAX_ATTEMPTS_LIMIT);
-        this.nextRetryAt = null;
+        this.nextRetryAt = Instant.now();
         this.failedAt = null;
         this.ladderResumedAt = Instant.now();
-        // The worker leaves its token behind; kept, the retry looks claimed and a backpressure
-        // reschedule (claim_token IS NULL) never matches it.
         this.claimToken = null;
+    }
+
+    // A PENDING row without a due time is never claimed.
+    @PrePersist
+    void dueNowIfPending() {
+        if (nextRetryAt == null && status == DeliveryStatus.PENDING) {
+            nextRetryAt = Instant.now();
+        }
     }
 
     @ManyToOne(fetch = FetchType.LAZY)

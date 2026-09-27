@@ -16,97 +16,66 @@ import java.util.UUID;
 @Repository
 public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
 
-    // Clears the token so the abandoned attempt's late finalizer cannot write to the row.
-    @Modifying
-    @Query(value = "UPDATE deliveries SET status = 'PENDING', claim_token = NULL, " +
-           "next_retry_at = now(), updated_at = now(), version = version + 1 " +
-           "WHERE status = 'PROCESSING' AND (last_attempt_at < :threshold OR (last_attempt_at IS NULL AND updated_at < :threshold))", nativeQuery = true)
-    int resetStuckDeliveries(@Param("threshold") Instant threshold);
-
-    /** Gated on updated_at so freshly ingested deliveries are not swept. */
-    @Modifying
-    @Query(value = "UPDATE deliveries SET next_retry_at = now(), updated_at = now(), version = version + 1 " +
-           "WHERE status = 'PENDING' AND next_retry_at IS NULL AND updated_at < :threshold", nativeQuery = true)
-    int resetStrandedPendingDeliveries(@Param("threshold") Instant threshold);
-
-
+    /**
+     * Takes up to {@code perEndpoint} due rows from each of up to {@code maxEndpoints} endpoints
+     * after {@code after}, so one endpoint's backlog cannot fill the batch. A PROCESSING row is due
+     * again once its claim has timed out: its holder is presumed lost, and the new token fences it.
+     */
     @Query(value = """
-            SELECT id FROM (
-                SELECT d.id,
-                       ROW_NUMBER() OVER (PARTITION BY d.endpoint_id ORDER BY d.next_retry_at ASC) AS rn_ep,
-                       ROW_NUMBER() OVER (PARTITION BY e.project_id ORDER BY d.next_retry_at ASC) AS rn_proj
-                FROM deliveries d
-                JOIN endpoints e ON d.endpoint_id = e.id
-                WHERE d.status = :#{#status.name()} AND d.next_retry_at IS NOT NULL AND d.next_retry_at <= :now
-            ) sub WHERE rn_ep <= :maxPerEndpoint AND rn_proj <= :maxPerProject
-            ORDER BY rn_proj ASC, rn_ep ASC LIMIT :limit
+            WITH RECURSIVE due_endpoints AS (
+                (SELECT d.endpoint_id, 1 AS n FROM deliveries d
+                 WHERE d.status IN ('PENDING', 'PROCESSING') AND d.next_retry_at <= :now
+                   AND d.endpoint_id > :after
+                 ORDER BY d.endpoint_id LIMIT 1)
+                UNION ALL
+                SELECT nxt.endpoint_id, e.n + 1 FROM due_endpoints e
+                CROSS JOIN LATERAL (
+                    SELECT d.endpoint_id FROM deliveries d
+                    WHERE d.status IN ('PENDING', 'PROCESSING') AND d.next_retry_at <= :now
+                      AND d.endpoint_id > e.endpoint_id
+                    ORDER BY d.endpoint_id LIMIT 1) nxt
+                WHERE e.n < :maxEndpoints
+            ),
+            picked AS (
+                SELECT p.id FROM due_endpoints e
+                CROSS JOIN LATERAL (
+                    SELECT d.id FROM deliveries d
+                    WHERE d.endpoint_id = e.endpoint_id AND d.status IN ('PENDING', 'PROCESSING')
+                      AND d.next_retry_at <= :now
+                    ORDER BY d.next_retry_at LIMIT :perEndpoint
+                    FOR UPDATE SKIP LOCKED) p
+                LIMIT :limit
+            )
+            UPDATE deliveries d SET status = 'PROCESSING', claim_token = gen_random_uuid(),
+                next_retry_at = :claimExpiresAt, last_attempt_at = :now, updated_at = :now,
+                version = d.version + 1
+            FROM picked WHERE d.id = picked.id
+            RETURNING d.*
             """, nativeQuery = true)
-    List<UUID> findPendingRetryIds(
-            @Param("status") Delivery.DeliveryStatus status,
-            @Param("now") Instant now,
-            @Param("limit") int limit,
-            @Param("maxPerEndpoint") int maxPerEndpoint,
-            @Param("maxPerProject") int maxPerProject
-    );
+    List<Delivery> claimDue(@Param("now") Instant now,
+            @Param("claimExpiresAt") Instant claimExpiresAt,
+            @Param("after") UUID after,
+            @Param("maxEndpoints") int maxEndpoints,
+            @Param("perEndpoint") int perEndpoint,
+            @Param("limit") int limit);
 
-    @Query(value = """
-            SELECT * FROM deliveries WHERE id IN :ids ORDER BY next_retry_at ASC FOR UPDATE SKIP LOCKED
-            """, nativeQuery = true)
-    List<Delivery> lockByIds(@Param("ids") List<UUID> ids);
-
-    // Not before its rung: a duplicate dispatch message matching on status alone used to run an
-    // Attempt early and spend a rung. :now comes from the application because next_retry_at has
-    // no time zone and the database's now() depends on the session's zone.
     @Modifying
-    @Query(value = "UPDATE deliveries SET status = 'PROCESSING', claim_token = :claimToken, " +
-            "last_attempt_at = now(), updated_at = now(), version = version + 1 " +
-            "WHERE id = :id AND status = 'PENDING' AND (next_retry_at IS NULL OR next_retry_at <= :now)",
-            nativeQuery = true)
-    int claimForProcessing(@Param("id") UUID id, @Param("claimToken") UUID claimToken, @Param("now") Instant now);
-
-    @Query(value = "UPDATE deliveries SET status = 'PROCESSING', claim_token = :claimToken, " +
-            "last_attempt_at = now(), updated_at = now(), version = version + 1 " +
-            "WHERE id = :id AND status = 'PENDING' AND (next_retry_at IS NULL OR next_retry_at <= :now) " +
-            "RETURNING *", nativeQuery = true)
-    Delivery claimForProcessingAndReturn(@Param("id") UUID id, @Param("claimToken") UUID claimToken,
+    @Query(value = "UPDATE deliveries SET status = 'PENDING', claim_token = NULL, next_retry_at = :until, " +
+            "ordering_first_buffered_at = COALESCE(ordering_first_buffered_at, :now), " +
+            "updated_at = :now, version = version + 1 " +
+            "WHERE id = :id AND status = 'PROCESSING' AND claim_token = :claimToken", nativeQuery = true)
+    int parkIfStillClaimed(@Param("id") UUID id,
+            @Param("claimToken") UUID claimToken,
+            @Param("until") Instant until,
             @Param("now") Instant now);
 
-    /**
-     * Swaps the scheduler's token for a fresh one, so a redelivered message or a late send the
-     * scheduler gave up on claims nothing.
-     *
-     * <p>Restamps {@code last_attempt_at}, which the stuck sweep measures from. Left at the
-     * scheduler's time, a message that sat in the retry topic past the sweep threshold was reset
-     * while its POST was on the wire and sent twice.
-     */
-    @Query(value = "UPDATE deliveries SET claim_token = :newClaimToken, " +
-            "last_attempt_at = now(), updated_at = now(), version = version + 1 " +
-            "WHERE id = :id AND status = 'PROCESSING' AND claim_token = :expectedClaimToken " +
-            "RETURNING *", nativeQuery = true)
-    Delivery claimRetryForProcessing(@Param("id") UUID id,
-            @Param("expectedClaimToken") UUID expectedClaimToken,
-            @Param("newClaimToken") UUID newClaimToken);
-
-    /**
-     * For a send the scheduler could not confirm. If it lands, the consumer owns the row and this
-     * must match nothing. Saving the entity instead threw on the version and rolled back every
-     * other row handed back in the batch.
-     */
-    @Modifying
-    @Query(value = "UPDATE deliveries SET status = 'PENDING', claim_token = NULL, " +
-            "next_retry_at = :retryAt, updated_at = now(), version = version + 1 " +
-            "WHERE id = :id AND status = 'PROCESSING' AND claim_token = :claimToken", nativeQuery = true)
-    int handBackIfStillClaimed(@Param("id") UUID id,
-            @Param("claimToken") UUID claimToken,
-            @Param("retryAt") Instant retryAt);
-
-    /** Matches nothing once any copy of the dispatch message has claimed the row. */
+    /** Matches nothing once the row is claimed, so it cannot overtake an Attempt in flight. */
     @Modifying
     @Query(value = "UPDATE deliveries SET next_retry_at = :retryAt, updated_at = now(), version = version + 1 " +
             "WHERE id = :id AND status = 'PENDING' AND claim_token IS NULL", nativeQuery = true)
     int scheduleIfUnclaimed(@Param("id") UUID id, @Param("retryAt") Instant retryAt);
 
-    /** Fenced, or an Attempt the stuck sweep had already reclaimed spends its successor's rung. */
+    /** Fenced, or an Attempt whose claim timed out spends its successor's rung. */
     @Modifying
     @Query(value = "UPDATE deliveries SET attempt_count = attempt_count + 1, " +
             "updated_at = now(), version = version + 1 " +

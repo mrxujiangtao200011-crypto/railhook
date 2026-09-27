@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Pure, so the routing rules can be tested without Postgres, Kafka or Redis. */
+/** Pure, so the routing rules can be tested without Postgres or Redis. */
 public final class IntakePlanner {
 
     private IntakePlanner() {

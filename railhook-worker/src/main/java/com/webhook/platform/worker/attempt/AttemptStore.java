@@ -37,7 +37,7 @@ public interface AttemptStore<C> {
      */
     boolean finalise(C claim, Finalization outcome);
 
-    /** Outside the finalising transaction, so a Kafka failure cannot roll back the DLQ write. */
+    /** Outside the finalising transaction, so a failed release cannot roll back the DLQ write. */
     void onAbandoned(C claim);
 
     void onSucceeded(C claim);

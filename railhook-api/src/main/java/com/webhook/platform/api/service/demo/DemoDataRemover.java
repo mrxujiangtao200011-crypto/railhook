@@ -76,7 +76,6 @@ public class DemoDataRemover {
     }
 
     private Removed remove() {
-        jdbc.update("DELETE FROM outbox_messages WHERE project_id = ?", DemoTenant.PROJECT_ID);
         DeletedHistory history = DemoDataSeeder.deleteHistory(jdbc);
 
         // Children first, explicitly, rather than relying on every foreign key cascading.

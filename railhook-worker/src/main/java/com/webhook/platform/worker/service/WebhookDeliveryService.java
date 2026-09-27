@@ -1,24 +1,23 @@
 package com.webhook.platform.worker.service;
 
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.attempt.AttemptRunner;
 import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
 import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
+import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
-import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class WebhookDeliveryService {
 
     private final AttemptRunner attemptRunner;
@@ -26,49 +25,48 @@ public class WebhookDeliveryService {
     private final DeliveryAttemptMetrics metrics;
     private final DeliveryRepository deliveryRepository;
     private final TransactionTemplate transactionTemplate;
+    private final Clock clock;
+    private final Duration claimTimeout;
+    private final int maxEndpoints;
+    private final int perEndpoint;
 
-    private final AtomicInteger inFlightCount = new AtomicInteger(0);
+    private UUID after = ClaimCursor.START;
 
-    // Only reports. The Kafka containers stop in the lifecycle phase, before any @PreDestroy,
-    // and the executor pools drain what is in flight after this.
-    @PreDestroy
-    public void onShutdown() {
-        log.info("Graceful shutdown: {} in-flight deliveries left for the executor pools to drain",
-                inFlightCount.get());
+    public WebhookDeliveryService(
+            AttemptRunner attemptRunner,
+            OutgoingAttemptStoreFactory storeFactory,
+            DeliveryAttemptMetrics metrics,
+            DeliveryRepository deliveryRepository,
+            TransactionTemplate transactionTemplate,
+            Clock clock,
+            @Value("${webhook.claim.timeout-seconds:300}") long claimTimeoutSeconds,
+            @Value("${webhook.claim.max-targets:500}") int maxEndpoints,
+            @Value("${webhook.claim.per-target:5}") int perEndpoint) {
+        this.attemptRunner = attemptRunner;
+        this.storeFactory = storeFactory;
+        this.metrics = metrics;
+        this.deliveryRepository = deliveryRepository;
+        this.transactionTemplate = transactionTemplate;
+        this.clock = clock;
+        this.claimTimeout = Duration.ofSeconds(claimTimeoutSeconds);
+        this.maxEndpoints = maxEndpoints;
+        this.perEndpoint = perEndpoint;
     }
 
-    public void processDelivery(DeliveryMessage message, boolean isRetry) {
-        inFlightCount.incrementAndGet();
+    /** Called from the poller thread only. */
+    public List<Delivery> claimDue(int limit) {
+        Instant now = clock.instant();
+        List<Delivery> claimed = transactionTemplate.execute(tx -> deliveryRepository.claimDue(
+                now, now.plus(claimTimeout), after, maxEndpoints, perEndpoint, limit));
+        after = ClaimCursor.next(claimed.stream().map(Delivery::getEndpointId).toList(), limit);
+        return claimed;
+    }
+
+    public void attempt(Delivery claimed) {
         try {
-            attemptRunner.run(storeFactory.create(message, isRetry), metrics);
+            attemptRunner.run(storeFactory.create(claimed), metrics);
         } catch (Exception e) {
-            log.error("Unexpected error in delivery {}: {}", message.getDeliveryId(), e.getMessage(), e);
-        } finally {
-            inFlightCount.decrementAndGet();
+            log.error("Unexpected error in delivery {}: {}", claimed.getId(), e.getMessage(), e);
         }
-    }
-
-    // Called when the pool is full. Hands back only the Claim this message would have taken:
-    // another copy may hold the row with its POST on the wire, and taking it sent the webhook twice.
-    public void rescheduleForBackpressure(DeliveryMessage message, boolean isRetry) {
-        UUID deliveryId = message.getDeliveryId();
-        long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
-        Instant retryAt = Instant.now().plusSeconds(delaySec);
-
-        if (isRetry && message.getClaimToken() == null) {
-            log.warn("Executor pool full for retry delivery {} with no claim token; leaving it to the stuck sweep",
-                    deliveryId);
-            return;
-        }
-        Integer written = transactionTemplate.execute(tx -> isRetry
-                ? deliveryRepository.handBackIfStillClaimed(deliveryId, message.getClaimToken(), retryAt)
-                : deliveryRepository.scheduleIfUnclaimed(deliveryId, retryAt));
-        if (written == null || written == 0) {
-            log.debug("Delivery {} is not in the state this message would claim (another copy holds it, "
-                    + "or it is done), skipping backpressure reschedule", deliveryId);
-            return;
-        }
-        log.warn("Executor pool full, rescheduled delivery {} via retry ladder in {}s instead of leaving it unacked",
-                deliveryId, delaySec);
     }
 }

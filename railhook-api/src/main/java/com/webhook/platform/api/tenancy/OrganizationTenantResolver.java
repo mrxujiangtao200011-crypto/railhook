@@ -31,7 +31,7 @@ public class OrganizationTenantResolver implements CurrentTenantIdentifierResolv
         if (tenant == null) {
             throw new TenantNotResolvedException(
                     "No tenant scope on this thread. A request path must go through TenantContextFilter; "
-                            + "background work (schedulers, Kafka consumers, WebSocket handlers) must wrap itself "
+                            + "background work (schedulers, WebSocket handlers) must wrap itself "
                             + "in TenantContext.runAsSystem(...); a public path must resolve its organization and "
                             + "use TenantContext.runAs(...).");
         }

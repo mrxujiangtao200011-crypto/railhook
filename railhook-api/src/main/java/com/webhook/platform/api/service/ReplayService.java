@@ -44,10 +44,8 @@ public class ReplayService {
     private final SubscriptionMatchingCache subscriptionMatchingCache;
     private final EventIntake eventIntake;
     private final DeliveryRepository deliveryRepository;
-    private final OutboxMessageRepository outboxMessageRepository;
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
-    private final DeliveryDispatch deliveryDispatch;
     private final SequenceGeneratorService sequenceGeneratorService;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate txTemplate;
@@ -73,10 +71,8 @@ public class ReplayService {
             SubscriptionMatchingCache subscriptionMatchingCache,
             EventIntake eventIntake,
             DeliveryRepository deliveryRepository,
-            OutboxMessageRepository outboxMessageRepository,
             ProjectRepository projectRepository,
             ObjectMapper objectMapper,
-            DeliveryDispatch deliveryDispatch,
             SequenceGeneratorService sequenceGeneratorService,
             ApplicationEventPublisher events,
             PlatformTransactionManager transactionManager,
@@ -87,10 +83,8 @@ public class ReplayService {
         this.subscriptionMatchingCache = subscriptionMatchingCache;
         this.eventIntake = eventIntake;
         this.deliveryRepository = deliveryRepository;
-        this.outboxMessageRepository = outboxMessageRepository;
         this.projectRepository = projectRepository;
         this.objectMapper = objectMapper;
-        this.deliveryDispatch = deliveryDispatch;
         this.sequenceGeneratorService = sequenceGeneratorService;
         this.events = events;
         this.txTemplate = new TransactionTemplate(transactionManager);
@@ -353,20 +347,7 @@ public class ReplayService {
         List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
         deliveryRepository.flush();
 
-        List<OutboxMessage> outboxMessages = new ArrayList<>();
-        for (Delivery delivery : savedDeliveries) {
-            try {
-                outboxMessages.add(deliveryDispatch.outboxFor(delivery, projectId, DeliveryDispatch.Reason.CREATED));
-            } catch (Exception e) {
-                errors++;
-                log.warn("Failed to create outbox message for delivery {}: {}",
-                        delivery.getId(), e.getMessage());
-            }
-        }
-        outboxMessageRepository.saveAll(outboxMessages);
-        outboxMessageRepository.flush();
-
-        return new BatchResult(outboxMessages.size(), errors);
+        return new BatchResult(savedDeliveries.size(), errors);
     }
 
     private List<Event> fetchBatch(UUID projectId, ReplaySession session, Instant cursorCreatedAt, UUID cursorId) {
