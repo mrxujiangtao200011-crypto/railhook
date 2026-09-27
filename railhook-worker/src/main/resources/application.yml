@@ -114,13 +114,9 @@ webhook:
     max-idle-time-seconds: ${WEBHOOK_POOL_MAX_IDLE_TIME_SECONDS:60}
   claim:
     enabled: ${WEBHOOK_CLAIM_ENABLED:true}
-    # How long an empty poll sleeps. A full batch polls again at once.
     idle-poll-ms: ${WEBHOOK_CLAIM_IDLE_POLL_MS:200}
-    # A claimed row whose holder has not finished by then is presumed lost and claimed again.
-    # Must stay above the longest request timeout (60s) plus the transformation time.
+    # Must stay above the longest request timeout (60s), or a live Attempt is claimed twice.
     timeout-seconds: ${WEBHOOK_CLAIM_TIMEOUT_SECONDS:300}
-    # Each poll takes at most per-target rows from each of max-targets endpoints (or destinations),
-    # so one target's backlog cannot fill the batch.
     per-target: ${WEBHOOK_CLAIM_PER_TARGET:5}
     max-targets: ${WEBHOOK_CLAIM_MAX_TARGETS:500}
   retry-after:

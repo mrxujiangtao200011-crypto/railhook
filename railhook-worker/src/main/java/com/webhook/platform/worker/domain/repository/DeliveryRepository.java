@@ -16,11 +16,7 @@ import java.util.UUID;
 @Repository
 public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
 
-    /**
-     * Takes up to {@code perEndpoint} due rows from each of up to {@code maxEndpoints} endpoints
-     * after {@code after}, so one endpoint's backlog cannot fill the batch. A PROCESSING row is due
-     * again once its claim has timed out: its holder is presumed lost, and the new token fences it.
-     */
+    /** Capped per endpoint so one backlog cannot fill a batch; a timed-out claim is retaken under a new token. */
     @Query(value = """
             WITH RECURSIVE due_endpoints AS (
                 (SELECT d.endpoint_id, 1 AS n FROM deliveries d
