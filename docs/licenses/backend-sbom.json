@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.5",
-  "serialNumber" : "urn:uuid:54e3f9f8-603f-33ca-b96f-9a3511d2166a",
+  "serialNumber" : "urn:uuid:b8480827-9be6-338d-93fa-f5c929daea42",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-09-26T16:54:16Z",
+    "timestamp" : "2026-09-27T22:18:30Z",
     "lifecycles" : [
       {
         "phase" : "build"
@@ -54,12 +54,12 @@
     "component" : {
       "group" : "com.webhook.platform",
       "name" : "railhook",
-      "version" : "2.31.1",
-      "description" : "Event Delivery Platform with Kafka and Spring Boot",
+      "version" : "3.0.0",
+      "description" : "Webhook delivery platform",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/railhook@2.31.1?type=pom",
+      "purl" : "pkg:maven/com.webhook.platform/railhook@3.0.0?type=pom",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/railhook@2.31.1?type=pom"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook@3.0.0?type=pom"
     },
     "properties" : [
       {
@@ -76,12 +76,12 @@
     {
       "group" : "com.webhook.platform",
       "name" : "railhook-common",
-      "version" : "2.31.1",
+      "version" : "3.0.0",
       "description" : "Shared DTOs, constants, and utilities",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/railhook-common@2.31.1?type=jar",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-common@3.0.0?type=jar",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-common@2.31.1?type=jar"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-common@3.0.0?type=jar"
     },
     {
       "publisher" : "VMware, Inc.",
@@ -4704,12 +4704,12 @@
     {
       "group" : "com.webhook.platform",
       "name" : "railhook-api",
-      "version" : "2.31.1",
+      "version" : "3.0.0",
       "description" : "REST API for event ingestion and management",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/railhook-api@2.31.1?type=jar",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-api@3.0.0?type=jar",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-api@2.31.1?type=jar"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-api@3.0.0?type=jar"
     },
     {
       "publisher" : "VMware, Inc.",
@@ -8939,442 +8939,6 @@
       ],
       "type" : "library",
       "bom-ref" : "pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar"
-    },
-    {
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-starter-kafka",
-      "version" : "4.1.1",
-      "description" : "Starter for using Apache Kafka",
-      "scope" : "required",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "8612c26fb3d77a5149b66ab69865e285"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "1d2fb47543139f95174fbb8ef21be33d6cea124a"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "b8f9804b8c4f2f6bb1851994949732b13a5ca2b64b22b54244f31d54b2eaf5dd"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "7ac21723f8fe7844f77c127c6b6d1e10fcaf01cba6c5a6f31b9b0f74a4081c3ac005b1c4f4e0e3e34ec9cf893866fc8e92fb8a16f7bceddfd86f0ee8fb6723e9"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "521b7f8df536987e577cf4395d83e7372150848f48c7a9795656dba41496205706a997e894cf150ad3b102b070f2b686"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "a51b6fd8903ea26581f5c6a98a2c5ebea01225ad93992b93ee43b24d46a89f73d0ddc8124cb9dd4665242facc809b2df"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "59a1f3fb19a87a70108aaec0ed52598bdc311dc75cbeb27c30a0bb6b04b1e301"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "13c18cee2738adab09cd7d5ac05866e038978caae5b09f28ad41017291f51e65fc5df0654c6f346b32bc3d2b2047744da923620fefc454ccaac03d515ffe84e7"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-starter-kafka@4.1.1?type=jar",
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io/projects/spring-boot"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-kafka@4.1.1?type=jar"
-    },
-    {
-      "publisher" : "VMware, Inc.",
-      "group" : "org.springframework.boot",
-      "name" : "spring-boot-kafka",
-      "version" : "4.1.1",
-      "description" : "Spring Boot Kafka",
-      "scope" : "required",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "027634b73d2f4bf48077f1c23a94af63"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "74b75077d2f0a13ccec99c44d5a22fd0a0f33886"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "4daf7c64efa111d330a3205372407c543f6b97a2b16d5881a8e1c49458524a5e"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "778ba47b2a8f1b63337b523081cf44b830e36d016792dbc194542a57a392d0320b29aa231ba94e378c72def9aa47d1ccd44b8cc1fef78d04af03e1d2a6ef7dd2"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "78b2e1c2ab8b631e22ea1c4fa5dba4ad3f8275707f9e1b6c91dcf6c9c8731a4b56e25a56aafe316af02e2b057c26d2cc"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "e8065fa9ba0624340419af9bce67b5480ea39b0b359fc3306b3017095828a27493b53033ebe088037009827976459b71"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "4a44cc48e4e8018962223526c2427e714773745d605d470b2a6f18519310b0c0"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "17f612c9390a5cc5ef4d5d7ac6d055eee2fa0b83f1f38c27b3ed6349e22073d9268da7125cd885a1cfd0dab7bdce34f8042063747e3a5c6a6419e97541a1664e"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.boot/spring-boot-kafka@4.1.1?type=jar",
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://spring.io/projects/spring-boot"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-boot/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-boot"
-        }
-      ],
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.boot/spring-boot-kafka@4.1.1?type=jar"
-    },
-    {
-      "publisher" : "Spring IO",
-      "group" : "org.springframework.kafka",
-      "name" : "spring-kafka",
-      "version" : "4.1.1",
-      "description" : "Spring Kafka Support",
-      "scope" : "required",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "25a459383751519b34687c0b7b8d5acd"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "776de20398883112a34271200cb7a00b142ba7f9"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "e0434aa0eca7fee4bcb0f39ed19cdc2bce387b60caa53cae9c5021c864ae11a3"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "f81d26b1eae5cd9d8d0c6bd84c46c638fde8257d0331d29b7f8098b961f10ecea4b8008f865bdcd88b35c130c9b14664b9603c45d5f08ebe4067ed7481d33297"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "651f09ca0ebf462343c865db572d5032b041c7cb7f0b7bc7ee98dab1eec168957b277f681556427350b0c3c712d45eae"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "862090ab949ca74d74d7a2a0820c9eba43ba37085d36b3d03b91a732ad2d0f561122cf8421ce122fba74f8627bc63f1b"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "6c3b592cc0cbd32954bfe638467769270fde5a245b87e76b772f318f5fa9e6fc"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "84834223cbcbc5eb962459b08c2e750e995134413ee270926be4039817339b3dc284345c896ff8e477459f34035d0885c4e3afa5c7dc064fdce2e09393a32f12"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.springframework.kafka/spring-kafka@4.1.1?type=jar",
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://github.com/spring-projects/spring-kafka"
-        },
-        {
-          "type" : "issue-tracker",
-          "url" : "https://github.com/spring-projects/spring-kafka/issues"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/spring-projects/spring-kafka"
-        }
-      ],
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.springframework.kafka/spring-kafka@4.1.1?type=jar"
-    },
-    {
-      "group" : "org.apache.kafka",
-      "name" : "kafka-clients",
-      "version" : "4.2.1",
-      "scope" : "required",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "be7702041671e7cab7fbbe302c667e02"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "6addc9b1f038d2dde0fc6b34464b1061ec5fb4c1"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "6a281026416938a53c105f2d91d2807fdc83d5658452abf0ad1b6d8ab8a553c8"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "22aaa8a56b15634a67a0a4993c07421804cabef59e0e5e284b75c94819a70f543c232f9040a29f8d02307f97677e11a1d43500997660a1d7a58d6fb5e7a67d09"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "ce51c29cc7e417f3f5fcc2755d0be1b9b969a1c0a11dd94c5e05afb9b438dc41bc9a7651e6deafbe435f6c9877435436"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "a42633d7f3dd36c976961da3878f395ade4bfc34e5b8e74ff9aac0c07cfd1360c415295ffd1e6785c5d0660d3a753d55"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "41d3e37a9ef1700fe1c0748020fbd90cddcb01b33c28851428a5f3b543cb1830"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "158522e4e2df1eb6107e0317a40c9abbd2f9e2cc63ce9db1d0672df45d2b2a3519b1555ed25fbdec483647e82e0e0adc1bbc6a9317456109cdb4cc1a8de7080a"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.apache.kafka/kafka-clients@4.2.1?type=jar",
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://kafka.apache.org"
-        }
-      ],
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.apache.kafka/kafka-clients@4.2.1?type=jar"
-    },
-    {
-      "publisher" : "com.github.luben",
-      "group" : "com.github.luben",
-      "name" : "zstd-jni",
-      "version" : "1.5.6-10",
-      "description" : "JNI bindings for Zstd native library that provides fast and high compression lossless algorithm for Java and all JVM languages.",
-      "scope" : "required",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "93299f5422c91c08b9e4b7c5e401dd56"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "7e146ecb598af55d1f64d1c118af27569a848558"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "b6c3237e24b8252a5a9c3a0e1ae30ef8f323412e74bd358548b7a9e527d676df"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "fdc73c64ba40b3a89c14b3cd2313c19e2867b9e202ed0dadcf33de37fb904bd1b6ba73abd754794acad3a81c6e43852cdc0f850b6b090d414ba65598eda6f47e"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "1faf411461ce2faf634b16e43ece8998abbe5aaec1727c03a7debb6e2d6a7c8d47a12e208a7bd20d308e82f7f0821002"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "b49963bf539e44c97c3850cc50f4e27e3b5e84a3da43be366f2a6b1e24875d64d7503fab9499268c004362d05a7eef14"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "54f687bd0d7bbf8591320422bdd19965a271334a9cc84abc62d85db82cddd99e"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "df813ddd37a46911723bb79736ff68e70a561ce6bf7553430ef6f2eda3aa350f038c1b98d3ba5494a4d0db52ce6a05271e278c3a6d8ab13683bccf149644a277"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "BSD-2-Clause"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/com.github.luben/zstd-jni@1.5.6-10?type=jar",
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://github.com/luben/zstd-jni"
-        }
-      ],
-      "type" : "library",
-      "bom-ref" : "pkg:maven/com.github.luben/zstd-jni@1.5.6-10?type=jar"
-    },
-    {
-      "group" : "at.yawk.lz4",
-      "name" : "lz4-java",
-      "version" : "1.10.1",
-      "description" : "Java bindings and pure Java implementations of LZ4 and XXHash",
-      "scope" : "required",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "8ea4d77e6a652da0162a69b6aea6e4a9"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "f541d7f910fe3d76f38f799c507c48cc81b12ecb"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "a58a84c4271e50df4c96ed916ccb7e48a869f8ed9cdcda1ad5d3d4c33b0214a3"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "6930598c1c27a247de88a0db74aa14e90d7837832b61042edde7f954f55c8382b505aa35a21d3e69a3dc333b013866a98a7c3570c34aeea3ab1c1ef1c05d0048"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "f266dbead14988f5b05d11628bb55b5266c6e1d10578356f9a25967310c301d20fab78d46d6dfe8a31b641c2844ba2f9"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "a35fd2201de77821293560ca5dcbbc4f831ee0a1ae056b0511847370091402c1433fd7e0ff18d4fc26f217b613d6f0e9"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "cd5bc0d64595fc34b50d830be6d61a5e537389368a9c50136d76100ff17c9727"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "d3da038eca828202ecccc8ccb0ba3355839723369ebf9e42ab0ed9d564671bad25b3559decf20673381a30c43da7b70af0a440d155021932cd6b1dc39bb43da5"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/at.yawk.lz4/lz4-java@1.10.1?type=jar",
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://github.com/yawkat/lz4-java"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/yawkat/lz4-java"
-        }
-      ],
-      "type" : "library",
-      "bom-ref" : "pkg:maven/at.yawk.lz4/lz4-java@1.10.1?type=jar"
-    },
-    {
-      "publisher" : "xerial.org",
-      "group" : "org.xerial.snappy",
-      "name" : "snappy-java",
-      "version" : "1.1.10.7",
-      "description" : "snappy-java: A fast compression/decompression library",
-      "scope" : "required",
-      "hashes" : [
-        {
-          "alg" : "MD5",
-          "content" : "d74bb2e2857f965683c9de931b71fc86"
-        },
-        {
-          "alg" : "SHA-1",
-          "content" : "3049f95640f4625a945cfab85715f603fa4c8f80"
-        },
-        {
-          "alg" : "SHA-256",
-          "content" : "4c766cb3f855415ee734b2392949a0b6f12a60879334a74518deaf6270d32e36"
-        },
-        {
-          "alg" : "SHA-512",
-          "content" : "22a6ebb8e8ad4d8a149b0c67d8658ac1535d7014857064c4f7ed4999e29c6186de8a80b50dd9b59f631fa1c24970524fdbbb84083c80c59eb0c72d4efb041fef"
-        },
-        {
-          "alg" : "SHA-384",
-          "content" : "b7ea971de5e286b4bdb8b96063f0ffe611ef82f5887fa6845fc2721bf0e71a88b0c754ba010816596f0b6c178160c0c5"
-        },
-        {
-          "alg" : "SHA3-384",
-          "content" : "9ef6c5ad194027c8b4be0f756dfeb958ae3daa5ad942b34c4e9e570ce7516ba91fad298929e4d716f6a091d0b274bbc9"
-        },
-        {
-          "alg" : "SHA3-256",
-          "content" : "83f4ede80f49271566745463652e3cdebbe4e2112174400ddf082bf9b39d09cd"
-        },
-        {
-          "alg" : "SHA3-512",
-          "content" : "3c1ffb884ac57e812f997357f9501afbffec3aaac2aa2bb87b0dd8ec2e7e43d922c250dfc658920ade2014aa138440d2d9cdfce8e453812d089898d10390a6db"
-        }
-      ],
-      "licenses" : [
-        {
-          "license" : {
-            "id" : "Apache-2.0",
-            "url" : "https://www.apache.org/licenses/LICENSE-2.0"
-          }
-        }
-      ],
-      "purl" : "pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7?type=jar",
-      "externalReferences" : [
-        {
-          "type" : "website",
-          "url" : "https://github.com/xerial/snappy-java"
-        },
-        {
-          "type" : "vcs",
-          "url" : "https://github.com/xerial/snappy-java"
-        }
-      ],
-      "type" : "library",
-      "bom-ref" : "pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7?type=jar"
     },
     {
       "group" : "io.micrometer",
@@ -16623,12 +16187,12 @@
     {
       "group" : "com.webhook.platform",
       "name" : "railhook-worker",
-      "version" : "2.31.1",
-      "description" : "Kafka consumer for webhook delivery",
+      "version" : "3.0.0",
+      "description" : "Webhook delivery worker",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/railhook-worker@2.31.1?type=jar",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-worker@3.0.0?type=jar",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-worker@2.31.1?type=jar"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-worker@3.0.0?type=jar"
     },
     {
       "publisher" : "VMware, Inc.",
@@ -16897,12 +16461,12 @@
     {
       "group" : "com.webhook.platform",
       "name" : "railhook-cli",
-      "version" : "2.31.1",
+      "version" : "3.0.0",
       "description" : "Railhook CLI — local tunnel, event replay, and diagnostics",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/railhook-cli@2.31.1?type=jar",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-cli@3.0.0?type=jar",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-cli@2.31.1?type=jar"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-cli@3.0.0?type=jar"
     },
     {
       "group" : "info.picocli",
@@ -17049,12 +16613,12 @@
     {
       "group" : "com.webhook.platform",
       "name" : "railhook-coverage-report",
-      "version" : "2.31.1",
+      "version" : "3.0.0",
       "description" : "Not a real module - it ships no code of its own. It exists only so jacoco-maven-plugin's report-aggregate goal has a project whose *dependencies* are the four real modules, which is how JaCoCo discovers their target/classes and target/jacoco*.exec at reactor build time (report-aggregate walks the current project's dependency list, not the reactor's modules list - a plain multi-module pom parent is not enough on its own). Threshold enforcement (jacoco:check) deliberately does NOT live here: the check goal, unlike report-aggregate, only ever reads a single `dataFile` against ITS OWN project's compiled classes - it has no equivalent of report-aggregate's dependency-walking, so binding it in a pom-packaging module with no classes of its own just silently skips (\"missing execution data file:.../railhook-coverage-report/target/jacoco.exec\"). Each of common/api/worker/cli therefore declares its own `check` execution against its own merged coverage instead - see the jacoco-merge execution in the root pom for how that per-module merged file gets built, and each module's own pom.xml for its threshold rules. Declared last in the root pom's modules list so the reactor builds it after common/api/worker/cli have already produced their classes and exec data (Maven also reorders by the dependency graph below regardless, so this is belt-and-braces).",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/railhook-coverage-report@2.31.1?type=pom",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-coverage-report@3.0.0?type=pom",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-coverage-report@2.31.1?type=pom"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-coverage-report@3.0.0?type=pom"
     },
     {
       "group" : "com.jayway.jsonpath",
@@ -17186,17 +16750,17 @@
   ],
   "dependencies" : [
     {
-      "ref" : "pkg:maven/com.webhook.platform/railhook@2.31.1?type=pom",
+      "ref" : "pkg:maven/com.webhook.platform/railhook@3.0.0?type=pom",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/railhook-common@2.31.1?type=jar",
-        "pkg:maven/com.webhook.platform/railhook-api@2.31.1?type=jar",
-        "pkg:maven/com.webhook.platform/railhook-worker@2.31.1?type=jar",
-        "pkg:maven/com.webhook.platform/railhook-cli@2.31.1?type=jar",
-        "pkg:maven/com.webhook.platform/railhook-coverage-report@2.31.1?type=pom"
+        "pkg:maven/com.webhook.platform/railhook-common@3.0.0?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-api@3.0.0?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-worker@3.0.0?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-cli@3.0.0?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-coverage-report@3.0.0?type=pom"
       ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/railhook-common@2.31.1?type=jar",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-common@3.0.0?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.1?type=jar",
         "pkg:maven/org.projectlombok/lombok@1.18.46?type=jar",
@@ -17692,9 +17256,9 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/railhook-api@2.31.1?type=jar",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-api@3.0.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/railhook-common@2.31.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-common@3.0.0?type=jar",
         "pkg:maven/org.graalvm.polyglot/polyglot@24.1.2?type=jar",
         "pkg:maven/org.graalvm.polyglot/js-community@24.1.2?type=pom",
         "pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.1?type=jar",
@@ -17704,7 +17268,6 @@
         "pkg:maven/org.springframework.boot/spring-boot-starter-security@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-aspectj@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-mail@4.1.1?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter-kafka@4.1.1?type=jar",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.1?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
         "pkg:maven/org.postgresql/postgresql@42.7.13?type=jar",
@@ -18287,59 +17850,6 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-kafka@4.1.1?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.1?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-kafka@4.1.1?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.springframework.boot/spring-boot-kafka@4.1.1?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springframework.boot/spring-boot@4.1.1?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-transaction@4.1.1?type=jar",
-        "pkg:maven/org.springframework.kafka/spring-kafka@4.1.1?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.springframework.kafka/spring-kafka@4.1.1?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springframework/spring-context@7.0.9?type=jar",
-        "pkg:maven/org.springframework/spring-messaging@7.0.9?type=jar",
-        "pkg:maven/org.springframework/spring-tx@7.0.9?type=jar",
-        "pkg:maven/org.apache.kafka/kafka-clients@4.2.1?type=jar",
-        "pkg:maven/io.micrometer/micrometer-observation@1.17.1?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.springframework/spring-messaging@7.0.9?type=jar",
-      "dependsOn" : [
-        "pkg:maven/org.springframework/spring-beans@7.0.9?type=jar",
-        "pkg:maven/org.springframework/spring-core@7.0.9?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/org.apache.kafka/kafka-clients@4.2.1?type=jar",
-      "dependsOn" : [
-        "pkg:maven/com.github.luben/zstd-jni@1.5.6-10?type=jar",
-        "pkg:maven/at.yawk.lz4/lz4-java@1.10.1?type=jar",
-        "pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7?type=jar",
-        "pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"
-      ]
-    },
-    {
-      "ref" : "pkg:maven/com.github.luben/zstd-jni@1.5.6-10?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/at.yawk.lz4/lz4-java@1.10.1?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
-      "ref" : "pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7?type=jar",
-      "dependsOn" : [ ]
-    },
-    {
       "ref" : "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.1?type=jar",
       "dependsOn" : [
         "pkg:maven/org.jspecify/jspecify@1.0.1?type=jar",
@@ -18635,6 +18145,13 @@
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot@4.1.1?type=jar",
         "pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/org.springframework/spring-messaging@7.0.9?type=jar",
+      "dependsOn" : [
+        "pkg:maven/org.springframework/spring-beans@7.0.9?type=jar",
+        "pkg:maven/org.springframework/spring-core@7.0.9?type=jar"
       ]
     },
     {
@@ -19038,9 +18555,9 @@
       ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/railhook-worker@2.31.1?type=jar",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-worker@3.0.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/railhook-common@2.31.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-common@3.0.0?type=jar",
         "pkg:maven/org.graalvm.polyglot/polyglot@24.1.2?type=jar",
         "pkg:maven/org.graalvm.polyglot/js-community@24.1.2?type=pom",
         "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.1?type=jar",
@@ -19049,7 +18566,6 @@
         "pkg:maven/org.springframework.boot/spring-boot-starter-webflux@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-webclient@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-jackson2@4.1.1?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter-kafka@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-data-redis@4.1.1?type=jar",
         "pkg:maven/org.redisson/redisson-spring-boot-starter@4.7.0?type=jar",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.1?type=jar",
@@ -19097,9 +18613,9 @@
       ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/railhook-cli@2.31.1?type=jar",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-cli@3.0.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/railhook-common@2.31.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-common@3.0.0?type=jar",
         "pkg:maven/info.picocli/picocli@4.7.5?type=jar",
         "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.5?type=jar",
         "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.5?type=jar",
@@ -19117,12 +18633,12 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/railhook-coverage-report@2.31.1?type=pom",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-coverage-report@3.0.0?type=pom",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/railhook-common@2.31.1?type=jar",
-        "pkg:maven/com.webhook.platform/railhook-api@2.31.1?type=jar",
-        "pkg:maven/com.webhook.platform/railhook-worker@2.31.1?type=jar",
-        "pkg:maven/com.webhook.platform/railhook-cli@2.31.1?type=jar"
+        "pkg:maven/com.webhook.platform/railhook-common@3.0.0?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-api@3.0.0?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-worker@3.0.0?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-cli@3.0.0?type=jar"
       ]
     },
     {
