@@ -37,7 +37,7 @@ class SchedulingPoolSizeTest {
                     assertTrue(poolSize > 1,
                             "spring.task.scheduling.pool.size resolved to " + poolSize +
                                     " - a pool of 1 means a single slow @Scheduled job (e.g. an " +
-                                    "unbounded Kafka AdminClient call) delays every other cron on " +
+                                    "slow database query) delays every other cron on " +
                                     "this JVM");
                 });
     }

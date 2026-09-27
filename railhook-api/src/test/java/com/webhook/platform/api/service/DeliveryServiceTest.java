@@ -7,14 +7,12 @@ import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.BulkReplayResponse;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
@@ -59,7 +57,6 @@ class DeliveryServiceTest {
     @Mock private DeliveryRepository deliveryRepository;
     @Mock private DeliveryAttemptRepository deliveryAttemptRepository;
     @Mock private EndpointRepository endpointRepository;
-    @Mock private OutboxMessageRepository outboxMessageRepository;
     @Mock private EventRepository eventRepository;
     @Mock private ProjectRepository projectRepository;
 
@@ -75,8 +72,7 @@ class DeliveryServiceTest {
     @BeforeEach
     void setUp() {
         deliveryService = new DeliveryService(deliveryRepository, deliveryAttemptRepository, endpointRepository,
-                eventRepository, projectRepository, new ObjectMapper(),
-                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()), piiMaskingService);
+                eventRepository, projectRepository, new ObjectMapper(), piiMaskingService);
     }
 
     private Event eventInProject() {
@@ -181,11 +177,10 @@ class DeliveryServiceTest {
         assertThatThrownBy(() -> deliveryService.replayDelivery(deliveryId, auth))
                 .isInstanceOf(ConflictException.class);
         verify(deliveryRepository, never()).save(any());
-        verifyNoInteractions(outboxMessageRepository);
     }
 
     @Test
-    void replayDelivery_failedDelivery_carriesTheAttemptCountForwardAndPublishesOutbox() {
+    void replayDelivery_failedDelivery_carriesTheAttemptCountForwardAndIsDueNow() {
         UUID deliveryId = UUID.randomUUID();
         UUID endpointId = UUID.randomUUID();
         Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId).endpointId(endpointId)
@@ -203,14 +198,9 @@ class DeliveryServiceTest {
         // Reset to zero, the next Attempt was recorded as a second attempt 1.
         assertThat(saved.getAttemptCount()).isEqualTo(7);
         assertThat(saved.getMaxAttempts()).isEqualTo(10);
-        assertThat(saved.getNextRetryAt()).isNull();
+        assertThat(saved.getNextRetryAt()).isNotNull();
         assertThat(saved.getFailedAt()).isNull();
         assertThat(saved.getLadderResumedAt()).isNotNull();
-
-        ArgumentCaptor<OutboxMessage> outboxCaptor = ArgumentCaptor.forClass(OutboxMessage.class);
-        verify(outboxMessageRepository).save(outboxCaptor.capture());
-        assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("DeliveryReplayed");
-        assertThat(outboxCaptor.getValue().getProjectId()).isEqualTo(projectId);
     }
 
     @Test
@@ -268,10 +258,6 @@ class DeliveryServiceTest {
         assertThat(savedCaptor.getValue().getAttemptCount()).isEqualTo(5);
         assertThat(savedCaptor.getValue().getMaxAttempts()).isEqualTo(10);
         assertThat(savedCaptor.getValue().getStatus()).isEqualTo(DeliveryStatus.PENDING);
-
-        ArgumentCaptor<OutboxMessage> outboxCaptor = ArgumentCaptor.forClass(OutboxMessage.class);
-        verify(outboxMessageRepository).save(outboxCaptor.capture());
-        assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("DeliveryReplayedFromStep");
     }
 
     @Test
@@ -391,8 +377,10 @@ class DeliveryServiceTest {
         when(projectRepository.findById(projectId))
                 .thenReturn(Optional.of(Project.builder().id(projectId).organizationId(UUID.randomUUID()).build()));
 
+        AuthContext otherProjectKey = new AuthContext(null, orgId, MembershipRole.API_KEY, UUID.randomUUID(), null);
+
         BulkReplayResponse response = deliveryService.bulkReplayDeliveries(
-                List.of(deliveryId), null, null, null, null, auth);
+                List.of(deliveryId), null, null, null, null, otherProjectKey);
 
         assertThat(response.getReplayed()).isZero();
         assertThat(response.getSkipped()).isEqualTo(1);
@@ -446,7 +434,7 @@ class DeliveryServiceTest {
         assertThat(response.getReplayed()).isEqualTo(2);
         assertThat(response.isHasMore()).isFalse();
         verify(deliveryRepository, times(2)).save(any());
-        verify(outboxMessageRepository, times(2)).save(any());
+        
     }
 
     @Test

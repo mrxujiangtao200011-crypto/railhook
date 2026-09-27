@@ -8,8 +8,8 @@ TypeScript in `railhook-ui`. `api` owns all Flyway migrations.
 
 ## Commands
 
-`make help` lists every target. `make up` also creates `.env` from `.env.dist` and the Kafka
-topics — don't do either by hand. There is one `docker-compose.yml` (published images, what
+`make help` lists every target. `make up` also creates `.env` from `.env.dist` — don't do it by
+hand. There is one `docker-compose.yml` (published images, what
 `install.sh` deploys) plus `docker-compose.build.yml`, a small overlay adding build contexts;
 put a service change in the former, never in both.
 

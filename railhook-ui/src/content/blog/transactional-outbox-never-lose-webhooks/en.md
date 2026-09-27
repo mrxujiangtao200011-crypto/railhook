@@ -1,10 +1,10 @@
 ---
 title: The transactional outbox, or how Railhook never loses an event it has accepted
 lead: Your service gets a 201, and the pod that sent it is OOM-killed four milliseconds later. This is how Railhook still delivers that event, how close it gets to exactly-once, and the one step no sender can take on its own.
-description: "The transactional outbox pattern with Postgres, Kafka and Spring Boot: why dual writes lose events, and how Railhook never loses an accepted webhook."
+description: "The transactional outbox pattern with Postgres and Spring Boot: why dual writes lose events, and how Railhook never loses an accepted webhook."
 date: 2026-09-20
 author: Vadym Kykalo
-tags: [outbox, kafka, postgres, reliability, spring-boot]
+tags: [outbox, postgres, reliability, spring-boot]
 sourcesCheckedOn: 2026-09-19
 ---
 
@@ -34,10 +34,7 @@ somewhere Railhook cannot read.
 **There is no transaction that spans both.** Inside one system, the answer to "two writes must
 agree" is a transaction. Across systems it is a two-phase commit: a coordinator both sides trust,
 and a prepare step both sides implement. A webhook is one POST to a stranger's server, with no
-prepare, no coordinator and nothing to roll back. Kafka's documentation reaches the same place
-from the other direction: exactly-once to an outside system "generally requires cooperation with
-such systems"
-([Apache Kafka, *Message Delivery Semantics*](https://kafka.apache.org/41/design/design/#message-delivery-semantics)).
+prepare, no coordinator and nothing to roll back.
 
 **The last message can always be lost.** Your endpoint commits, returns `200`, and the connection
 drops before the response reaches the worker. This is the Two Generals problem, described by
@@ -70,7 +67,7 @@ seven arrivals".
 an impossibility result. What can be built is an exactly-once *effect*, and the rest of this post
 is how Railhook gets as close to it as a sender can.
 
-## Why can't the API just write to Postgres and publish to Kafka?
+## Why can't the API just write to Postgres and publish to a broker?
 
 Because those are two systems with no transaction spanning them, and every ordering of the two
 writes has a hole.
@@ -95,7 +92,8 @@ already did.
 It turns the announcement from a network call into a row, and a row can share a transaction with
 the Event. [microservices.io](https://microservices.io/patterns/data/transactional-outbox.html)
 puts it as storing the message "in the database as part of the transaction that updates the
-business entities", with a separate process sending it on to the broker.
+business entities", with a separate process sending it on to the broker. Railhook has no broker,
+so the Delivery row itself is the message: there is no outbox table beside it and nothing to relay.
 
 In Railhook, the whole ingest runs in one `TransactionTemplate`:
 
@@ -105,21 +103,17 @@ response = transactionTemplate.execute(status ->
                 organizationToCharge));
 ```
 
-and inside it, after the Event and one Delivery per matching Subscription are saved, one Outbox row
-is written per Delivery:
+and inside it, after the Event is saved, one Delivery per matching Subscription is written,
+`PENDING`, with a `next_retry_at` that says when it is due:
 
 ```java
-List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
-for (Delivery delivery : savedDeliveries) {
-    outboxMessages.add(deliveryDispatch.outboxFor(delivery, projectId, DeliveryDispatch.Reason.CREATED));
-}
-outboxMessageRepository.saveAll(outboxMessages);
+List<Delivery> savedDeliveries = deliveryRepository.saveAll(decision.deliveries());
 ```
 
 (`railhook-api/.../service/EventIngestService.java`)
 
 Either all of it commits and the client gets `201`, or none of it exists. There is no state in which
-the Event is stored and its announcement is not.
+the Event is stored and its Deliveries are not.
 
 The client's own POST is a dual write too, seen from its side: after a timeout it cannot know
 whether the Event was stored. That is what `Idempotency-Key` is for. `events` has a unique index on
@@ -136,82 +130,60 @@ than failing an ingest that has already been accepted.
 **Takeaway:** an outbox is for writes that must never disagree. Be explicit about which ones are
 allowed to.
 
-## How does the outbox get to Kafka?
+## How does a worker find the row?
 
-A publisher in the API polls every second (`OUTBOX_POLL_INTERVAL_MS=1000`), under a ShedLock
-(`@SchedulerLock(name = "outbox-publisher")`) so one instance polls at a time. It claims a batch in a
-short transaction and commits before it talks to Kafka:
+Each worker polls Postgres for due rows. One statement takes at most five rows per endpoint,
+walking endpoints in id order from where the last poll stopped, so one endpoint's backlog cannot
+fill the batch, and claims them in the same statement:
 
-```java
-// Phase 1: fast claim — SELECT FOR UPDATE + mark SENDING, commit immediately
-List<OutboxMessage> claimed = txTemplate.execute(status -> {
-    List<OutboxMessage> batch = outboxMessageRepository
-            .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize, maxPerKey, maxPerProject);
+```sql
+UPDATE deliveries d SET status = 'PROCESSING', claim_token = gen_random_uuid(),
+    next_retry_at = :claimExpiresAt, last_attempt_at = :now, updated_at = :now,
+    version = d.version + 1
+FROM picked WHERE d.id = picked.id
+RETURNING d.*
 ```
 
-(`railhook-api/.../service/OutboxPublisherService.java`)
+(`railhook-worker/.../domain/repository/DeliveryRepository.java`)
 
-The query ends in `FOR UPDATE SKIP LOCKED`, which Postgres documents as a way "to avoid lock
+`picked` selects its rows `FOR UPDATE SKIP LOCKED`, which Postgres documents as a way "to avoid lock
 contention with multiple consumers accessing a queue-like table"
-([PostgreSQL, *SELECT*](https://www.postgresql.org/docs/current/sql-select.html)). Rows go from
-`PENDING` to `SENDING`, the transaction commits, and only then are they produced, so no lock is
-held across a call to the broker. A row Kafka acknowledges becomes `PUBLISHED`, under a
-`status = 'SENDING'` guard, so a late acknowledgement for a row that has since been reclaimed changes
-nothing.
-
-Each row is keyed by its endpoint's id, which puts all of one endpoint's work on one partition, and
-a batch takes at most ten rows per endpoint and thirty per project, so one burst cannot starve
-everyone else's announcements.
+([PostgreSQL, *SELECT*](https://www.postgresql.org/docs/current/sql-select.html)). Two workers polling
+at the same moment never get the same row: the second skips what the first has locked. A worker
+claims only as many rows as it has free threads, so a claimed row does not sit waiting in memory.
 
 :::figure outbox-pipeline
 
 What happens when things break:
 
-- **Kafka is down.** The row goes to `FAILED` and a loop every 30 seconds retries it with
-  exponential back-off. The Event is late, not lost.
-- **A row fails five times.** It becomes `DEAD`, and even that does not lose the Delivery, because
-  the Outbox row is only the announcement. The obligation is the Delivery row, still `PENDING`. A
-  sweep in the worker finds Deliveries left `PENDING` with nothing scheduled for an hour and puts
-  them on the retry path, which reaches Kafka through a different producer.
+- **A worker dies holding rows.** They stay `PROCESSING`, due again 300 seconds after the claim.
+  Once that passes, the next poll claims them under a new token. The Event is late, not lost.
+- **Every worker is down.** The rows wait in Postgres, and the first worker to start claims them.
 
-**Takeaway:** Kafka carries the news. Postgres keeps the obligation. Lose the news and the
-obligation is still there to be announced again.
+**Takeaway:** Postgres keeps the obligation, and the obligation is the queue. Nothing has to be
+announced, so nothing can be lost on the way.
 
 ## Claims and fences: why don't two workers send the same Attempt?
 
-In the worker, a Kafka message is not a command. It says a Delivery might be ready; the row decides.
-Before anything is sent, the worker takes a **Claim**:
+That poll is the **Claim**. A row comes back to one worker only: the lock decides who gets it, and
+the new `claim_token` records it. Every write the Attempt makes afterwards is conditional on that
+token still being in the row.
 
-```sql
-UPDATE deliveries SET status = 'PROCESSING', claim_token = :claimToken,
-       last_attempt_at = now(), updated_at = now(), version = version + 1
-WHERE id = :id AND status = 'PENDING' AND (next_retry_at IS NULL OR next_retry_at <= :now)
-RETURNING *
-```
+Retries go through the same gate. A failed Attempt puts the row back to `PENDING` with a new
+`next_retry_at`, and the same poll claims it when it is due. There is no second path to a Delivery.
 
-(`railhook-worker/.../domain/repository/DeliveryRepository.java`)
-
-One worker gets the row back. Every other copy of that message (a republished Outbox row, a
-consumer rebalance) matches nothing. This line is where duplicates in Kafka stop.
-
-Retries go through the same gate differently. The retry scheduler claims due rows itself and
-publishes each with the token it claimed under; the consumer swaps that token for its own only
-while the row still carries it, so a redelivered retry message claims nothing. And once a send to
-Kafka succeeds, the scheduler stops writing to that row, because it is now the consumer's. Its
-comment explains why: re-saving the old snapshot raced the consumer, "and when the consumer lost,
-the retry partition stalled until a restart".
-
-The `claim_token` is also a fence. A sweep hands anything `PROCESSING` for more than five minutes
-back to `PENDING` and clears the token. A worker that stalled and wakes up writes against a token
-the row no longer carries, and its write lands on nothing. The fence cannot recall a request a
-stalled worker already put on the wire; it stops that request's outcome from counting.
+The `claim_token` is also a fence. A `PROCESSING` row whose claim has timed out can be claimed again:
+in the query's own words, "its holder is presumed lost, and the new token fences it". A worker that
+stalled and wakes up writes against a token the row no longer carries, and its write lands on
+nothing. The fence cannot recall a request a stalled worker already put on the wire; it stops that
+request's outcome from counting.
 
 Everything after the Claim is the **Attempt Runner**, one class for both directions. Its javadoc
-lists six invariants, each of which "was once correct on one direction and wrong on the other".
+lists six invariants, and each "was once broken in one direction".
 Two of them are duplicate-delivery rules:
 
-> No DB, Redis or Kafka work inside the reactive chain — a write there can trip the HTTP timeout and
-> drive the failure path over a SUCCESS already written.
+> No DB or Redis work inside the reactive chain. A write there can trip the HTTP timeout and run the
+> failure path over a SUCCESS already written.
 
 > No successor Attempt unless `AttemptStore#finalise` reports it wrote.
 
@@ -219,8 +191,8 @@ The first stops a slow database write from turning a delivered webhook into a "f
 gets retried. The second is the fence applied to retries: an Attempt that lost its Claim may fail,
 but it may not queue the next one.
 
-**Takeaway:** a message is a hint and the row is the truth. Every write that matters is
-conditional on still owning the row.
+**Takeaway:** the row is the truth. Every write that matters is conditional on still owning the
+row.
 
 ## How close does Railhook get?
 
@@ -230,23 +202,19 @@ Each close is a unique index or a conditional `UPDATE` in Postgres, not an assum
 1. **Your POST is retried after a timeout.** Closed by `Idempotency-Key`, unique per project: the
    retry gets back the Event it already created.
 2. **A provider resends its webhook.** Closed by the provider's own event id, unique per Source.
-3. **The API dies between storing the Event and announcing it.** Closed by the outbox: one
-   transaction, so there is no between.
-4. **The publisher dies after sending to Kafka, before marking the row.** The message goes out
-   twice, and the Claim turns the second copy into nothing: `WHERE status = 'PENDING'` matches once.
-5. **Kafka redelivers, or a rebalance replays a partition.** The same Claim, and on the retry path
-   the swap on the scheduler's token.
-6. **The retry scheduler and the consumer both write one row.** Closed by ownership: once the send
-   to Kafka succeeds, the scheduler never writes that row again.
-7. **A worker stalls and the sweep hands its Delivery to another.** The fence records one outcome
-   and queues one successor, whichever worker wakes up first.
-8. **An Attempt reached your endpoint and its outcome never made it back into Railhook's
+3. **The API dies between storing the Event and its Deliveries.** Closed by the transaction: they
+   commit together, so there is no between.
+4. **Two workers poll at the same moment.** Closed by `SKIP LOCKED`: a locked row is skipped, so
+   each row is claimed once.
+5. **A worker stalls, its claim times out and another worker claims the row.** The fence records
+   one outcome and queues one successor, whichever worker wakes up first.
+6. **An Attempt reached your endpoint and its outcome never made it back into Railhook's
    Postgres.** The response was lost on the wire, or the worker holding it died or stalled before
    writing it down. These are the same problem one hop apart, and the first section is why it
    stays open.
 
 Every duplicate that starts inside Railhook is stopped inside Railhook. What reaches your endpoint
-twice is only ever window 8: the same Delivery, carrying the same `webhook-id`, and that is exactly
+twice is only ever window 6: the same Delivery, carrying the same `webhook-id`, and that is exactly
 what the id is for. The last step is one line on your side, in the same transaction as the work:
 
 ```sql
@@ -256,7 +224,7 @@ INSERT INTO processed_webhooks (webhook_id) VALUES ($1) ON CONFLICT DO NOTHING;
 If it inserted nothing, you have done this one before: answer `2xx` and stop. A whole receiver is
 further down.
 
-**Takeaway:** seven windows closed in Postgres, one that the Two Generals keep open, and one unique
+**Takeaway:** five windows closed in Postgres, one that the Two Generals keep open, and one unique
 index on your side that closes it.
 
 ## How long does Railhook keep trying?
@@ -305,7 +273,7 @@ Delivery gets an endpoint-scoped **Sequence Number**, assigned *after* the inges
 rollback cannot burn one, and sent as `X-Sequence-Number`. A Delivery whose predecessors have not
 resolved is parked in the **Ordering Buffer**, which is a Deferral: Claim released, token cleared,
 no Attempt spent. When the predecessor succeeds or is abandoned, the cursor moves and whatever was
-waiting is republished.
+waiting is made due at once.
 
 :::figure ordering-hold
 
@@ -352,65 +320,39 @@ for. To recognise the same Event across replays, use `X-Event-Id`, which does no
 
 **Takeaway:** one unique index on your side turns at-least-once into an exactly-once effect.
 
-## What does a poller leave on the table, compared with CDC?
+## What does polling cost, compared with CDC?
 
-Railhook drains its outbox by polling. The alternative is change data capture: reading the outbox
-from Postgres's write-ahead log through
+Railhook's workers find work by polling Postgres. The alternative is change data capture: reading
+new rows from Postgres's write-ahead log through
 [logical decoding](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html), usually
 with [Debezium's outbox event router](https://debezium.io/documentation/reference/stable/transformations/outbox-event-router.html).
-Here is exactly what polling costs in our implementation, and what narrows each gap.
+Here is what polling costs in our implementation.
 
-**A crash after the send, before `PUBLISHED`, publishes twice.** The row stays `SENDING`; after
-`OUTBOX_SENDING_RECOVERY_SECONDS=300` it goes back to `PENDING` and out again. Narrowed three ways:
-recovery waits well past the producer's 120-second delivery timeout; acknowledgements that arrive
-after the batch stopped waiting are settled by `settleLateOutcomes()` instead of being dropped,
-which, its javadoc notes, used to publish "a message Kafka had already accepted" a second time; and
-the producer runs with `acks=all` and `enable.idempotence=true`, so its own internal retries "will
-not result in duplicate entries in the log". What is left is absorbed by the Claim. CDC does not make this go
-away on its own: Debezium states that it "provides at-least-once delivery guarantees", and its
-exactly-once mode depends on Kafka Connect's exactly-once support
+**Latency.** A poll that fills its batch polls again at once; one that does not sleeps 200 ms. A new
+Delivery can wait that long before a worker sees it. CDC would bring this close to commit time.
+
+**Database load.** Each worker runs the claim query every 200 ms whether or not anything is due. A
+partial index on the due rows keeps an empty poll cheap. Tailing the WAL does no work while nothing
+is written.
+
+CDC does not remove duplicates either: Debezium states that it "provides at-least-once delivery
+guarantees"
 ([Debezium, *Exactly once delivery*](https://debezium.io/documentation/reference/stable/configuration/eos.html)).
 
-**Latency.** Up to one poll interval plus the batch before a worker hears anything. With ten rows
-per endpoint per batch, one hot endpoint is announced at about ten Events a second at the default
-poll. Both are configurable; the per-endpoint cap is the price of fairness. CDC would bring this
-close to commit time.
-
-**Database load.** A windowed query every second whether or not anything is pending. The
-oldest-pending-age gauge is sampled inside that poll instead of querying on every Prometheus scrape;
-the queue-depth gauges still count rows per scrape. Tailing the WAL does no work while nothing is
-written.
-
-**Ordering in Kafka.** One publisher polls at a time and a batch is sent in `created_at` order, but a
-`FAILED` row is retried by a separate loop and can reach Kafka after newer rows for the same
-endpoint. Nothing relies on Kafka's order for correctness: ordered Deliveries carry Sequence
-Numbers and the ordering gate enforces them in the worker.
-
-**Cleanup.** `PUBLISHED` rows are deleted after three days by an hourly job, in bounded batches;
-`DEAD` rows are kept 90 days for a person. Alert on `outbox_oldest_pending_age_seconds` and
-`outbox_queue_depth`, including `status="sending"`. An outbox that grows quietly is an outage with
-the symptoms postponed.
-
-| | Accepted Event can be lost | Can publish twice | What it adds |
+| | Accepted Event can be lost | Can send twice | What it adds |
 |---|---|---|---|
 | Commit, then publish | yes, on a crash between the two | no | nothing |
 | Publish, then commit | no, but announces rolled-back rows | yes | nothing |
-| Outbox + CDC (Debezium) | no | yes | Kafka Connect, replication slots |
-| Outbox + poller (Railhook) | no | yes | a table, a poll, a cleanup job |
+| Outbox + CDC (Debezium) | no | yes | a connector, replication slots |
+| Delivery row as the queue (Railhook) | no | yes | a poll and an index |
 
-So why a poller? Railhook is meant to install with one command on one machine, and CDC means Kafka
-Connect and replication slots to operate, and a stalled slot that holds WAL on disk until someone
-notices. At volumes where the poll interval or the poll query starts to matter, CDC is the better
-tool, and it is a reasonable future step here. It is not on a roadmap, and this post does not
-promise it.
+So why a poller? Railhook is meant to install with one command on one machine, and the claim query
+needs nothing but Postgres. CDC means replication slots to operate, and a stalled slot holds WAL on
+disk until someone notices. If Postgres is your only store, the outbox is already a queue: workers
+claim rows with `SKIP LOCKED` and no broker is needed. The correctness comes from the transaction.
 
-And you might not need Kafka at all. If Postgres is your only store, the Outbox is already a queue:
-workers can claim rows with `SKIP LOCKED` and skip the broker. Railhook uses Kafka for partitioning
-by endpoint, for retry tiers that are topics rather than sleeping consumers, and to keep the API's
-write path apart from the workers. That buys throughput. The correctness comes from the transaction.
-
-**Takeaway:** we narrowed every window a poller leaves, and what remains is one duplicate path the
-Claim absorbs, plus about a second of latency.
+**Takeaway:** a poller costs up to 200 ms of latency and a steady query per worker. In return the
+queue is the same row as the obligation, committed in the same transaction.
 
 ## Read the code
 

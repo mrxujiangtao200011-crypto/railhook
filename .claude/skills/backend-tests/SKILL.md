@@ -32,8 +32,8 @@ CI runs both jobs with `--fail-at-end`, so a local run that stops at the first f
 
 ## Writing integration tests
 
-Extend `com.webhook.platform.api.AbstractIntegrationTest` (`railhook-api/src/test/java/.../AbstractIntegrationTest.java`) rather than assembling `@SpringBootTest` by hand. It provides a Testcontainers PostgreSQL instance and, importantly, **excludes Kafka and Redisson autoconfiguration** and `@MockBean`s the infrastructure services that would otherwise reach for them — `OutboxPublisherService`, `SequenceGeneratorService`, `RedisRateLimiterService`, `TokenBlacklistService`, `RedisTunnelCoordinator`, and others.
+Extend `com.webhook.platform.api.AbstractIntegrationTest` (`railhook-api/src/test/java/.../AbstractIntegrationTest.java`) rather than assembling `@SpringBootTest` by hand. It provides a Testcontainers PostgreSQL instance and, importantly, **excludes Redisson autoconfiguration** and `@MockBean`s the infrastructure services that would otherwise reach for them — `SequenceGeneratorService`, `RedisRateLimiterService`, `TokenBlacklistService`, `RedisTunnelCoordinator`, and others.
 
-Consequence: in these tests nothing is actually published to Kafka and no Redis state is real. A test that asserts on delivery dispatch, rate limiting, or sequence numbers is asserting on a mock — stub it explicitly or the assertion is vacuous. Test the outbox *rows* written in the transaction instead of the Kafka publish.
+Consequence: in these tests no worker claims anything and no Redis state is real. A test that asserts on rate limiting or sequence numbers is asserting on a mock — stub it explicitly or the assertion is vacuous. Test the Delivery and Forward *rows* written in the transaction; those rows are what the worker claims.
 
 The class is annotated `@DirtiesContext(AFTER_CLASS)`, so each integration test class pays a full context restart. Group related scenarios into one class rather than splitting across many.

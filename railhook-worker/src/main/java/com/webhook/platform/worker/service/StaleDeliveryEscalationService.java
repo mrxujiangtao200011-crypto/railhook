@@ -1,7 +1,5 @@
 package com.webhook.platform.worker.service;
 
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import io.micrometer.core.instrument.Counter;
@@ -9,7 +7,6 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -30,7 +27,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class StaleDeliveryEscalationService {
 
     private final DeliveryRepository deliveryRepository;
-    private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final TransactionTemplate transactionTemplate;
     private final OrderingBufferService orderingBufferService;
     private final Duration hardCapAge;
@@ -40,14 +36,12 @@ public class StaleDeliveryEscalationService {
 
     public StaleDeliveryEscalationService(
             DeliveryRepository deliveryRepository,
-            KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             TransactionTemplate transactionTemplate,
             OrderingBufferService orderingBufferService,
             MeterRegistry meterRegistry,
             @Value("${delivery.escalation.hard-cap-hours:96}") long hardCapHours,
             @Value("${delivery.escalation.batch-size:100}") int escalationBatchSize) {
         this.deliveryRepository = deliveryRepository;
-        this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
         this.orderingBufferService = orderingBufferService;
         this.hardCapAge = Duration.ofHours(hardCapHours);
@@ -116,22 +110,6 @@ public class StaleDeliveryEscalationService {
                 // This path bypasses the Runner, so it must move the ordering cursor itself. It
                 // once did not, and one hard-capped Delivery froze an ordered endpoint for good.
                 releaseOrdering(d);
-                try {
-                    DeliveryMessage msg = DeliveryMessage.builder()
-                            .deliveryId(d.getId())
-                            .eventId(d.getEventId())
-                            .endpointId(d.getEndpointId())
-                            .subscriptionId(d.getSubscriptionId())
-                            .status(Delivery.DeliveryStatus.DLQ.name())
-                            .attemptCount(d.getAttemptCount())
-                            .sequenceNumber(d.getSequenceNumber())
-                            .orderingEnabled(d.getOrderingEnabled())
-                            .build();
-                    kafkaTemplate.send(KafkaTopics.DELIVERIES_DLQ, d.getEndpointId().toString(), msg);
-                } catch (Exception e) {
-                    log.error("Failed to publish DLQ notification for escalated delivery {}: {}",
-                            d.getId(), e.getMessage());
-                }
             }
 
         } catch (Exception e) {

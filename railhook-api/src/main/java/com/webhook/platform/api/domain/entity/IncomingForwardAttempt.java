@@ -89,6 +89,14 @@ public class IncomingForwardAttempt {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    // A PENDING row without a due time is never claimed.
+    @PrePersist
+    void dueNowIfPending() {
+        if (nextRetryAt == null && status == ForwardAttemptStatus.PENDING) {
+            nextRetryAt = Instant.now();
+        }
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "incoming_event_id", insertable = false, updatable = false)
     private IncomingEvent incomingEvent;

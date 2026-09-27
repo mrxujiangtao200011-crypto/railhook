@@ -1,6 +1,6 @@
 package com.webhook.platform.worker.service;
 
-import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -10,7 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -30,8 +29,6 @@ class StaleDeliveryEscalationServiceTest {
     @Mock
     private DeliveryRepository deliveryRepository;
 
-    @Mock
-    private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
 
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -50,7 +47,6 @@ class StaleDeliveryEscalationServiceTest {
 
         service = new StaleDeliveryEscalationService(
                 deliveryRepository,
-                kafkaTemplate,
                 transactionTemplate,
                 orderingBufferService,
                 new SimpleMeterRegistry(),
@@ -71,7 +67,7 @@ class StaleDeliveryEscalationServiceTest {
                 .eventId(eventId)
                 .endpointId(endpointId)
                 .subscriptionId(subscriptionId)
-                .status(Delivery.DeliveryStatus.PENDING)
+                .status(DeliveryStatus.PENDING)
                 .attemptCount(5)
                 .maxAttempts(7)
                 .orderingEnabled(false)
@@ -94,10 +90,8 @@ class StaleDeliveryEscalationServiceTest {
 
         List<Delivery> saved = captor.getValue();
         assertEquals(1, saved.size());
-        assertEquals(Delivery.DeliveryStatus.DLQ, saved.get(0).getStatus());
+        assertEquals(DeliveryStatus.DLQ, saved.get(0).getStatus());
         assertNotNull(saved.get(0).getFailedAt());
-
-        verify(kafkaTemplate).send(anyString(), eq(endpointId.toString()), any(DeliveryMessage.class));
     }
 
     @Test
@@ -110,7 +104,7 @@ class StaleDeliveryEscalationServiceTest {
                 .eventId(UUID.randomUUID())
                 .endpointId(endpointId)
                 .subscriptionId(UUID.randomUUID())
-                .status(Delivery.DeliveryStatus.PENDING)
+                .status(DeliveryStatus.PENDING)
                 .attemptCount(5)
                 .maxAttempts(7)
                 .orderingEnabled(true)
@@ -143,7 +137,7 @@ class StaleDeliveryEscalationServiceTest {
                 .eventId(UUID.randomUUID())
                 .endpointId(endpointId)
                 .subscriptionId(UUID.randomUUID())
-                .status(Delivery.DeliveryStatus.PENDING)
+                .status(DeliveryStatus.PENDING)
                 .attemptCount(5)
                 .maxAttempts(7)
                 .orderingEnabled(false)
@@ -185,35 +179,4 @@ class StaleDeliveryEscalationServiceTest {
         verify(deliveryRepository, never()).saveAll(anyList());
     }
 
-    @Test
-    void runEscalation_kafkaSendFails_doesNotThrow() {
-        UUID deliveryId = UUID.randomUUID();
-        UUID endpointId = UUID.randomUUID();
-
-        Delivery staleDelivery = Delivery.builder()
-                .id(deliveryId)
-                .eventId(UUID.randomUUID())
-                .endpointId(endpointId)
-                .subscriptionId(UUID.randomUUID())
-                .status(Delivery.DeliveryStatus.PENDING)
-                .attemptCount(7)
-                .maxAttempts(7)
-                .orderingEnabled(false)
-                .createdAt(Instant.now().minus(120, ChronoUnit.HOURS))
-                .updatedAt(Instant.now().minus(96, ChronoUnit.HOURS))
-                .build();
-
-        when(deliveryRepository.findOldestPendingCreatedAtGlobal())
-                .thenReturn(staleDelivery.getCreatedAt());
-        when(deliveryRepository.findStaleDeliveryIds(any(Instant.class), anyInt()))
-                .thenReturn(List.of(deliveryId));
-        when(deliveryRepository.findAllById(List.of(deliveryId)))
-                .thenReturn(List.of(staleDelivery));
-        when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class)))
-                .thenThrow(new RuntimeException("Kafka unavailable"));
-
-        assertDoesNotThrow(() -> service.runEscalation());
-
-        verify(deliveryRepository).saveAll(anyList());
-    }
 }

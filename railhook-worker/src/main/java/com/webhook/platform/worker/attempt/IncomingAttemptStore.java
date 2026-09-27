@@ -2,8 +2,6 @@ package com.webhook.platform.worker.attempt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryableStatuses;
@@ -19,7 +17,6 @@ import com.webhook.platform.worker.service.TransformationCacheService;
 import com.webhook.platform.common.transform.TransformRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -61,7 +58,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             "X-Shopify-Triggered-At");
 
     /**
-     * {@code fence} is null only for a retry message published before claim tokens existed.
      * {@code replaySessionId} is part of the row's identity: once a Replay starts a second ladder,
      * (event, destination, attempt number) alone matches two rows.
      */
@@ -77,51 +73,16 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final ObjectMapper objectMapper;
     private final WebClient webClient;
-    private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
     private final TargetFailureRecorder targetFailureRecorder;
 
-    private final IncomingForwardMessage message;
+    private final IncomingForwardAttempt claimed;
     private final IncomingEvent event;
     private final IncomingDestination destination;
 
-    /**
-     * First dispatch and replay claim a PENDING row outright. A retry CASes on the token the
-     * scheduler stamped, because a redelivered Kafka message would otherwise double-POST.
-     */
+    /** The row was claimed by {@code IncomingForwardAttemptRepository#claimDue}; its token is the fence. */
     @Override
     public ClaimResult<Claim> claim() {
-        boolean isRetry = message.getAttemptCount() != null && message.getAttemptCount() > 0;
-        boolean isReplay = message.isReplay();
-
-        int attemptNumber = isRetry ? message.getAttemptCount() : 1;
-
-        UUID claimToken = UUID.randomUUID();
-
-        if (isRetry && !isReplay) {
-            Instant expected = message.getStartedAt();
-            if (expected == null) {
-                log.debug("Retry message has no fencing token (older producer?), proceeding without CAS: "
-                        + "eventId={}, destId={}, attempt={}", event.getId(), destination.getId(), attemptNumber);
-                return claimed(attemptNumber, null);
-            }
-            Integer applied = transactionTemplate.execute(tx -> attemptRepository.claimRetryForProcessing(
-                    event.getId(), destination.getId(), attemptNumber, message.getReplaySessionId(),
-                    expected, claimToken));
-            if (applied == null || applied == 0) {
-                return new ClaimResult.NotClaimed<>(
-                        "retry attempt already claimed by a prior delivery of this Kafka message");
-            }
-            // Fence on the new token, not on started_at, which this CAS just superseded.
-            return claimed(attemptNumber, claimToken);
-        }
-
-        final int number = attemptNumber;
-        Integer applied = transactionTemplate.execute(tx -> attemptRepository.claimForProcessing(
-                event.getId(), destination.getId(), number, message.getReplaySessionId(), claimToken));
-        if (applied == null || applied == 0) {
-            return new ClaimResult.NotClaimed<>("forward attempt already claimed or not PENDING");
-        }
-        return claimed(number, claimToken);
+        return claimed(claimed.getAttemptNumber(), claimed.getClaimToken());
     }
 
     /**
@@ -130,7 +91,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
      */
     private ClaimResult<Claim> claimed(int attemptNumber, UUID fence) {
         Claim claim = new Claim(event.getId(), destination.getId(), attemptNumber, fence,
-                message.getReplaySessionId());
+                claimed.getReplaySessionId());
 
         if (!Boolean.TRUE.equals(destination.getEnabled())) {
             // Turned off by its owner: fail. Auto-disabled by us: DLQ, so a person can retry.
@@ -416,7 +377,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             }
 
             if (outcome instanceof Finalization.Deferred deferred) {
-                // next_retry_at must be set: the scheduler ignores rows without one.
                 if (attempt.getStatus() != ForwardAttemptStatus.PENDING
                         && attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
                     return false;
@@ -444,7 +404,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 return false;
             }
 
-            attempt.setStatus(statusFor(outcome));
+            attempt.setStatus(attempt.getStatus().moveTo(statusFor(outcome)));
             attempt.setFinishedAt(Instant.now());
             attempt.setNextRetryAt(null);
             applyRecord(attempt);
@@ -479,27 +439,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return attemptRepository.holdIfStillClaimed(attempt.getId(), names, claim.fence()) == 1;
     }
 
-    /**
-     * Only a notification; the DLQ state is already committed. The topic also carries the
-     * container's poison records, so consumers must tolerate both shapes.
-     */
+    /** Incoming enforces no ordering, so nothing is released. */
     @Override
     public void onAbandoned(Claim claim) {
-        try {
-            kafkaTemplate.send(KafkaTopics.INCOMING_FORWARD_DLQ, claim.destinationId().toString(),
-                    IncomingForwardMessage.builder()
-                            .incomingEventId(claim.eventId())
-                            .destinationId(claim.destinationId())
-                            .incomingSourceId(event.getIncomingSourceId())
-                            .attemptCount(claim.attemptNumber())
-                            .replaySessionId(claim.replaySessionId())
-                            .build());
-            log.debug("Published DLQ event for forward eventId={}, destId={}",
-                    claim.eventId(), claim.destinationId());
-        } catch (Exception e) {
-            log.error("Failed to publish DLQ event for forward eventId={}, destId={}: {}",
-                    claim.eventId(), claim.destinationId(), e.getMessage(), e);
-        }
     }
 
     /** Incoming enforces no ordering, so nothing is released. */

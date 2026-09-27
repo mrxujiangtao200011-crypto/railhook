@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.domain.entity;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.retry.RetryableStatuses;
 import jakarta.persistence.*;
@@ -121,18 +122,8 @@ public class Delivery {
     @Column(name = "version", nullable = false)
     private Long version;
 
-    /** A set token means "currently claimed", which is why handing the row back clears it. */
-    public void claim(UUID token) {
-        Instant now = Instant.now();
-        this.status = DeliveryStatus.PROCESSING;
-        this.nextRetryAt = null;
-        this.lastAttemptAt = now;
-        this.claimToken = token;
-        this.updatedAt = now;
-    }
-
     public void handBackTo(Instant retryAt) {
-        this.status = DeliveryStatus.PENDING;
+        this.status = status.moveTo(DeliveryStatus.PENDING);
         this.claimToken = null;
         this.nextRetryAt = retryAt;
         this.updatedAt = Instant.now();
@@ -140,37 +131,41 @@ public class Delivery {
 
     public void succeed() {
         Instant now = Instant.now();
-        this.status = DeliveryStatus.SUCCESS;
+        this.status = status.moveTo(DeliveryStatus.SUCCESS);
         this.succeededAt = now;
+        this.nextRetryAt = null;
+        this.claimToken = null;
         this.updatedAt = now;
     }
 
     public void abandon() {
         Instant now = Instant.now();
-        this.status = DeliveryStatus.DLQ;
+        this.status = status.moveTo(DeliveryStatus.DLQ);
         this.failedAt = now;
+        this.nextRetryAt = null;
+        this.claimToken = null;
         this.updatedAt = now;
     }
 
     /** Sets {@code failedAt} like every terminal end; the status says it was not a failure. */
     public void cancel() {
         Instant now = Instant.now();
-        this.status = DeliveryStatus.CANCELLED;
+        this.status = status.moveTo(DeliveryStatus.CANCELLED);
         this.failedAt = now;
+        this.nextRetryAt = null;
+        this.claimToken = null;
         this.updatedAt = now;
     }
 
     public void failTerminally() {
         Instant now = Instant.now();
-        this.status = DeliveryStatus.FAILED;
+        this.status = status.moveTo(DeliveryStatus.FAILED);
         this.failedAt = now;
+        this.nextRetryAt = null;
+        this.claimToken = null;
         this.updatedAt = now;
     }
 
-    public enum DeliveryStatus {
-        PENDING, PROCESSING, SUCCESS, FAILED, DLQ,
-        CANCELLED
-    }
 
     public enum DeliveryOrigin {
         SUBSCRIPTION, RULE

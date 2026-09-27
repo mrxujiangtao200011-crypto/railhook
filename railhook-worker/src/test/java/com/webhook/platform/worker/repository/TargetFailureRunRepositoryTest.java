@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration,"
+        "spring.autoconfigure.exclude="
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration"
 })

@@ -5,7 +5,6 @@ import com.webhook.platform.common.retry.RetryAfter;
 import com.webhook.platform.worker.attempt.TargetFailureRecorder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
-import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
@@ -60,7 +59,7 @@ import static org.mockito.Mockito.mock;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration,"
+        "spring.autoconfigure.exclude="
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration"
 })
@@ -149,12 +148,14 @@ class IncomingForwardAttemptRecordingRepositoryTest {
     private IncomingForwardAttempt forward(String body, String payloadTransform) {
         UUID eventId = UUID.randomUUID();
         UUID destinationId = UUID.randomUUID();
-        attemptRepository.save(IncomingForwardAttempt.builder()
+        IncomingForwardAttempt claimed = attemptRepository.save(IncomingForwardAttempt.builder()
                 .organizationId(FIXTURE_ORG)
                 .incomingEventId(eventId)
                 .destinationId(destinationId)
                 .attemptNumber(1)
-                .status(ForwardAttemptStatus.PENDING)
+                .status(ForwardAttemptStatus.PROCESSING)
+                .claimToken(UUID.randomUUID())
+                .nextRetryAt(Instant.now().plusSeconds(300))
                 .build());
 
         IncomingEvent event = IncomingEvent.builder()
@@ -180,13 +181,10 @@ class IncomingForwardAttemptRecordingRepositoryTest {
                 .timeoutSeconds(5)
                 .payloadTransform(payloadTransform)
                 .build();
-        IncomingForwardMessage message = IncomingForwardMessage.builder()
-                .incomingEventId(eventId).destinationId(destinationId).attemptCount(0).build();
-
         IncomingAttemptStore store = new IncomingAttemptStore(attemptRepository, activeProjects(),
                 new TransactionTemplate(transactionManager), null, null, null, new ObjectMapper(),
-                WebClient.builder().build(), null, mock(TargetFailureRecorder.class),
-                message, event, destination);
+                WebClient.builder().build(), mock(TargetFailureRecorder.class),
+                claimed, event, destination);
 
         runner.run(store, new NoMetrics());
 

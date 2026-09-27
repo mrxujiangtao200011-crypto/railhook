@@ -19,7 +19,7 @@ cd ~/railhook
 2. Pins `API_IMAGE_TAG`, `WORKER_IMAGE_TAG` and `UI_IMAGE_TAG` in `.env`.
 3. **Takes a database backup, and stops if that fails.**
 4. Replaces `docker-compose.yml` with the release's copy and keeps yours as `docker-compose.yml.previous`.
-5. Pulls the images and restarts the database, broker, cache and dashboard.
+5. Pulls the images and restarts the database, cache and dashboard.
 6. Replaces the API containers one at a time. The new API runs the release's migrations.
 7. Restarts the worker once the new API is serving.
 
@@ -106,7 +106,7 @@ Store `.env` separately from the dumps. Without its `WEBHOOK_ENCRYPTION_KEY` and
 
 </Steps>
 
-Leave Kafka alone after a restore. Messages for rolled-back deliveries are dropped (expect a burst of these in the worker log). Deliveries left pending are picked up again after about an hour. Events accepted after the dump are lost.
+After a restore, pending deliveries are claimed on the worker's next poll. Deliveries that were in progress when the dump was taken are claimed again once their claim times out (`WEBHOOK_CLAIM_TIMEOUT_SECONDS`, 300 by default), so an endpoint may receive such an attempt twice. Events accepted after the dump are lost.
 
 <Aside type="tip">
 From a clone, `make backup-db` and `make restore-db FILE=backups/<file>.dump` do the same against the embedded database. `DB_MODE=external` points them at a managed one.

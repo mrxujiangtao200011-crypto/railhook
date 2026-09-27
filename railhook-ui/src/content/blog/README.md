@@ -96,7 +96,7 @@ Do not add a charting dependency. These are inline SVG on purpose: the public pa
 prerendered and every kilobyte is paid for by a first-time reader.
 
 Provider logos are already bundled in `public/logos/brand/` (stripe, github, shopify, slack,
-postgresql, redis, apachekafka, google) with a `SOURCES.md` recording where each came from and
+postgresql, redis, google) with a `SOURCES.md` recording where each came from and
 under what terms. Reuse those — in prose with `![](/logos/brand/stripe.svg)`, in a figure with an
 `<image href="/logos/brand/stripe.svg">`. Do not draw a new brand mark, do not fetch one from a
 CDN (the app ships `img-src 'self' data: blob:`), and do not add a file to that directory without

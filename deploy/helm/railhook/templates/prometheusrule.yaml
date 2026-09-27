@@ -10,27 +10,6 @@ metadata:
     {{- end }}
 spec:
   groups:
-    # An outbox row is an Event the caller was told was accepted but that is not a Delivery yet,
-    # so delivery_queue_depth cannot see it.
-    - name: railhook.outbox
-      rules:
-        - alert: OutboxOldestPendingAgeHigh
-          expr: outbox_oldest_pending_age_seconds > 300
-          for: 5m
-          labels:
-            severity: critical
-            component: api
-          annotations:
-            summary: "Oldest unpublished outbox message is {{`{{ $value | printf \"%.0f\" }}`}}s old"
-        - alert: OutboxSendingStuck
-          expr: outbox_queue_depth{status="sending"} > 0
-          for: 10m
-          labels:
-            severity: warning
-            component: api
-          annotations:
-            summary: "{{`{{ $value | printf \"%.0f\" }}`}} outbox messages stuck SENDING for >10m"
-
     - name: railhook.retry_backlog
       rules:
         - alert: DeliveryPendingBacklogGrowing
@@ -99,7 +78,6 @@ spec:
             component: worker
           annotations:
             summary: "Incoming forward failure rate above 10%"
-        # Unlike the Kafka topic counters, this returns to 0 once DLQ items are retried or purged.
         - alert: DlqActionableBacklog
           expr: webhook_dlq_depth > 0
           for: 30m
@@ -143,25 +121,6 @@ spec:
             component: worker
           annotations:
             summary: "Circuit breaker cannot reach Redis, so it cannot trip"
-
-    - name: railhook.retry_governor
-      rules:
-        - alert: RetryGovernorCooldown
-          expr: retry_governor_cooldown_remaining > 0
-          for: 5m
-          labels:
-            severity: warning
-            component: worker
-          annotations:
-            summary: "Retry governor {{`{{ $labels.scheduler }}`}} in cooldown"
-        - alert: RetryGovernorConsecutiveFailures
-          expr: retry_governor_consecutive_failures > 5
-          for: 2m
-          labels:
-            severity: critical
-            component: worker
-          annotations:
-            summary: "Retry governor {{`{{ $labels.scheduler }}`}}: {{`{{ $value }}`}} consecutive failures"
 
     - name: railhook.api
       rules:

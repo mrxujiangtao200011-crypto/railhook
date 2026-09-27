@@ -37,7 +37,6 @@ worker:
   env:
     APP_ENV: production
     LOG_LEVEL: WARN
-    KAFKA_DELIVERY_CONCURRENCY: "12"
   
   hpa:
     enabled: true
@@ -70,11 +69,6 @@ email:
 
 postgresql:
   enabled: false
-
-kafka:
-  enabled: false
-  topicReplicationFactor: 3  # Production: 3-way replication across brokers
-  topicPartitions: 24        # Higher partition count for parallel consumers
 
 backup:
   enabled: true

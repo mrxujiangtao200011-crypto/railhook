@@ -4,7 +4,7 @@ import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.api.domain.enums.DeliveryOrigin;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -144,14 +144,20 @@ public class Delivery {
      * it. The headroom comes from maxAttempts, capped at the largest ladder the worker accepts.
      */
     public void returnToLadder(int additionalAttempts) {
-        this.status = DeliveryStatus.PENDING;
+        this.status = status.moveTo(DeliveryStatus.PENDING);
         this.maxAttempts = Math.min(attemptCount + additionalAttempts, RetryLadder.MAX_ATTEMPTS_LIMIT);
-        this.nextRetryAt = null;
+        this.nextRetryAt = Instant.now();
         this.failedAt = null;
         this.ladderResumedAt = Instant.now();
-        // The worker leaves its token behind; kept, the retry looks claimed and a backpressure
-        // reschedule (claim_token IS NULL) never matches it.
         this.claimToken = null;
+    }
+
+    // A PENDING row without a due time is never claimed.
+    @PrePersist
+    void dueNowIfPending() {
+        if (nextRetryAt == null && status == DeliveryStatus.PENDING) {
+            nextRetryAt = Instant.now();
+        }
     }
 
     @ManyToOne(fetch = FetchType.LAZY)

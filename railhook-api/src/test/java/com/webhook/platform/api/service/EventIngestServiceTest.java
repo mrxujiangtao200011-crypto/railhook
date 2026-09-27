@@ -46,8 +46,6 @@ class EventIngestServiceTest {
     @Mock
     private DeliveryRepository deliveryRepository;
     @Mock
-    private OutboxMessageRepository outboxMessageRepository;
-    @Mock
     private SequenceGeneratorService sequenceGeneratorService;
     @Mock
     private PayloadSchemaValidator payloadSchemaValidator;
@@ -85,8 +83,8 @@ class EventIngestServiceTest {
                 eventRepository,
                 new EventIntake(subscriptionMatchingCache, ruleEngineService, entitlementService, objectMapper),
                 deliveryRepository,
-                outboxMessageRepository, workflowTriggerOutboxRepository,
-                objectMapper, new DeliveryDispatch(outboxMessageRepository, objectMapper), meterRegistry,
+                workflowTriggerOutboxRepository,
+                objectMapper, meterRegistry,
                 sequenceGeneratorService, new SchemaValidationGate(payloadSchemaValidator, objectMapper), projectRepository,
                 quotaCounterService, entitlementService,
                 transactionManager, 262144L, 1024
@@ -251,7 +249,7 @@ class EventIngestServiceTest {
             return deliveries;
         });
         when(sequenceGeneratorService.nextSequence(endpointId)).thenReturn(1L);
-        when(deliveryRepository.updateSequenceNumber(deliveryId, 1L)).thenReturn(1);
+        when(deliveryRepository.updateSequenceNumber(eq(deliveryId), eq(1L), any())).thenReturn(1);
 
         stubTransactionTemplate();
 
@@ -262,7 +260,7 @@ class EventIngestServiceTest {
         assertThat(capturedAtSaveTime.get(0).getOrderingEnabled()).isTrue();
 
         verify(sequenceGeneratorService).nextSequence(endpointId);
-        verify(deliveryRepository).updateSequenceNumber(deliveryId, 1L);
+        verify(deliveryRepository).updateSequenceNumber(eq(deliveryId), eq(1L), any());
     }
 
     private Delivery cloneForAssertion(Delivery d) {
@@ -300,9 +298,9 @@ class EventIngestServiceTest {
             }
             return deliveries;
         });
-        when(outboxMessageRepository.saveAll(anyList()))
-                .thenThrow(new RuntimeException("simulated failure after delivery was saved"));
 
+        when(workflowTriggerOutboxRepository.save(any()))
+                .thenThrow(new RuntimeException("simulated failure"));
         stubTransactionTemplate();
 
         assertThatThrownBy(() -> service.ingestEvent(projectId, request, null))
@@ -310,7 +308,7 @@ class EventIngestServiceTest {
                 .hasMessageContaining("simulated failure");
 
         verify(sequenceGeneratorService, never()).nextSequence(any());
-        verify(deliveryRepository, never()).updateSequenceNumber(any(), anyLong());
+        verify(deliveryRepository, never()).updateSequenceNumber(any(), anyLong(), any());
     }
 
     // The Redis quota counter is not rolled back with the transaction, so it is charged after commit.

@@ -2,7 +2,6 @@ package com.webhook.platform.worker.attempt;
 
 import com.webhook.platform.common.retry.RetryableStatuses;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
@@ -60,7 +59,7 @@ class IncomingAttemptStoreTest {
 
         store = new IncomingAttemptStore(
                 attemptRepository, activeProjects(), transactionTemplate,
-                null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
     }
 
     @Test
@@ -108,10 +107,9 @@ class IncomingAttemptStoreTest {
 
     @Test
     void aDisabledDestinationFailsTheForwardUnderItsFencingToken() {
-        IncomingForwardAttempt row = pendingRow();
+        IncomingForwardAttempt row = processingRow();
         rowIs(row);
-        claimStampsTokenOn(row);
-        IncomingAttemptStore store = storeFor(destination(false), firstDispatch());
+        IncomingAttemptStore store = storeFor(destination(false), row);
 
         ClaimResult<IncomingAttemptStore.Claim> result = store.claim();
 
@@ -119,15 +117,11 @@ class IncomingAttemptStoreTest {
         IncomingForwardAttempt written = saved();
         assertThat(written.getStatus()).isEqualTo(ForwardAttemptStatus.FAILED);
         assertThat(written.getErrorMessage()).isEqualTo("Destination is disabled");
-        // Claimed first: the fence is what stops this write landing on a row somebody else owns.
-        verify(attemptRepository).claimForProcessing(eq(EVENT_ID), eq(DEST_ID), eq(1), isNull(), any(UUID.class));
     }
 
     @Test
     void anEnabledDestinationIsClaimedAndAttempted() {
-        IncomingForwardAttempt row = pendingRow();
-        claimStampsTokenOn(row);
-        IncomingAttemptStore store = storeFor(destination(true), firstDispatch());
+        IncomingAttemptStore store = storeFor(destination(true), processingRow());
 
         assertThat(store.claim()).isInstanceOf(ClaimResult.Claimed.class);
         verify(attemptRepository, never()).save(any());
@@ -162,7 +156,7 @@ class IncomingAttemptStoreTest {
     void theDestinationsOwnCredentialsAreMaskedBeforeTheyAreRecorded() {
         IncomingDestination destination = destination(true);
         destination.setCustomHeadersJson("{\"Authorization\":\"Bearer super-secret\",\"X-Trace\":\"t-1\"}");
-        IncomingAttemptStore store = storeFor(destination, firstDispatch());
+        IncomingAttemptStore store = storeFor(destination, processingRow());
 
         String recorded = store.buildRequest(claim(FENCE), TransformedBody.of("{}")).recordedHeaders();
 
@@ -172,11 +166,11 @@ class IncomingAttemptStoreTest {
     }
 
     @Test
-    void aReplayClaimsOnlyTheRowInItsOwnSession() {
+    void aReplayClaimKeepsItsSession() {
         UUID session = UUID.randomUUID();
-        when(attemptRepository.claimForProcessing(eq(EVENT_ID), eq(DEST_ID), eq(1), eq(session), any(UUID.class)))
-                .thenReturn(1);
-        IncomingAttemptStore store = storeFor(destination(true), replayIn(session));
+        IncomingForwardAttempt row = processingRow();
+        row.setReplaySessionId(session);
+        IncomingAttemptStore store = storeFor(destination(true), row);
 
         ClaimResult<IncomingAttemptStore.Claim> result = store.claim();
 
@@ -206,7 +200,7 @@ class IncomingAttemptStoreTest {
     void anUntransformedForwardSendsTheBytesThatArrived() {
         byte[] arrived = {(byte) 0x7B, (byte) 0xC0, (byte) 0xFF, 0x00, (byte) 0x7D};
         IncomingEvent event = event("application/octet-stream", "{���}", arrived, null);
-        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+        IncomingAttemptStore store = storeFor(destination(true), processingRow(), event);
 
         String body = store.buildBody(claim(FENCE)).body();
 
@@ -219,7 +213,7 @@ class IncomingAttemptStoreTest {
         IncomingDestination destination = destination(true);
         destination.setPayloadTransform("$.data");
         IncomingEvent event = event("application/json", "{\"data\":{\"name\":\"Zoë\"}}", null, null);
-        IncomingAttemptStore store = storeFor(destination, firstDispatch(), event);
+        IncomingAttemptStore store = storeFor(destination, processingRow(), event);
 
         String body = store.buildBody(claim(FENCE)).body();
 
@@ -233,7 +227,7 @@ class IncomingAttemptStoreTest {
     void anUntransformedForwardCarriesTheContentEncodingItArrivedWith() {
         IncomingEvent event = event("application/json", null, new byte[] {0x1f, (byte) 0x8b, 0x08},
                 "{\"content-type\":\"application/json\",\"content-encoding\":\"gzip\"}");
-        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+        IncomingAttemptStore store = storeFor(destination(true), processingRow(), event);
 
         String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
 
@@ -246,7 +240,7 @@ class IncomingAttemptStoreTest {
         destination.setPayloadTransform("$.data");
         IncomingEvent event = event("application/json", "{\"data\":1}", null,
                 "{\"content-encoding\":\"gzip\"}");
-        IncomingAttemptStore store = storeFor(destination, firstDispatch(), event);
+        IncomingAttemptStore store = storeFor(destination, processingRow(), event);
 
         String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
 
@@ -258,7 +252,7 @@ class IncomingAttemptStoreTest {
     void anUntransformedForwardCarriesTheProvidersEventHeadersUnderTheirCanonicalNames() {
         IncomingEvent event = event("application/json", "{}", null,
                 "{\"x-github-event\":\"push\",\"x-github-delivery\":\"d-1\",\"x-github-hook-id\":\"42\"}");
-        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+        IncomingAttemptStore store = storeFor(destination(true), processingRow(), event);
 
         String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
 
@@ -273,7 +267,7 @@ class IncomingAttemptStoreTest {
         destination.setPayloadTransform("$.data");
         IncomingEvent event = event("application/json", "{\"data\":1}", null,
                 "{\"X-Shopify-Topic\":\"orders/create\",\"X-Gitlab-Event\":\"Push Hook\"}");
-        IncomingAttemptStore store = storeFor(destination, firstDispatch(), event);
+        IncomingAttemptStore store = storeFor(destination, processingRow(), event);
 
         String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
 
@@ -288,7 +282,7 @@ class IncomingAttemptStoreTest {
                 "{\"x-hub-signature-256\":\"sha256=abc\",\"x-shopify-hmac-sha256\":\"h\","
                         + "\"x-gitlab-token\":\"t\",\"stripe-signature\":\"s\",\"x-slack-signature\":\"v0=x\","
                         + "\"authorization\":\"Bearer p\",\"cookie\":\"c=1\",\"x-custom-provider\":\"v\"}");
-        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+        IncomingAttemptStore store = storeFor(destination(true), processingRow(), event);
 
         String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
 
@@ -308,7 +302,7 @@ class IncomingAttemptStoreTest {
         IncomingDestination destination = destination(true);
         destination.setCustomHeadersJson("{\"x-github-event\":\"overridden\"}");
         IncomingEvent event = event("application/json", "{}", null, "{\"X-GitHub-Event\":\"push\"}");
-        IncomingAttemptStore store = storeFor(destination, firstDispatch(), event);
+        IncomingAttemptStore store = storeFor(destination, processingRow(), event);
 
         String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
 
@@ -322,7 +316,7 @@ class IncomingAttemptStoreTest {
         IncomingEvent event = event("application/json", "{}", null,
                 "{\"X-GitHub-Event\":\"push\\r\\nX-Injected: 1\",\"X-Shopify-Topic\":\"a\\nb\","
                         + "\"X-GitHub-Delivery\":\"d-1\"}");
-        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+        IncomingAttemptStore store = storeFor(destination(true), processingRow(), event);
 
         String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
 
@@ -344,13 +338,13 @@ class IncomingAttemptStoreTest {
                 .build();
     }
 
-    private IncomingAttemptStore storeFor(IncomingDestination destination, IncomingForwardMessage message,
+    private IncomingAttemptStore storeFor(IncomingDestination destination, IncomingForwardAttempt claimed,
             IncomingEvent event) {
         return new IncomingAttemptStore(attemptRepository, activeProjects(), transactionTemplate, null, null, null,
-                new ObjectMapper(), null, null, null, message, event, destination);
+                new ObjectMapper(), null, null, claimed, event, destination);
     }
 
-    private IncomingAttemptStore storeFor(IncomingDestination destination, IncomingForwardMessage message) {
+    private IncomingAttemptStore storeFor(IncomingDestination destination, IncomingForwardAttempt claimed) {
         IncomingEvent event = IncomingEvent.builder()
                 .id(EVENT_ID)
                 .incomingSourceId(UUID.randomUUID())
@@ -359,7 +353,7 @@ class IncomingAttemptStoreTest {
                 .bodyRaw("{}")
                 .build();
         return new IncomingAttemptStore(attemptRepository, activeProjects(), transactionTemplate, null, null, null,
-                new ObjectMapper(), null, null, null, message, event, destination);
+                new ObjectMapper(), null, null, claimed, event, destination);
     }
 
     private IncomingDestination destination(boolean enabled) {
@@ -374,35 +368,6 @@ class IncomingAttemptStoreTest {
                 .retryDelays(RetryLadderDefaults.INCOMING_DELAYS)
                 .retryableStatuses(RetryableStatuses.DEFAULT_SPEC)
                 .build();
-    }
-
-    private IncomingForwardMessage firstDispatch() {
-        return IncomingForwardMessage.builder()
-                .incomingEventId(EVENT_ID).destinationId(DEST_ID).attemptCount(0).build();
-    }
-
-    private IncomingForwardMessage replayIn(UUID session) {
-        return IncomingForwardMessage.builder()
-                .incomingEventId(EVENT_ID).destinationId(DEST_ID).attemptCount(1)
-                .replay(true).replaySessionId(session).build();
-    }
-
-    /** What the claiming UPDATE does to the row, so finalise can see its own fence. */
-    private void claimStampsTokenOn(IncomingForwardAttempt row) {
-        when(attemptRepository.claimForProcessing(eq(EVENT_ID), eq(DEST_ID), eq(1), isNull(), any(UUID.class)))
-                .thenAnswer(invocation -> {
-                    row.setStatus(ForwardAttemptStatus.PROCESSING);
-                    row.setClaimToken(invocation.getArgument(4, UUID.class));
-                    return 1;
-                });
-    }
-
-    private IncomingForwardAttempt pendingRow() {
-        IncomingForwardAttempt row = processingRow();
-        row.setStatus(ForwardAttemptStatus.PENDING);
-        row.setClaimToken(null);
-        row.setStartedAt(null);
-        return row;
     }
 
     private IncomingForwardAttempt processingRow() {

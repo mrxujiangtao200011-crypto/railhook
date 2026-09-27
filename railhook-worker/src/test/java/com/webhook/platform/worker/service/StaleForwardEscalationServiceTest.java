@@ -1,7 +1,5 @@
 package com.webhook.platform.worker.service;
 
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
@@ -16,7 +14,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -41,8 +38,6 @@ class StaleForwardEscalationServiceTest {
     @Mock
     private IncomingForwardAttemptRepository attemptRepository;
     @Mock
-    private KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
-    @Mock
     private TransactionTemplate transactionTemplate;
 
     private MeterRegistry meterRegistry;
@@ -57,7 +52,7 @@ class StaleForwardEscalationServiceTest {
                 inv.getArgument(0, TransactionCallback.class).doInTransaction(null));
         meterRegistry = new SimpleMeterRegistry();
         service = new StaleForwardEscalationService(
-                attemptRepository, kafkaTemplate, transactionTemplate, meterRegistry, HARD_CAP_HOURS, 100);
+                attemptRepository, transactionTemplate, meterRegistry, HARD_CAP_HOURS, 100);
     }
 
     private IncomingForwardAttempt pendingAttempt(UUID eventId, UUID destinationId, int attemptNumber) {
@@ -110,42 +105,6 @@ class StaleForwardEscalationServiceTest {
         Duration cap = Duration.ofHours(HARD_CAP_HOURS);
         assertThat(cutoff.getValue())
                 .isBetween(before.minus(cap), after.minus(cap));
-    }
-
-    @Test
-    @DisplayName("each escalated Forward gets a DLQ notification, keyed by Destination")
-    void publishesOneNotificationPerForward() {
-        UUID eventId = UUID.randomUUID();
-        UUID destinationId = UUID.randomUUID();
-        IncomingForwardAttempt attempt = pendingAttempt(eventId, destinationId, 5);
-
-        when(attemptRepository.findStaleForwardAttemptIds(any(Instant.class), anyInt()))
-                .thenReturn(List.of(attempt.getId()));
-        when(attemptRepository.findAllById(any())).thenReturn(List.of(attempt));
-
-        service.runEscalation();
-
-        ArgumentCaptor<IncomingForwardMessage> published = ArgumentCaptor.forClass(IncomingForwardMessage.class);
-        verify(kafkaTemplate).send(eq(KafkaTopics.INCOMING_FORWARD_DLQ), eq(destinationId.toString()),
-                published.capture());
-        assertThat(published.getValue().getIncomingEventId()).isEqualTo(eventId);
-        assertThat(published.getValue().getDestinationId()).isEqualTo(destinationId);
-        assertThat(published.getValue().getAttemptCount()).isEqualTo(5);
-    }
-
-    @Test
-    void kafkaFailureDoesNotUndoTheWrite() {
-        IncomingForwardAttempt attempt = pendingAttempt(UUID.randomUUID(), UUID.randomUUID(), 1);
-        when(attemptRepository.findStaleForwardAttemptIds(any(Instant.class), anyInt()))
-                .thenReturn(List.of(attempt.getId()));
-        when(attemptRepository.findAllById(any())).thenReturn(List.of(attempt));
-        when(kafkaTemplate.send(any(String.class), any(String.class), any(IncomingForwardMessage.class)))
-                .thenThrow(new RuntimeException("broker unreachable"));
-
-        service.runEscalation();
-
-        verify(attemptRepository).saveAll(any());
-        assertThat(meterRegistry.counter("forward_escalated_to_dlq_total").count()).isEqualTo(1);
     }
 
     @Test

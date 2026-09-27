@@ -18,7 +18,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration,"
+        "spring.autoconfigure.exclude="
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration"
 })
@@ -61,58 +63,43 @@ class IncomingForwardAttemptRepositoryTest {
     private TestEntityManager entityManager;
 
     @Test
-    void claimingAnIngressForwardMatchesTheRowThatCarriesNoReplaySession() {
+    void claimDueTakesDueRowsAndTimedOutClaimsButNeverAFutureRung() {
         UUID eventId = UUID.randomUUID();
         UUID destinationId = UUID.randomUUID();
-        persist(eventId, destinationId, 1, null, ForwardAttemptStatus.PENDING, null);
-        UUID token = UUID.randomUUID();
-
-        int claimed = attemptRepository.claimForProcessing(eventId, destinationId, 1, null, token);
+        Instant now = Instant.now();
+        UUID due = persist(eventId, destinationId, 1, null, ForwardAttemptStatus.PENDING, now.minusSeconds(1));
+        UUID replay = persist(eventId, destinationId, 1, UUID.randomUUID(), ForwardAttemptStatus.PROCESSING,
+                now.minusSeconds(1));
+        persist(eventId, destinationId, 2, null, ForwardAttemptStatus.PENDING, now.plusSeconds(300));
+        entityManager.flush();
         entityManager.clear();
 
-        assertEquals(1, claimed, "a Forward with no Replay session must still be claimable");
-        IncomingForwardAttempt row = only(attemptRepository.findForwardAttempts(eventId, destinationId, null));
-        assertEquals(ForwardAttemptStatus.PROCESSING, row.getStatus());
-        assertEquals(token, row.getClaimToken());
+        List<IncomingForwardAttempt> claimed = attemptRepository.claimDue(now, now.plusSeconds(300),
+                new UUID(0L, 0L), 10, 10, 10);
+
+        assertEquals(Set.of(due, replay), claimed.stream().map(IncomingForwardAttempt::getId).collect(Collectors.toSet()));
+        assertTrue(claimed.stream().allMatch(a -> a.getClaimToken() != null
+                && a.getStatus() == ForwardAttemptStatus.PROCESSING));
     }
 
     @Test
-    void aReplayAndTheLiveLadderClaimDifferentRowsAtTheSameAttemptNumber() {
+    void claimDueCapsEachDestination() {
         UUID eventId = UUID.randomUUID();
-        UUID destinationId = UUID.randomUUID();
-        UUID session = UUID.randomUUID();
-        persist(eventId, destinationId, 1, null, ForwardAttemptStatus.PENDING, null);
-        persist(eventId, destinationId, 1, session, ForwardAttemptStatus.PENDING, null);
-
-        UUID replayToken = UUID.randomUUID();
-        int claimed = attemptRepository.claimForProcessing(eventId, destinationId, 1, session, replayToken);
+        UUID busy = UUID.randomUUID();
+        UUID quiet = UUID.randomUUID();
+        Instant now = Instant.now();
+        for (int i = 0; i < 6; i++) {
+            persist(UUID.randomUUID(), busy, 1, null, ForwardAttemptStatus.PENDING, now.minusSeconds(60 + i));
+        }
+        UUID quietRow = persist(eventId, quiet, 1, null, ForwardAttemptStatus.PENDING, now.minusSeconds(1));
+        entityManager.flush();
         entityManager.clear();
 
-        assertEquals(1, claimed, "the Replay must claim exactly its own row, not both attempt 1s");
-        assertEquals(ForwardAttemptStatus.PROCESSING,
-                only(attemptRepository.findForwardAttempts(eventId, destinationId, session)).getStatus());
-        assertEquals(ForwardAttemptStatus.PENDING,
-                only(attemptRepository.findForwardAttempts(eventId, destinationId, null)).getStatus(),
-                "the ingress Forward is a different obligation and must be untouched");
-    }
+        List<IncomingForwardAttempt> claimed = attemptRepository.claimDue(now, now.plusSeconds(300),
+                new UUID(0L, 0L), 10, 2, 10);
 
-    @Test
-    void strandedPendingForwardsAreHandedBackToTheScheduler() {
-        UUID eventId = UUID.randomUUID();
-        UUID destinationId = UUID.randomUUID();
-        UUID stranded = persist(eventId, destinationId, 1, null, ForwardAttemptStatus.PENDING, null);
-        UUID fresh = persist(eventId, UUID.randomUUID(), 1, null, ForwardAttemptStatus.PENDING, null);
-        backdate(stranded, Instant.now().minus(3, ChronoUnit.HOURS));
-
-        int recovered = attemptRepository.resetStrandedPendingForwardAttempts(
-                Instant.now().minus(1, ChronoUnit.HOURS));
-        entityManager.clear();
-
-        assertEquals(1, recovered);
-        assertNotNull(attemptRepository.findById(stranded).orElseThrow().getNextRetryAt(),
-                "the scheduler ignores rows without a next_retry_at, so recovery must set one");
-        assertNull(attemptRepository.findById(fresh).orElseThrow().getNextRetryAt(),
-                "a Forward that has only just been received is still waiting for its dispatch message");
+        assertEquals(2, claimed.stream().filter(a -> a.getDestinationId().equals(busy)).count());
+        assertTrue(claimed.stream().anyMatch(a -> a.getId().equals(quietRow)));
     }
 
     @Test

@@ -26,105 +26,57 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                         @Param("destinationId") UUID destinationId,
                         @Param("replaySessionId") UUID replaySessionId);
 
+        /** Same fairness and claim timeout as {@code DeliveryRepository#claimDue}, per Destination. */
         @Query(value = """
-                        SELECT id FROM (
-                            SELECT id, ROW_NUMBER() OVER (PARTITION BY destination_id ORDER BY next_retry_at ASC) AS rn
-                            FROM incoming_forward_attempts
-                            WHERE status = :#{#status.name()} AND next_retry_at IS NOT NULL AND next_retry_at <= :now
-                        ) sub WHERE rn <= :maxPerDest ORDER BY rn ASC LIMIT :limit
+                        WITH RECURSIVE due_destinations AS (
+                            (SELECT a.destination_id, 1 AS n FROM incoming_forward_attempts a
+                             WHERE a.status IN ('PENDING', 'PROCESSING') AND a.next_retry_at <= :now
+                               AND a.destination_id > :after
+                             ORDER BY a.destination_id LIMIT 1)
+                            UNION ALL
+                            SELECT nxt.destination_id, e.n + 1 FROM due_destinations e
+                            CROSS JOIN LATERAL (
+                                SELECT a.destination_id FROM incoming_forward_attempts a
+                                WHERE a.status IN ('PENDING', 'PROCESSING') AND a.next_retry_at <= :now
+                                  AND a.destination_id > e.destination_id
+                                ORDER BY a.destination_id LIMIT 1) nxt
+                            WHERE e.n < :maxDestinations
+                        ),
+                        picked AS (
+                            SELECT p.id FROM due_destinations e
+                            CROSS JOIN LATERAL (
+                                SELECT a.id FROM incoming_forward_attempts a
+                                WHERE a.destination_id = e.destination_id
+                                  AND a.status IN ('PENDING', 'PROCESSING') AND a.next_retry_at <= :now
+                                ORDER BY a.next_retry_at LIMIT :perDestination
+                                FOR UPDATE SKIP LOCKED) p
+                            LIMIT :limit
+                        )
+                        UPDATE incoming_forward_attempts a SET status = 'PROCESSING',
+                            claim_token = gen_random_uuid(), started_at = :now, next_retry_at = :claimExpiresAt
+                        FROM picked WHERE a.id = picked.id
+                        RETURNING a.*
                         """, nativeQuery = true)
-        List<UUID> findPendingRetryIds(@Param("status") ForwardAttemptStatus status,
-                        @Param("now") Instant now,
-                        @Param("limit") int limit,
-                        @Param("maxPerDest") int maxPerDest);
-
-        @Query(value = "SELECT * FROM incoming_forward_attempts WHERE id IN :ids ORDER BY next_retry_at ASC FOR UPDATE SKIP LOCKED",
-                        nativeQuery = true)
-        List<IncomingForwardAttempt> lockByIds(@Param("ids") List<UUID> ids);
-
-        /**
-         * {@code IS NOT DISTINCT FROM} because an ingress Forward has a null Replay session, which
-         * {@code =} never matches. The cast lets a null bind resolve to uuid.
-         */
-        @Modifying
-        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PROCESSING', " +
-                        "started_at = now(), claim_token = :claimToken " +
-                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
-                        "AND attempt_number = :attemptNumber AND status = 'PENDING' " +
-                        "AND replay_session_id IS NOT DISTINCT FROM CAST(:replaySessionId AS uuid)",
-                        nativeQuery = true)
-        int claimForProcessing(@Param("eventId") UUID eventId,
-                        @Param("destinationId") UUID destinationId,
-                        @Param("attemptNumber") int attemptNumber,
-                        @Param("replaySessionId") UUID replaySessionId,
-                        @Param("claimToken") UUID claimToken);
+        List<IncomingForwardAttempt> claimDue(@Param("now") Instant now,
+                        @Param("claimExpiresAt") Instant claimExpiresAt,
+                        @Param("after") UUID after,
+                        @Param("maxDestinations") int maxDestinations,
+                        @Param("perDestination") int perDestination,
+                        @Param("limit") int limit);
 
         @Modifying
-        // Cleared alongside the status: a swept attempt must not still match its own token.
-        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', " +
-                        "next_retry_at = now(), claim_token = NULL " +
-                        "WHERE status = 'PROCESSING' AND started_at < :threshold", nativeQuery = true)
-        int resetStuckForwardAttempts(@Param("threshold") Instant threshold);
-
-        /**
-         * First dispatch and replay insert PENDING rows with no next_retry_at and rely on the Kafka
-         * message, so a lost message stranded the Forward. Gated on created_at so a just-ingested
-         * Forward is not swept from under its in-flight message.
-         */
-        @Modifying
-        @Query(value = "UPDATE incoming_forward_attempts SET next_retry_at = now() " +
-                        "WHERE status = 'PENDING' AND next_retry_at IS NULL AND created_at < :threshold",
+        @Query(value = "UPDATE incoming_forward_attempts SET status = 'FAILED', finished_at = :now, " +
+                        "error_message = :reason, next_retry_at = NULL, claim_token = NULL " +
+                        "WHERE id = :id AND status = 'PROCESSING' AND claim_token = :claimToken",
                         nativeQuery = true)
-        int resetStrandedPendingForwardAttempts(@Param("threshold") Instant threshold);
-
-        /** CAS on the scheduler's stamp, so a redelivered Kafka message updates no rows. */
-        @Modifying
-        @Query(value = "UPDATE incoming_forward_attempts SET started_at = now(), " +
-                        "claim_token = :claimToken " +
-                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
-                        "AND attempt_number = :attemptNumber AND status = 'PROCESSING' " +
-                        "AND started_at = :expectedStartedAt " +
-                        "AND replay_session_id IS NOT DISTINCT FROM CAST(:replaySessionId AS uuid)",
-                        nativeQuery = true)
-        int claimRetryForProcessing(@Param("eventId") UUID eventId,
-                        @Param("destinationId") UUID destinationId,
-                        @Param("attemptNumber") int attemptNumber,
-                        @Param("replaySessionId") UUID replaySessionId,
-                        @Param("expectedStartedAt") Instant expectedStartedAt,
-                        @Param("claimToken") UUID claimToken);
-
-        /** Matches nothing once any copy of the retry message has claimed the row. */
-        @Modifying
-        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', started_at = NULL, " +
-                        "claim_token = NULL, next_retry_at = :retryAt " +
-                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
-                        "AND attempt_number = :attemptNumber AND status = 'PROCESSING' " +
-                        "AND started_at = :expectedStartedAt " +
-                        "AND replay_session_id IS NOT DISTINCT FROM CAST(:replaySessionId AS uuid)",
-                        nativeQuery = true)
-        int handBackIfStillClaimed(@Param("eventId") UUID eventId,
-                        @Param("destinationId") UUID destinationId,
-                        @Param("attemptNumber") int attemptNumber,
-                        @Param("replaySessionId") UUID replaySessionId,
-                        @Param("expectedStartedAt") Instant expectedStartedAt,
-                        @Param("retryAt") Instant retryAt);
-
-        /** Matches nothing once any copy of the message has claimed the row. */
-        @Modifying
-        @Query(value = "UPDATE incoming_forward_attempts SET next_retry_at = :retryAt " +
-                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
-                        "AND attempt_number = :attemptNumber AND status = 'PENDING' " +
-                        "AND replay_session_id IS NOT DISTINCT FROM CAST(:replaySessionId AS uuid)",
-                        nativeQuery = true)
-        int scheduleIfUnclaimed(@Param("eventId") UUID eventId,
-                        @Param("destinationId") UUID destinationId,
-                        @Param("attemptNumber") int attemptNumber,
-                        @Param("replaySessionId") UUID replaySessionId,
-                        @Param("retryAt") Instant retryAt);
+        int failIfStillClaimed(@Param("id") UUID id,
+                        @Param("claimToken") UUID claimToken,
+                        @Param("reason") String reason,
+                        @Param("now") Instant now);
 
         /**
          * Locks the row for the caller's transaction if it is still held under {@code fence}, so
-         * {@code finalise} cannot overwrite a stuck sweep that committed after its read. The no-op
+         * {@code finalise} cannot overwrite a reclaim that committed after its read. The no-op
          * UPDATE is what takes the lock and re-evaluates the predicate after a concurrent writer.
          */
         @Modifying
@@ -134,19 +86,6 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
         int holdIfStillClaimed(@Param("id") UUID id,
                         @Param("statuses") List<String> statuses,
                         @Param("fence") UUID fence);
-
-        /**
-         * For a send the scheduler could not confirm. It may still land and hand the row to a
-         * consumer, so this must match nothing once a consumer has claimed it.
-         */
-        @Modifying
-        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', started_at = NULL, " +
-                        "claim_token = NULL, next_retry_at = :retryAt " +
-                        "WHERE id = :id AND status = 'PROCESSING' AND started_at = :claimedAt " +
-                        "AND claim_token IS NULL", nativeQuery = true)
-        int handBackSchedulerClaim(@Param("id") UUID id,
-                        @Param("claimedAt") Instant claimedAt,
-                        @Param("retryAt") Instant retryAt);
 
         /**
          * Ages a Forward from its attempt 1 in the same Replay session. Each Attempt is a new row,
@@ -163,10 +102,7 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                         """, nativeQuery = true)
         Instant findOldestPendingForwardStartedAt();
 
-        /**
-         * SKIP LOCKED so two replicas do not publish duplicate DLQ notifications. Only {@code a}
-         * is locked, as Postgres requires for the outer join.
-         */
+        /** SKIP LOCKED so two replicas do not escalate one row; only {@code a}, as the outer join requires. */
         @Query(value = """
                         SELECT a.id FROM incoming_forward_attempts a
                         LEFT JOIN incoming_forward_attempts f

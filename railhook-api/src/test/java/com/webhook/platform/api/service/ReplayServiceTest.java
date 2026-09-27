@@ -5,7 +5,6 @@ import org.junit.jupiter.api.AfterEach;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Event;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.ReplaySession;
 import com.webhook.platform.api.domain.entity.Subscription;
@@ -53,7 +52,6 @@ class ReplayServiceTest {
     @Mock private EventRepository eventRepository;
     @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private DeliveryRepository deliveryRepository;
-    @Mock private OutboxMessageRepository outboxMessageRepository;
     @Mock private ProjectRepository projectRepository;
     @Mock private SequenceGeneratorService sequenceGeneratorService;
     @Mock private PlatformTransactionManager transactionManager;
@@ -80,8 +78,7 @@ class ReplayServiceTest {
 
         replayService = new ReplayService(replaySessionRepository, eventRepository, subscriptionRepository,
                 matchingCache, intake,
-                deliveryRepository, outboxMessageRepository, projectRepository, new ObjectMapper(),
-                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()),
+                deliveryRepository, projectRepository, new ObjectMapper(),
                 sequenceGeneratorService, events, transactionManager, new SimpleMeterRegistry());
 
         ReflectionTestUtils.setField(replayService, "batchSize", 200);
@@ -307,7 +304,6 @@ class ReplayServiceTest {
         when(eventRepository.findByCursorForReplay(any(), eq(projectId), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of(e1), List.of());
         when(deliveryRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         replayService.run(sessionId);
 
@@ -344,7 +340,6 @@ class ReplayServiceTest {
             in.forEach(d -> d.setId(UUID.randomUUID()));
             return in;
         });
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         replayService.run(sessionId);
 
@@ -361,10 +356,6 @@ class ReplayServiceTest {
             assertThat(d.getEndpointId()).isEqualTo(endpointId);
             assertThat(d.getReplaySessionId()).isEqualTo(sessionId);
         });
-
-        ArgumentCaptor<List<OutboxMessage>> outboxCaptor = ArgumentCaptor.forClass(List.class);
-        verify(outboxMessageRepository).saveAll(outboxCaptor.capture());
-        assertThat(outboxCaptor.getValue()).hasSize(2);
     }
 
     @Test
@@ -396,7 +387,6 @@ class ReplayServiceTest {
             in.forEach(d -> d.setId(UUID.randomUUID()));
             return in;
         });
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         replayService.run(sessionId);
 

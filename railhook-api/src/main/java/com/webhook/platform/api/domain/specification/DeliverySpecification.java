@@ -1,7 +1,7 @@
 package com.webhook.platform.api.domain.specification;
 
 import com.webhook.platform.api.domain.entity.Delivery;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;

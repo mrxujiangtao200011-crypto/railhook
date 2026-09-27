@@ -100,7 +100,7 @@ public class SequenceReconciliationService {
         for (Delivery delivery : stranded) {
             try {
                 long sequenceNumber = sequenceGeneratorService.nextSequence(delivery.getEndpointId());
-                if (deliveryRepository.updateSequenceNumber(delivery.getId(), sequenceNumber) > 0) {
+                if (deliveryRepository.updateSequenceNumber(delivery.getId(), sequenceNumber, Instant.now()) > 0) {
                     repaired++;
                     strandedCounter.increment();
                 }

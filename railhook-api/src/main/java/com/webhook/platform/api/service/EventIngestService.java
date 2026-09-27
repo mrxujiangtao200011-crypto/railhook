@@ -23,6 +23,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -31,13 +33,14 @@ import java.util.concurrent.atomic.AtomicReference;
 @Slf4j
 public class EventIngestService {
 
+    // Sent unordered if numbering after commit fails, as before; the reconciliation job numbers it later.
+    private static final Duration UNNUMBERED_ORDERED_DELAY = Duration.ofMinutes(2);
+
     private final EventRepository eventRepository;
     private final EventIntake eventIntake;
     private final DeliveryRepository deliveryRepository;
-    private final OutboxMessageRepository outboxMessageRepository;
     private final WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository;
     private final ObjectMapper objectMapper;
-    private final DeliveryDispatch deliveryDispatch;
     private final MeterRegistry meterRegistry;
     private final Counter eventsIngestedCounter;
     private final Counter duplicateEventsCounter;
@@ -58,10 +61,8 @@ public class EventIngestService {
             EventRepository eventRepository,
             EventIntake eventIntake,
             DeliveryRepository deliveryRepository,
-            OutboxMessageRepository outboxMessageRepository,
             WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository,
             ObjectMapper objectMapper,
-            DeliveryDispatch deliveryDispatch,
             MeterRegistry meterRegistry,
             SequenceGeneratorService sequenceGeneratorService,
             SchemaValidationGate schemaValidationGate,
@@ -74,10 +75,8 @@ public class EventIngestService {
         this.eventRepository = eventRepository;
         this.eventIntake = eventIntake;
         this.deliveryRepository = deliveryRepository;
-        this.outboxMessageRepository = outboxMessageRepository;
         this.workflowTriggerOutboxRepository = workflowTriggerOutboxRepository;
         this.objectMapper = objectMapper;
-        this.deliveryDispatch = deliveryDispatch;
         this.meterRegistry = meterRegistry;
         // Registered eagerly so a quiet deployment exports 0 instead of "No data".
         this.eventsIngestedCounter = Counter.builder("events_ingested_total").tag("direction", "outgoing")
@@ -143,7 +142,7 @@ public class EventIngestService {
         for (Delivery delivery : deliveries) {
             try {
                 long sequenceNumber = sequenceGeneratorService.nextSequence(delivery.getEndpointId());
-                int updated = deliveryRepository.updateSequenceNumber(delivery.getId(), sequenceNumber);
+                int updated = deliveryRepository.updateSequenceNumber(delivery.getId(), sequenceNumber, Instant.now());
                 if (updated == 0) {
                     log.warn("Delivery {} disappeared before post-commit sequence backfill (seq {} for endpoint {} left unused)",
                             delivery.getId(), sequenceNumber, delivery.getEndpointId());
@@ -218,6 +217,12 @@ public class EventIngestService {
             return buildResponse(event, 0, schemaWarnings);
         }
 
+        Instant unnumberedDueAt = Instant.now().plus(UNNUMBERED_ORDERED_DELAY);
+        for (Delivery delivery : decision.deliveries()) {
+            if (Boolean.TRUE.equals(delivery.getOrderingEnabled())) {
+                delivery.setNextRetryAt(unnumberedDueAt);
+            }
+        }
         List<Delivery> savedDeliveries = deliveryRepository.saveAll(decision.deliveries());
 
         for (Delivery delivery : savedDeliveries) {
@@ -225,12 +230,6 @@ public class EventIngestService {
                 pendingSequenceAssignment.add(delivery);
             }
         }
-
-        List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
-        for (Delivery delivery : savedDeliveries) {
-            outboxMessages.add(deliveryDispatch.outboxFor(delivery, projectId, DeliveryDispatch.Reason.CREATED));
-        }
-        outboxMessageRepository.saveAll(outboxMessages);
 
         int deliveriesCreated = savedDeliveries.size();
         deliveriesCreatedCounter.increment(deliveriesCreated);

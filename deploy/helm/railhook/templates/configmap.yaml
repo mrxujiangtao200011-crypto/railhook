@@ -10,8 +10,6 @@ data:
   DB_NAME: {{ .Values.postgresql.auth.database | default .Values.postgresql.external.database | quote }}
   DB_USER: {{ .Values.postgresql.auth.username | default .Values.postgresql.external.username | quote }}
   
-  KAFKA_BOOTSTRAP_SERVERS: {{ include "railhook.kafka.bootstrapServers" . | quote }}
-  
   REDIS_HOST: {{ include "railhook.redis.host" . | quote }}
   REDIS_PORT: {{ include "railhook.redis.port" . | quote }}
 

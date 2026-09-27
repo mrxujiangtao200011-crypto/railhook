@@ -11,7 +11,7 @@ Railhook retries a delivery on a fixed schedule, the **retry ladder**, until the
 | Status | Meaning |
 |---|---|
 | `PENDING` | Created, or waiting for its next attempt to be due. |
-| `PROCESSING` | Claimed by a worker for one attempt. A delivery left here by a worker that died is handed back to `PENDING`. |
+| `PROCESSING` | Claimed by a worker for one attempt. If the worker dies, another worker claims the delivery again once the claim times out (`WEBHOOK_CLAIM_TIMEOUT_SECONDS`, 300 by default). |
 | `SUCCESS` | The endpoint answered `2xx`. Nothing more is sent. |
 | `FAILED` | Given up on because nobody can make another attempt help: the URL is refused, or the endpoint cannot receive it. |
 | `DLQ` | The ladder ran out, the endpoint answered with a status another attempt will not change, or the delivery outlived the age cap. Shown in the dashboard as **Failed Messages**. |

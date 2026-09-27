@@ -13,17 +13,16 @@ The installer stops without Docker, Compose, 2 GiB of RAM or a free port, and wa
 | Docker | Docker Engine 20.10 or newer, with the daemon running and reachable by your user |
 | Compose | Compose v2, as `docker compose` or the standalone `docker-compose` |
 | Memory | About 4 GiB. Between 2 and 4 GiB the installer warns you to expect swapping; below 2 GiB it stops |
-| Disk | At least 5 GiB free for the images, plus room for the database and the Kafka log. The installer warns below 5 GiB |
+| Disk | At least 5 GiB free for the images, plus room for the database. The installer warns below 5 GiB |
 | Tools | `curl` and `openssl`, which the installer uses to download files and generate secrets |
 
-The stack runs two JVMs, a broker, a database and a cache. Default memory limits per container, each set in `.env`:
+The stack runs two JVMs, a database and a cache. The default memory limits per container, each set in `.env`, add up to about 3.1 GiB:
 
 | Service | Limit | Variable |
 |---|---|---|
 | `api` | 768m | `API_MEMORY_LIMIT` |
 | `worker` | 768m | `WORKER_MEMORY_LIMIT` |
 | `postgres` | 1G | `POSTGRES_MEMORY_LIMIT` |
-| `kafka` | 1G | `KAFKA_MEMORY_LIMIT` |
 | `redis` | 512m | `REDIS_MEMORY_LIMIT` |
 | `ui` | 128m | `UI_MEMORY_LIMIT` |
 
@@ -49,4 +48,4 @@ By default Railhook refuses private and internal IP addresses, so an endpoint ca
 
 ## Kubernetes
 
-The Helm chart needs Kubernetes 1.24+ and Helm 3.8+, plus PostgreSQL 16+, Kafka 3.7+ and Redis 7+ that you supply. See [Kubernetes](/docs/self-hosting/kubernetes/).
+The Helm chart needs Kubernetes 1.24+ and Helm 3.8+, plus PostgreSQL 16+ and Redis 7+ that you supply. See [Kubernetes](/docs/self-hosting/kubernetes/).

@@ -32,7 +32,7 @@ groups:
         annotations:
           summary: "Disk {{ $labels.device }} is {{ $value | printf \"%.0f\" }}% full"
           description: |
-            Postgres, Kafka and the backups share this disk. Postgres stops accepting writes
+            Postgres and the backups share this disk. Postgres stops accepting writes
             when it is full, which stops every event from being accepted. Check backups/ and
             `docker system df` first.
 

@@ -1,10 +1,9 @@
 package com.webhook.platform.worker;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.RailhookSignature;
 import com.webhook.platform.worker.domain.entity.Delivery;
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -29,8 +27,8 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.kafka.KafkaContainer;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -45,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-// Real Kafka, Redis and Postgres: unlike api's AbstractIntegrationTest, nothing is mocked or excluded.
+// Real Redis and Postgres: unlike api's AbstractIntegrationTest, nothing is mocked or excluded.
 @SpringBootTest(classes = WebhookPlatformWorkerApplication.class)
 @Testcontainers
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -67,9 +65,6 @@ class DeliveryEndToEndIntegrationTest {
             .withPassword("test");
 
     @Container
-    static final KafkaContainer KAFKA = new KafkaContainer("apache/kafka:3.7.0");
-
-    @Container
     static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine")
             .withExposedPorts(6379);
 
@@ -83,8 +78,6 @@ class DeliveryEndToEndIntegrationTest {
         // The worker owns no migrations, so Hibernate derives the schema from its entities.
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
 
-        registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
-
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
         registry.add("spring.data.redis.password", () -> "");
@@ -94,11 +87,7 @@ class DeliveryEndToEndIntegrationTest {
         // WireMock runs on localhost:<random port> - the SSRF guard must not block it.
         registry.add("webhook.url-validation.allow-private-ips", () -> "true");
 
-        // Fast enough to observe, slow enough not to race in-flight attempts between tests.
-        registry.add("retry.scheduler.poll-interval-ms", () -> "500");
-        registry.add("retry.scheduler.reschedule-delay-seconds", () -> "1");
-        registry.add("stuck-delivery.check-interval-ms", () -> "500");
-        registry.add("stuck-delivery.threshold-minutes", () -> "1");
+        registry.add("webhook.claim.idle-poll-ms", () -> "100");
         // The burst still drains through the fallback poll; the 5s default nearly ate the await budget.
         registry.add("ordering.buffer-reschedule-delay-seconds", () -> "1");
 
@@ -143,8 +132,6 @@ class DeliveryEndToEndIntegrationTest {
     private DeliveryAttemptRepository deliveryAttemptRepository;
     @Autowired
     private EncryptionKeyRegistry encryptionKeyRegistry;
-    @Autowired
-    private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
@@ -191,30 +178,21 @@ class DeliveryEndToEndIntegrationTest {
                 .endpointId(endpointId)
                 .subscriptionId(UUID.randomUUID())
                 .deliveryOrigin(Delivery.DeliveryOrigin.SUBSCRIPTION)
-                .status(Delivery.DeliveryStatus.PENDING)
+                .status(DeliveryStatus.PENDING)
                 .attemptCount(0)
                 .maxAttempts(maxAttempts)
                 .orderingEnabled(false)
                 .timeoutSeconds(timeoutSeconds)
                 .retryDelays(retryDelays)
+                .nextRetryAt(Instant.now())
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
         return deliveryRepository.save(delivery);
     }
 
-    // Exactly the record OutboxPublisherService's Phase 2 send publishes.
-    private void publishDispatch(Delivery delivery) {
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(delivery.getId())
-                .eventId(delivery.getEventId())
-                .endpointId(delivery.getEndpointId())
-                .subscriptionId(delivery.getSubscriptionId())
-                .status(delivery.getStatus().name())
-                .attemptCount(delivery.getAttemptCount())
-                .orderingEnabled(delivery.getOrderingEnabled())
-                .build();
-        kafkaTemplate.send(KafkaTopics.DELIVERIES_DISPATCH, delivery.getEndpointId().toString(), message);
+    private void dueAt(UUID deliveryId, Instant at) {
+        jdbcTemplate.update("UPDATE deliveries SET next_retry_at = ? WHERE id = ?", Timestamp.from(at), deliveryId);
     }
 
     private Delivery reload(UUID deliveryId) {
@@ -235,10 +213,8 @@ class DeliveryEndToEndIntegrationTest {
 
         wireMock.stubFor(WireMock.post(urlEqualTo(path)).willReturn(aResponse().withStatus(200)));
 
-        publishDispatch(reload(deliveryId));
-
         await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+                .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
 
         Delivery finalDelivery = reload(deliveryId);
         assertEquals(1, finalDelivery.getAttemptCount());
@@ -278,11 +254,8 @@ class DeliveryEndToEndIntegrationTest {
                 .whenScenarioStateIs("recovered")
                 .willReturn(aResponse().withStatus(200)));
 
-        publishDispatch(reload(deliveryId));
-
-        // RetryGovernor backs off to 30s while the retry queue is empty, so give headroom past that.
-        await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
 
         Delivery finalDelivery = reload(deliveryId);
         assertEquals(2, finalDelivery.getAttemptCount(), "one failed attempt + one successful retry");
@@ -303,11 +276,8 @@ class DeliveryEndToEndIntegrationTest {
 
         wireMock.stubFor(WireMock.post(urlEqualTo(path)).willReturn(aResponse().withStatus(500)));
 
-        publishDispatch(reload(deliveryId));
-
-        // Same RetryGovernor headroom as above.
-        await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.DLQ, reload(deliveryId).getStatus()));
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(DeliveryStatus.DLQ, reload(deliveryId).getStatus()));
 
         Delivery finalDelivery = reload(deliveryId);
         assertEquals(2, finalDelivery.getAttemptCount());
@@ -315,7 +285,7 @@ class DeliveryEndToEndIntegrationTest {
         wireMock.verify(2, postRequestedFor(urlEqualTo(path)));
     }
 
-    // Pins three fixes: the claim leaves PROCESSING, the sweep recovers it, a late response is fenced out.
+    // Pins three fixes: the claim leaves PROCESSING, a timed-out claim is taken again, a late response is fenced out.
     @Test
     void retryClaimedThenAbandoned_isRecoveredNotStranded() {
         UUID endpointId = UUID.randomUUID();
@@ -342,13 +312,10 @@ class DeliveryEndToEndIntegrationTest {
                 .whenScenarioStateIs("up")
                 .willReturn(aResponse().withStatus(200)));
 
-        publishDispatch(reload(deliveryId));
-
-        // The claim flips PENDING -> PROCESSING with attemptCount still 1; headroom for RetryGovernor's backoff.
-        await().atMost(Duration.ofSeconds(50)).pollInterval(Duration.ofMillis(150))
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(150))
                 .untilAsserted(() -> {
                     Delivery d = reload(deliveryId);
-                    assertEquals(Delivery.DeliveryStatus.PROCESSING, d.getStatus());
+                    assertEquals(DeliveryStatus.PROCESSING, d.getStatus());
                 });
 
         // Wait until the slow second attempt has started.
@@ -358,23 +325,15 @@ class DeliveryEndToEndIntegrationTest {
         // Anchored after WireMock began holding, so anchor + hold is never before the response lands.
         long heldResponseAnchor = System.currentTimeMillis();
 
-        // Backdate the claim so it looks abandoned, without waiting wall-clock time.
-        int updated = jdbcTemplate.update(
-                "UPDATE deliveries SET last_attempt_at = now() - interval '2 minutes', "
-                        + "updated_at = now() - interval '2 minutes' WHERE id = ?",
-                deliveryId);
-        assertEquals(1, updated, "must have backdated exactly the delivery under test");
+        // Time the claim out so its holder looks lost, without waiting wall-clock time.
+        dueAt(deliveryId, Instant.now().minusSeconds(1));
 
-        // Asserted through attempt_count: PENDING is a window narrower than any poll interval.
-        // Only a claim the sweep handed back can start a third attempt.
         await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(150))
                 .untilAsserted(() -> assertTrue(reload(deliveryId).getAttemptCount() >= 3,
-                        "the stuck sweep must hand the abandoned claim back to the retry ladder, "
-                                + "which then starts a third attempt"));
+                        "a timed-out claim must be taken again and start a third attempt"));
 
-        // The retry ladder must pick the recovered row up and complete it with a third attempt.
-        await().atMost(Duration.ofSeconds(50)).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
 
         Instant succeededAtFromThirdAttempt = reload(deliveryId).getSucceededAt();
         assertNotNull(succeededAtFromThirdAttempt);
@@ -392,17 +351,15 @@ class DeliveryEndToEndIntegrationTest {
         }
 
         Delivery finalDelivery = reload(deliveryId);
-        assertEquals(Delivery.DeliveryStatus.SUCCESS, finalDelivery.getStatus());
+        assertEquals(DeliveryStatus.SUCCESS, finalDelivery.getStatus());
         assertEquals(succeededAtFromThirdAttempt, finalDelivery.getSucceededAt(),
                 "a late-arriving response for an already-abandoned attempt must not re-write "
                         + "succeededAt over what the attempt that actually finalized the delivery wrote");
-        // A lower bound: whether recovery needs one more attempt depends on the next sweep; both are correct.
         wireMock.verify(moreThanOrExactly(3), postRequestedFor(urlEqualTo(path)));
     }
 
-    // Redelivery of a terminal delivery is stopped by processDelivery's PROCESSING entry check.
     @Test
-    void duplicateKafkaMessage_afterSuccess_isNotRedelivered() {
+    void aSucceededDeliveryIsNotClaimedAgainEvenWithAStaleDueTime() {
         UUID endpointId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
         UUID deliveryId = UUID.randomUUID();
@@ -414,32 +371,17 @@ class DeliveryEndToEndIntegrationTest {
 
         wireMock.stubFor(WireMock.post(urlEqualTo(path)).willReturn(aResponse().withStatus(200)));
 
-        publishDispatch(reload(deliveryId));
-
         await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+                .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
         Instant succeededAt = reload(deliveryId).getSucceededAt();
-        wireMock.verify(1, postRequestedFor(urlEqualTo(path)));
+        dueAt(deliveryId, Instant.now().minusSeconds(60));
 
-        Delivery successState = reload(deliveryId);
-        DeliveryMessage duplicate = DeliveryMessage.builder()
-                .deliveryId(successState.getId())
-                .eventId(successState.getEventId())
-                .endpointId(successState.getEndpointId())
-                .subscriptionId(successState.getSubscriptionId())
-                .status(successState.getStatus().name())
-                .attemptCount(successState.getAttemptCount())
-                .build();
-        kafkaTemplate.send(KafkaTopics.DELIVERIES_DISPATCH, endpointId.toString(), duplicate);
-        kafkaTemplate.send(KafkaTopics.DELIVERIES_RETRY_1M, endpointId.toString(), duplicate);
-
-        await().pollDelay(Duration.ofSeconds(5)).atMost(Duration.ofSeconds(10))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+        await().pollDelay(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
 
         Delivery finalDelivery = reload(deliveryId);
-        assertEquals(Delivery.DeliveryStatus.SUCCESS, finalDelivery.getStatus());
         assertEquals(succeededAt, finalDelivery.getSucceededAt(), "the original SUCCESS write must not be re-committed");
-        assertEquals(1, finalDelivery.getAttemptCount(), "a duplicate message must not trigger a second HTTP attempt");
+        assertEquals(1, finalDelivery.getAttemptCount());
         wireMock.verify(1, postRequestedFor(urlEqualTo(path)));
     }
 
@@ -459,10 +401,8 @@ class DeliveryEndToEndIntegrationTest {
         wireMock.stubFor(WireMock.post(urlEqualTo(path))
                 .willReturn(aResponse().withStatus(200).withFixedDelay(950)));
 
-        publishDispatch(reload(deliveryId));
-
         await().atMost(Duration.ofSeconds(20)).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+                .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
 
         try {
             TimeUnit.SECONDS.sleep(3);
@@ -471,7 +411,7 @@ class DeliveryEndToEndIntegrationTest {
         }
 
         Delivery finalDelivery = reload(deliveryId);
-        assertEquals(Delivery.DeliveryStatus.SUCCESS, finalDelivery.getStatus());
+        assertEquals(DeliveryStatus.SUCCESS, finalDelivery.getStatus());
         assertEquals(1, finalDelivery.getAttemptCount());
         wireMock.verify(1, postRequestedFor(urlEqualTo(path)));
     }
@@ -485,13 +425,14 @@ class DeliveryEndToEndIntegrationTest {
                 .endpointId(endpointId)
                 .subscriptionId(UUID.randomUUID())
                 .deliveryOrigin(Delivery.DeliveryOrigin.SUBSCRIPTION)
-                .status(Delivery.DeliveryStatus.PENDING)
+                .status(DeliveryStatus.PENDING)
                 .attemptCount(0)
                 .maxAttempts(maxAttempts)
                 .orderingEnabled(true)
                 .sequenceNumber(sequenceNumber)
                 .timeoutSeconds(timeoutSeconds)
                 .retryDelays(retryDelays)
+                .nextRetryAt(Instant.now())
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
@@ -499,7 +440,7 @@ class DeliveryEndToEndIntegrationTest {
     }
 
     @Test
-    void orderedDeliveries_publishedOutOfOrderWithAnInducedRetry_arriveAtWireMockInOrder() {
+    void orderedDeliveries_dueOutOfOrderWithAnInducedRetry_arriveAtWireMockInOrder() {
         UUID endpointId = UUID.randomUUID();
         String path = "/hook/ordered-" + endpointId;
         createEndpoint(endpointId, path);
@@ -515,6 +456,7 @@ class DeliveryEndToEndIntegrationTest {
             createEvent(eventIds[i], "{\"n\":" + seq + "}");
             // Tight retry ladder so the induced failure on seq 3 resolves quickly.
             deliveries[i] = createOrderedPendingDelivery(deliveryId, eventIds[i], endpointId, seq, 5, "1", 30);
+            dueAt(deliveryId, Instant.now().plusSeconds(3600));
         }
 
         // Catch-all, lowest priority.
@@ -536,16 +478,17 @@ class DeliveryEndToEndIntegrationTest {
                 .whenScenarioStateIs("seq3-recovered")
                 .willReturn(aResponse().withStatus(200)));
 
-        // Out of order on purpose: the buffer, not publish order, must enforce FIFO.
-        int[] publishOrder = {4, 2, 5, 1, 3};
-        for (int seq : publishOrder) {
-            publishDispatch(deliveries[seq - 1]);
+        // Out of order on purpose: the buffer, not the order rows fall due, must enforce FIFO.
+        int[] dueOrder = {4, 2, 5, 1, 3};
+        Instant first = Instant.now().minusSeconds(dueOrder.length);
+        for (int k = 0; k < dueOrder.length; k++) {
+            dueAt(deliveries[dueOrder[k] - 1].getId(), first.plusSeconds(k));
         }
 
         for (Delivery delivery : deliveries) {
             UUID deliveryId = delivery.getId();
             await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(200))
-                    .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+                    .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
         }
 
         // Only the terminal 200s reflect release order; seq 3 also got a 500.
@@ -571,7 +514,7 @@ class DeliveryEndToEndIntegrationTest {
 
         assertEquals(java.util.List.of(1, 2, 3, 4, 5), arrivalOrder,
                 "ordering-enabled deliveries must reach the endpoint in strict sequence order despite "
-                        + "an out-of-order publish and an induced mid-range retry");
+                        + "rows falling due out of order and an induced mid-range retry");
     }
 
     // Deletes only seq:* keys: FLUSHALL also wipes the semaphore keys and stalls delivery for another reason.
@@ -588,9 +531,8 @@ class DeliveryEndToEndIntegrationTest {
         createEvent(event1, "{\"n\":1}");
         Delivery delivery1 = createOrderedPendingDelivery(delivery1Id, event1, endpointId, 1, 5, "1", 30);
 
-        publishDispatch(delivery1);
         await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(delivery1Id).getStatus()));
+                .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(delivery1Id).getStatus()));
 
         redissonClient.getKeys().deleteByPattern("seq:*");
 
@@ -598,20 +540,18 @@ class DeliveryEndToEndIntegrationTest {
         UUID delivery2Id = UUID.randomUUID();
         createEvent(event2, "{\"n\":2}");
         Delivery delivery2 = createOrderedPendingDelivery(delivery2Id, event2, endpointId, 2, 5, "1", 30);
-        publishDispatch(delivery2);
 
         // Well inside the 60s gap timeout: a desynced cursor would drain only via that timeout.
         await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(delivery2Id).getStatus()));
+                .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(delivery2Id).getStatus()));
 
         UUID event3 = UUID.randomUUID();
         UUID delivery3Id = UUID.randomUUID();
         createEvent(event3, "{\"n\":3}");
         Delivery delivery3 = createOrderedPendingDelivery(delivery3Id, event3, endpointId, 3, 5, "1", 30);
-        publishDispatch(delivery3);
 
         await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(delivery3Id).getStatus()));
+                .untilAsserted(() -> assertEquals(DeliveryStatus.SUCCESS, reload(delivery3Id).getStatus()));
 
         java.util.List<com.github.tomakehurst.wiremock.stubbing.ServeEvent> calls = wireMock.getAllServeEvents();
         calls.sort(java.util.Comparator.comparing(e -> e.getRequest().getLoggedDate()));

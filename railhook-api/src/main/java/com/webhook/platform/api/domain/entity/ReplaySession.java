@@ -1,6 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.ReplaySessionStatus;
 import jakarta.persistence.*;
 import lombok.*;

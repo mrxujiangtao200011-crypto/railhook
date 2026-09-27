@@ -1,7 +1,7 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.UsageDaily;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;

@@ -43,8 +43,8 @@ node --test load/receiver/server.test.js
 
 - Ingestion: k6 `http_reqs` rate against `TARGET_RPS`, and whether `ingest_errors` or 429s climb.
 - End-to-end latency: `GET http://localhost:9000/_control/summary` returns `latencyMsP50` and
-  `latencyMsP99`, measured from `data.sentAtMs`. It includes outbox, Kafka and worker time.
-- Outbox backlog: `watch -n5 ./load/scripts/outbox-depth.sh`.
+  `latencyMsP99`, measured from `data.sentAtMs`. It includes the time a delivery waits to be claimed and worker time.
+- Delivery backlog (due but not yet finished): `watch -n5 ./load/scripts/queue-depth.sh`.
 - Ordering: `ordering.js` exits non-zero if sequences arrive out of order or fewer than
   `BURST_SIZE` arrive. Give `RETRY_WAIT_SECONDS` room for the first retry at maximum jitter plus
   one retry poll.
@@ -73,4 +73,4 @@ with other work and fill this in.
 | Events ingested/sec | | RPS, VUs, hardware |
 | Deliveries/sec | | endpoint count, ordering on/off |
 | p99 end-to-end latency | | healthy endpoint, no backlog |
-| Outbox backlog onset | | RPS at which the outbox stops draining |
+| Delivery backlog onset | | RPS at which due deliveries stop draining |

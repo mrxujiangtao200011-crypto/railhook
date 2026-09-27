@@ -63,7 +63,7 @@ class AlertRuleParityTest {
         for (String metric : new String[]{
                 "delivery_oldest_pending_age_seconds",
                 "circuit_breaker_degraded_total",
-                "outbox_oldest_pending_age_seconds"}) {
+                "forward_oldest_pending_age_seconds"}) {
             assertTrue(compose.contains(metric),
                     metric + " is named in the observability guide as one of the three signals to "
                             + "alert on, but no Compose rule uses it.");

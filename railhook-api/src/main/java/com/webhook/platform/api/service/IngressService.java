@@ -6,7 +6,6 @@ import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.api.domain.entity.IncomingSource;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
@@ -15,7 +14,6 @@ import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.common.demo.DemoTenant;
@@ -65,9 +63,7 @@ public class IngressService {
     private final IncomingEventRepository eventRepository;
     private final IncomingDestinationRepository destinationRepository;
     private final IncomingForwardAttemptRepository forwardAttemptRepository;
-    private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
-    private final ForwardDispatch forwardDispatch;
     private final MeterRegistry meterRegistry;
     private final Counter incomingEventsIngestedCounter;
     private final WebhookVerifierFactory verifierFactory;
@@ -88,9 +84,7 @@ public class IngressService {
             IncomingEventRepository eventRepository,
             IncomingDestinationRepository destinationRepository,
             IncomingForwardAttemptRepository forwardAttemptRepository,
-            OutboxMessageRepository outboxMessageRepository,
             ObjectMapper objectMapper,
-            ForwardDispatch forwardDispatch,
             MeterRegistry meterRegistry,
             WebhookVerifierFactory verifierFactory,
             ReplayDetectionService replayDetectionService,
@@ -108,9 +102,7 @@ public class IngressService {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.forwardAttemptRepository = forwardAttemptRepository;
-        this.outboxMessageRepository = outboxMessageRepository;
         this.objectMapper = objectMapper;
-        this.forwardDispatch = forwardDispatch;
         this.meterRegistry = meterRegistry;
         // Shared with the /events path. Registered eagerly so an idle deployment exports 0.
         this.incomingEventsIngestedCounter = Counter.builder("events_ingested_total").tag("direction", "incoming")
@@ -416,7 +408,6 @@ public class IngressService {
 
         if (!destinations.isEmpty()) {
             List<IncomingForwardAttempt> attempts = new ArrayList<>(destinations.size());
-            List<OutboxMessage> outboxMessages = new ArrayList<>(destinations.size());
 
             for (IncomingDestination destination : destinations) {
                 attempts.add(IncomingForwardAttempt.builder()
@@ -425,14 +416,9 @@ public class IngressService {
                         .attemptNumber(1)
                         .status(ForwardAttemptStatus.PENDING)
                         .build());
-
-                outboxMessages.add(forwardDispatch.outboxFor(event.getId(), source.getId(),
-                        destination.getId(), source.getProjectId(), 0, null,
-                        ForwardDispatch.Reason.CREATED));
             }
 
             forwardAttemptRepository.saveAll(attempts);
-            outboxMessageRepository.saveAll(outboxMessages);
         }
 
         return event;

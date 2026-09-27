@@ -47,12 +47,14 @@ export default function ReliabilitySection() {
           </div>
 
           <figure className="mt-[72px] min-[901px]:mt-[110px]">
-            <div className="lp-flow" role="img" aria-label={t('landing.reliability.pipeAria')}>
+            <div className="lp-flow lp-flow--4" role="img" aria-label={t('landing.reliability.pipeAria')}>
               <Node>POST /api/v1/events</Node>
               <Wire mark="✓">{t('landing.reliability.written')}</Wire>
-              <Node>Kafka</Node>
+              <Node>PostgreSQL</Node>
               <Wire mark="✓">{t('landing.reliability.pickedUp')}</Wire>
               <Node hl>{t('landing.reliability.worker')}</Node>
+              <Wire mark="✓">{t('landing.reliability.sent')}</Wire>
+              <Node>{t('landing.reliability.endpoint')}</Node>
             </div>
             <figcaption className="mt-12 text-center font-mono text-xs uppercase leading-snug tracking-[0.08em] text-[#9C9C9C] min-[901px]:mt-[70px]">
               {t('landing.reliability.caption')}

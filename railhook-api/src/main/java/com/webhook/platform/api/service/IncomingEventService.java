@@ -5,14 +5,12 @@ import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.api.domain.entity.IncomingSource;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.IncomingBulkReplayRequest;
 import com.webhook.platform.api.dto.IncomingBulkReplayResponse;
@@ -47,10 +45,8 @@ public class IncomingEventService {
     private final IncomingSourceRepository sourceRepository;
     private final IncomingForwardAttemptRepository forwardAttemptRepository;
     private final IncomingDestinationRepository destinationRepository;
-    private final OutboxMessageRepository outboxMessageRepository;
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
-    private final ForwardDispatch forwardDispatch;
     private final TransactionTemplate txTemplate;
     private final PiiMaskingService piiMaskingService;
 
@@ -59,20 +55,16 @@ public class IncomingEventService {
             IncomingSourceRepository sourceRepository,
             IncomingForwardAttemptRepository forwardAttemptRepository,
             IncomingDestinationRepository destinationRepository,
-            OutboxMessageRepository outboxMessageRepository,
             ProjectRepository projectRepository,
             ObjectMapper objectMapper,
-            ForwardDispatch forwardDispatch,
             PlatformTransactionManager txManager,
             PiiMaskingService piiMaskingService) {
         this.eventRepository = eventRepository;
         this.sourceRepository = sourceRepository;
         this.forwardAttemptRepository = forwardAttemptRepository;
         this.destinationRepository = destinationRepository;
-        this.outboxMessageRepository = outboxMessageRepository;
         this.projectRepository = projectRepository;
         this.objectMapper = objectMapper;
-        this.forwardDispatch = forwardDispatch;
         this.txTemplate = new TransactionTemplate(txManager);
         this.piiMaskingService = piiMaskingService;
     }
@@ -168,16 +160,7 @@ public class IncomingEventService {
                     .status(ForwardAttemptStatus.PENDING)
                     .build();
             forwardAttemptRepository.save(attempt);
-
-            try {
-                outboxMessageRepository.save(forwardDispatch.outboxFor(eventId,
-                        event.getIncomingSourceId(), destination.getId(), projectId,
-                        1, replaySessionId, ForwardDispatch.Reason.REPLAY));
-                replayed++;
-            } catch (Exception e) {
-                log.error("Failed to create replay outbox message: eventId={}, destId={}",
-                        eventId, destination.getId(), e);
-            }
+            replayed++;
         }
 
         log.debug("Replayed incoming event {} to {} destinations", eventId, replayed);
@@ -250,8 +233,6 @@ public class IncomingEventService {
                                        UUID sourceId, UUID projectId, UUID replaySessionId) {
         Integer result = txTemplate.execute(status -> {
             List<IncomingForwardAttempt> attemptsToSave = new ArrayList<>();
-            List<OutboxMessage> outboxToSave = new ArrayList<>();
-            int errors = 0;
 
             for (IncomingEvent event : events) {
                 for (IncomingDestination destination : destinations) {
@@ -262,22 +243,11 @@ public class IncomingEventService {
                             .replaySessionId(replaySessionId)
                             .status(ForwardAttemptStatus.PENDING)
                             .build());
-
-                    try {
-                        outboxToSave.add(forwardDispatch.outboxFor(event.getId(), sourceId,
-                                destination.getId(), projectId, 1, replaySessionId,
-                                ForwardDispatch.Reason.BULK_REPLAY));
-                    } catch (Exception e) {
-                        log.error("Failed to create bulk replay outbox: eventId={}, destId={}",
-                                event.getId(), destination.getId(), e);
-                        errors++;
-                    }
                 }
             }
 
             forwardAttemptRepository.saveAll(attemptsToSave);
-            outboxMessageRepository.saveAll(outboxToSave);
-            return outboxToSave.size();
+            return attemptsToSave.size();
         });
         return result != null ? result : 0;
     }
