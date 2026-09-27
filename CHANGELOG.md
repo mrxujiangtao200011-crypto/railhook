@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-09-28
+
 ### Removed
 
 - Kafka. The api writes a delivery or forward row and the worker claims due rows from PostgreSQL, so the stack is PostgreSQL, Redis, api, worker and ui. The outbox table, its publisher, the retry scheduler, the stuck and stranded sweeps and the DLQ topics are gone with it.
