@@ -377,8 +377,10 @@ class DeliveryServiceTest {
         when(projectRepository.findById(projectId))
                 .thenReturn(Optional.of(Project.builder().id(projectId).organizationId(UUID.randomUUID()).build()));
 
+        AuthContext otherProjectKey = new AuthContext(null, orgId, MembershipRole.API_KEY, UUID.randomUUID(), null);
+
         BulkReplayResponse response = deliveryService.bulkReplayDeliveries(
-                List.of(deliveryId), null, null, null, null, auth);
+                List.of(deliveryId), null, null, null, null, otherProjectKey);
 
         assertThat(response.getReplayed()).isZero();
         assertThat(response.getSkipped()).isEqualTo(1);

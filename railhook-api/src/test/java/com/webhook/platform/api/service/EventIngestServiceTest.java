@@ -299,6 +299,8 @@ class EventIngestServiceTest {
             return deliveries;
         });
 
+        when(workflowTriggerOutboxRepository.save(any()))
+                .thenThrow(new RuntimeException("simulated failure"));
         stubTransactionTemplate();
 
         assertThatThrownBy(() -> service.ingestEvent(projectId, request, null))

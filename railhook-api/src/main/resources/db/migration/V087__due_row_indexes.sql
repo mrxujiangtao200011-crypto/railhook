@@ -1,3 +1,4 @@
+-- flyway:executeInTransaction=false
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_deliveries_due
     ON deliveries (endpoint_id, next_retry_at) WHERE status IN ('PENDING', 'PROCESSING');
 
