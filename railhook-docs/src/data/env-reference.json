@@ -183,83 +183,6 @@
       ]
     },
     {
-      "title": "Kafka configuration",
-      "variables": [
-        {
-          "name": "KAFKA_BOOTSTRAP_SERVERS",
-          "default": "kafka:9092",
-          "example": null,
-          "description": "Kafka bootstrap servers: kafka:9092 in embedded mode, your cluster otherwise."
-        },
-        {
-          "name": "KAFKA_IMAGE",
-          "default": "apache/kafka:3.7.0",
-          "example": null,
-          "description": "Kafka bootstrap servers: kafka:9092 in embedded mode, your cluster otherwise."
-        },
-        {
-          "name": "KAFKA_NUM_PARTITIONS",
-          "default": "12",
-          "example": null,
-          "description": "Partitions per topic; the ceiling on consumer parallelism."
-        },
-        {
-          "name": "KAFKA_CONSUMER_GROUP_ID",
-          "default": "webhook-worker",
-          "example": null,
-          "description": "Consumer group IDs; prefix them with the environment on a shared cluster."
-        },
-        {
-          "name": "KAFKA_INCOMING_GROUP_ID",
-          "default": "incoming-forward-worker",
-          "example": null,
-          "description": "Consumer group IDs; prefix them with the environment on a shared cluster."
-        },
-        {
-          "name": "KAFKA_DELIVERY_CONCURRENCY",
-          "default": "6",
-          "example": null,
-          "description": "Outgoing delivery consumer threads; keep at or below KAFKA_NUM_PARTITIONS."
-        },
-        {
-          "name": "KAFKA_INCOMING_CONCURRENCY",
-          "default": "3",
-          "example": null,
-          "description": "Incoming forward consumer threads; keep at or below KAFKA_NUM_PARTITIONS."
-        },
-        {
-          "name": "KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS",
-          "default": "120000",
-          "example": null,
-          "description": "How long one producer send may keep retrying (ms); an expired send is retried from the outbox."
-        },
-        {
-          "name": "KAFKA_PRODUCER_MAX_BLOCK_MS",
-          "default": "10000",
-          "example": null,
-          "description": "How long send() may block on cluster metadata (ms). Kafka's 60s default would hold the\nshared scheduler threads the outbox publisher runs on."
-        },
-        {
-          "name": "KAFKA_CONSUMER_AUTO_OFFSET_RESET",
-          "default": "earliest",
-          "example": null,
-          "description": "Worker consumer offset reset policy and retries on a failed record (interval in ms)."
-        },
-        {
-          "name": "KAFKA_CONSUMER_MAX_RETRIES",
-          "default": "3",
-          "example": null,
-          "description": "Worker consumer offset reset policy and retries on a failed record (interval in ms)."
-        },
-        {
-          "name": "KAFKA_CONSUMER_RETRY_INTERVAL_MS",
-          "default": "5000",
-          "example": null,
-          "description": "Worker consumer offset reset policy and retries on a failed record (interval in ms)."
-        }
-      ]
-    },
-    {
       "title": "Security (required - must change for production)",
       "variables": [
         {
@@ -335,7 +258,7 @@
           "name": "SCHEDULING_POOL_SIZE",
           "default": "8",
           "example": null,
-          "description": "Threads shared by all scheduled jobs. Keep at 8 or more: with Spring's default of 1, one slow\njob stalls every other one, outbox dispatch included."
+          "description": "Threads shared by all scheduled jobs. Keep at 8 or more: with Spring's default of 1, one slow\njob stalls every other one."
         }
       ]
     },
@@ -389,71 +312,6 @@
           "default": "",
           "example": null,
           "description": "Domain for the sales@ and support@ addresses in the contact form and footer, e.g. example.com.\nEmpty offers no addresses. Read by the ui container at start."
-        }
-      ]
-    },
-    {
-      "title": "Outbox publisher",
-      "variables": [
-        {
-          "name": "OUTBOX_POLL_INTERVAL_MS",
-          "default": "1000",
-          "example": null,
-          "description": "Poll interval for pending outbox messages (ms)."
-        },
-        {
-          "name": "OUTBOX_RETRY_INTERVAL_MS",
-          "default": "30000",
-          "example": null,
-          "description": "Retry interval for failed outbox messages (ms)."
-        },
-        {
-          "name": "OUTBOX_CLEANUP_INTERVAL_MS",
-          "default": "3600000",
-          "example": null,
-          "description": "Cleanup interval for PUBLISHED and DEAD outbox messages (ms)."
-        },
-        {
-          "name": "OUTBOX_BATCH_SIZE",
-          "default": "100",
-          "example": null,
-          "description": "Messages per poll."
-        },
-        {
-          "name": "OUTBOX_MAX_RETRIES",
-          "default": "5",
-          "example": null,
-          "description": "Publish retries before a message goes DEAD."
-        },
-        {
-          "name": "OUTBOX_DEAD_RETENTION_DAYS",
-          "default": "90",
-          "example": null,
-          "description": "Days DEAD messages are kept for manual re-drive."
-        },
-        {
-          "name": "OUTBOX_SENDING_RECOVERY_SECONDS",
-          "default": "300",
-          "example": null,
-          "description": "Seconds before a stuck SENDING message returns to PENDING; must exceed KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS."
-        },
-        {
-          "name": "OUTBOX_BATCH_SEND_TIMEOUT_SECONDS",
-          "default": "30",
-          "example": null,
-          "description": "Seconds to wait for a batch of Kafka sends to complete."
-        },
-        {
-          "name": "OUTBOX_MAX_PER_PROJECT",
-          "default": "30",
-          "example": null,
-          "description": "Messages claimed per project per batch, so one project cannot crowd out the rest."
-        },
-        {
-          "name": "OUTBOX_MAX_PER_KEY",
-          "default": "10",
-          "example": null,
-          "description": "Messages claimed per endpoint per batch. With a 1000 ms poll this caps one endpoint at 10\nevents/s whatever OUTBOX_BATCH_SIZE is; raise it only when one endpoint dominates."
         }
       ]
     },
@@ -739,6 +597,36 @@
           "description": "Threads for incoming forwards."
         },
         {
+          "name": "WEBHOOK_CLAIM_ENABLED",
+          "default": "true",
+          "example": null,
+          "description": "Worker claims due Deliveries and Forwards from Postgres (true | false)."
+        },
+        {
+          "name": "WEBHOOK_CLAIM_IDLE_POLL_MS",
+          "default": "200",
+          "example": null,
+          "description": "How long a poll that found nothing sleeps (ms); a full batch polls again at once."
+        },
+        {
+          "name": "WEBHOOK_CLAIM_TIMEOUT_SECONDS",
+          "default": "300",
+          "example": null,
+          "description": "Seconds after which a claimed row whose worker has not finished is claimed again; keep above 60s plus transformation time."
+        },
+        {
+          "name": "WEBHOOK_CLAIM_PER_TARGET",
+          "default": "5",
+          "example": null,
+          "description": "Rows one poll takes from each endpoint or destination, so one backlog cannot fill the batch."
+        },
+        {
+          "name": "WEBHOOK_CLAIM_MAX_TARGETS",
+          "default": "500",
+          "example": null,
+          "description": "Endpoints or destinations one poll visits."
+        },
+        {
           "name": "WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS",
           "default": "60",
           "example": null,
@@ -874,12 +762,6 @@
           "default": "60000",
           "example": null,
           "description": "DLQ monitoring interval (ms)."
-        },
-        {
-          "name": "DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS",
-          "default": "10",
-          "example": null,
-          "description": "Timeout for DLQ monitoring's Kafka admin calls (seconds)."
         }
       ]
     },
@@ -962,105 +844,12 @@
           "default": "500000",
           "example": null,
           "description": "Most events one replay session may cover."
-        }
-      ]
-    },
-    {
-      "title": "Retry scheduler",
-      "variables": [
-        {
-          "name": "RETRY_SCHEDULER_BATCH_SIZE",
-          "default": "100",
-          "example": null,
-          "description": "Largest retry batch; the governor adapts below it."
-        },
-        {
-          "name": "RETRY_SCHEDULER_MAX_PER_ENDPOINT",
-          "default": "10",
-          "example": null,
-          "description": "Retries claimed per endpoint per poll."
-        },
-        {
-          "name": "RETRY_SCHEDULER_MAX_PER_PROJECT",
-          "default": "30",
-          "example": null,
-          "description": "Retries claimed per project per poll."
-        },
-        {
-          "name": "RETRY_SCHEDULER_HIGH_WATERMARK",
-          "default": "5000",
-          "example": null,
-          "description": "Pending retries above which the governor shrinks batches, avoiding a retry storm after an outage."
-        },
-        {
-          "name": "RETRY_SCHEDULER_SEND_TIMEOUT_SECONDS",
-          "default": "30",
-          "example": null,
-          "description": "Seconds to wait for a Kafka send to be confirmed."
-        },
-        {
-          "name": "RETRY_SCHEDULER_RESCHEDULE_DELAY_SECONDS",
-          "default": "60",
-          "example": null,
-          "description": "Seconds before a failed send is rescheduled."
-        },
-        {
-          "name": "RETRY_SCHEDULER_POLL_INTERVAL_MS",
-          "default": "10000",
-          "example": null,
-          "description": "Baseline poll interval (ms); the governor polls 3x slower when idle and up to 5x faster under backlog."
         },
         {
           "name": "WEBHOOK_RETRY_AFTER_MAX_SECONDS",
           "default": "21600",
           "example": null,
           "description": "Longest a receiver's Retry-After (on 429 and 503) may delay the next attempt (seconds); it only\never delays. 0 ignores the header. Kept within DELIVERY_ESCALATION_HARD_CAP_HOURS."
-        }
-      ]
-    },
-    {
-      "title": "Stuck delivery recovery",
-      "variables": [
-        {
-          "name": "STUCK_DELIVERY_THRESHOLD_MINUTES",
-          "default": "5",
-          "example": null,
-          "description": "Minutes after which a Delivery stuck in PROCESSING is reset."
-        },
-        {
-          "name": "STUCK_DELIVERY_STRANDED_PENDING_THRESHOLD_MINUTES",
-          "default": "60",
-          "example": null,
-          "description": "Minutes after which an unclaimed PENDING Delivery with no retry time is reset; keep well above\nthe normal dispatch time."
-        },
-        {
-          "name": "STUCK_DELIVERY_CHECK_INTERVAL_MS",
-          "default": "60000",
-          "example": null,
-          "description": "Check interval (ms)."
-        }
-      ]
-    },
-    {
-      "title": "Stuck forward recovery (incoming forward attempts)",
-      "variables": [
-        {
-          "name": "STUCK_FORWARD_THRESHOLD_MINUTES",
-          "default": "5",
-          "example": null,
-          "description": "Minutes after which a Forward stuck in PROCESSING is reset."
-        },
-        {
-          "name": "STUCK_FORWARD_STRANDED_PENDING_THRESHOLD_MINUTES",
-          "default": "60",
-          "example": null,
-          "description": "Minutes after which a PENDING Forward with no retry time goes back to the retry scheduler; keep\nwell above the normal dispatch time."
-        },
-        {
-          "name": "STUCK_FORWARD_CHECK_INTERVAL_MS",
-          "default": "60000",
-          "example": null,
-          "description": "Check interval (ms)."
         }
       ]
     },
@@ -1829,34 +1618,22 @@
           "description": "Container memory limits."
         },
         {
-          "name": "KAFKA_MEMORY_LIMIT",
-          "default": null,
-          "example": "1G",
-          "description": "Container memory limits."
-        },
-        {
-          "name": "KAFKA_HEAP_OPTS",
-          "default": null,
-          "example": "-Xms512m -Xmx512m",
-          "description": "Kafka JVM heap; keep it near half of KAFKA_MEMORY_LIMIT, the rest serves page cache and buffers."
-        },
-        {
           "name": "REDIS_MEMORY_LIMIT",
           "default": null,
           "example": "512m",
-          "description": "Kafka JVM heap; keep it near half of KAFKA_MEMORY_LIMIT, the rest serves page cache and buffers."
+          "description": "Container memory limits."
         },
         {
           "name": "API_MEMORY_LIMIT",
           "default": null,
           "example": "768m",
-          "description": "Kafka JVM heap; keep it near half of KAFKA_MEMORY_LIMIT, the rest serves page cache and buffers."
+          "description": "Container memory limits."
         },
         {
           "name": "WORKER_MEMORY_LIMIT",
           "default": null,
           "example": "768m",
-          "description": "Kafka JVM heap; keep it near half of KAFKA_MEMORY_LIMIT, the rest serves page cache and buffers."
+          "description": "Container memory limits."
         },
         {
           "name": "API_REPLICAS",
