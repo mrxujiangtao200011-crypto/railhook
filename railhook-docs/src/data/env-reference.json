@@ -734,30 +734,6 @@
           "description": "Default ingress limit for a source that sets none (requests/s); 0 disables the default."
         },
         {
-          "name": "INCOMING_FORWARD_RETRY_POLL_INTERVAL_MS",
-          "default": "10000",
-          "example": null,
-          "description": "Incoming forward retry scheduler: poll interval (ms), batch size, and per-destination cap."
-        },
-        {
-          "name": "INCOMING_FORWARD_RETRY_BATCH_SIZE",
-          "default": "50",
-          "example": null,
-          "description": "Incoming forward retry scheduler: poll interval (ms), batch size, and per-destination cap."
-        },
-        {
-          "name": "INCOMING_FORWARD_RETRY_MAX_PER_DEST",
-          "default": "10",
-          "example": null,
-          "description": "Incoming forward retry scheduler: poll interval (ms), batch size, and per-destination cap."
-        },
-        {
-          "name": "INCOMING_FORWARD_RETRY_HIGH_WATERMARK",
-          "default": "3000",
-          "example": null,
-          "description": "Pending forward retries above which the governor shrinks batches."
-        },
-        {
           "name": "DLQ_MONITORING_INTERVAL_MS",
           "default": "60000",
           "example": null,
