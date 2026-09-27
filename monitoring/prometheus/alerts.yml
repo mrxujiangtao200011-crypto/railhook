@@ -1,39 +1,4 @@
-# webhook_dlq_topic_retained_total and incoming_forward_dlq_topic_retained_total count raw Kafka
-# topic volume, which never returns to 0 — do not alert on them.
-
 groups:
-  - name: railhook.outbox
-    rules:
-      - alert: OutboxOldestPendingAgeHigh
-        expr: |
-          outbox_oldest_pending_age_seconds > 300
-        for: 5m
-        labels:
-          severity: critical
-          component: api
-        annotations:
-          summary: "Oldest unpublished outbox message is {{ $value | printf \"%.0f\" }}s old"
-          description: |
-            An event has been accepted and written to the outbox but not published to Kafka
-            for over 5 minutes. The publisher polls every second, so this means it is not
-            running, not keeping up, or failing to reach the broker. Nothing downstream can
-            see this backlog: the work has not become a Delivery yet.
-
-      - alert: OutboxSendingStuck
-        expr: |
-          outbox_queue_depth{status="sending"} > 0
-        for: 10m
-        labels:
-          severity: warning
-          component: api
-        annotations:
-          summary: "{{ $value | printf \"%.0f\" }} outbox messages stuck SENDING for >10m"
-          description: |
-            Outbox messages have been SENDING for longer than
-            outbox.publisher.sending-recovery-seconds (default 300s) plus the 30s retry-cycle
-            poll — recovery back to PENDING should already have happened. Check API logs for
-            recoverStuckSendingMessages() and Kafka broker health.
-
   - name: railhook.retry_backlog
     rules:
       - alert: DeliveryPendingBacklogGrowing
@@ -137,8 +102,7 @@ groups:
         annotations:
           summary: "{{ $value | printf \"%.0f\" }} deliveries in DLQ status"
           description: |
-            Deliveries awaiting manual retry or purge via DlqService. Not tied to Kafka
-            topic retention -- see webhook_dlq_topic_retained_total for raw topic volume.
+            Deliveries awaiting manual retry or purge via DlqService.
 
       - alert: IncomingForwardDlqActionableBacklog
         expr: |
@@ -150,36 +114,7 @@ groups:
         annotations:
           summary: "{{ $value | printf \"%.0f\" }} forwards in DLQ status"
           description: |
-            Forwards awaiting manual retry or purge. Not tied to Kafka topic retention --
-            see incoming_forward_dlq_topic_retained_total for raw topic volume.
-
-  - name: railhook.retry_governor
-    rules:
-      - alert: RetryGovernorCooldown
-        expr: |
-          retry_governor_cooldown_remaining > 0
-        for: 5m
-        labels:
-          severity: warning
-          component: worker
-        annotations:
-          summary: "Retry governor {{ $labels.scheduler }} in cooldown"
-          description: |
-            Governor entered cooldown after sustained failures.
-            Cooldown remaining: {{ $value }} polls. Check downstream health.
-
-      - alert: RetryGovernorConsecutiveFailures
-        expr: |
-          retry_governor_consecutive_failures > 5
-        for: 2m
-        labels:
-          severity: critical
-          component: worker
-        annotations:
-          summary: "Retry governor {{ $labels.scheduler }}: {{ $value }} consecutive failures"
-          description: |
-            Persistent Kafka send failures or downstream unavailability.
-            Check Kafka broker health, worker logs, and network connectivity.
+            Forwards awaiting manual retry or purge.
 
   - name: railhook.circuit_breaker
     rules:
@@ -258,7 +193,7 @@ groups:
           summary: "Oldest pending delivery is {{ $value | printf \"%.0f\" }}s old"
           description: |
             A delivery has been pending for over 1 hour.
-            This may indicate a stuck delivery or scheduler issue.
+            Check the worker is running and claiming, and whether the endpoint is failing.
 
       - alert: OldestPendingDeliveryCritical
         expr: |
@@ -284,7 +219,7 @@ groups:
           summary: "Oldest pending forward is {{ $value | printf \"%.0f\" }}s old"
           description: |
             An incoming forward has been pending for over 1 hour.
-            This may indicate a stuck forward or scheduler issue.
+            Check the worker is running and claiming, and whether the destination is failing.
 
   - name: railhook.infrastructure
     rules:

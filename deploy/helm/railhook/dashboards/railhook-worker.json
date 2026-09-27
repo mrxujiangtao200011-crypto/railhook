@@ -55,56 +55,6 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
-      "id": 201,
-      "title": "Retry Governor",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "short" }
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
-      "id": 10,
-      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
-      "targets": [
-        { "expr": "retry_governor_pending_count", "legendFormat": "{{scheduler}}" }
-      ],
-      "title": "Retry Governor — Pending Count",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "short" }
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
-      "id": 11,
-      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
-      "targets": [
-        { "expr": "retry_governor_effective_batch", "legendFormat": "{{scheduler}}" }
-      ],
-      "title": "Retry Governor — Effective Batch Size",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "short" }
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
-      "id": 12,
-      "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
-      "targets": [
-        { "expr": "retry_governor_consecutive_failures", "legendFormat": "{{scheduler}} failures" },
-        { "expr": "retry_governor_cooldown_remaining", "legendFormat": "{{scheduler}} cooldown" }
-      ],
-      "title": "Retry Governor — Failures & Cooldown",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
       "id": 202,
       "title": "Queue Depth",
       "type": "row"
@@ -114,7 +64,7 @@
       "fieldConfig": {
         "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "stacking": { "mode": "normal" } }, "unit": "short" }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
       "id": 20,
       "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
@@ -130,7 +80,7 @@
       "fieldConfig": {
         "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "stacking": { "mode": "normal" } }, "unit": "short" }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
       "id": 21,
       "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
@@ -143,7 +93,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
       "id": 203,
       "title": "Async Delivery Pool",
       "type": "row"
@@ -153,7 +103,7 @@
       "fieldConfig": {
         "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "short" }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
       "id": 30,
       "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
@@ -169,7 +119,7 @@
       "fieldConfig": {
         "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "ops" }
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
       "id": 31,
       "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [

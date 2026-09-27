@@ -1,7 +1,7 @@
 # Railhook Helm chart
 
-Needs Kubernetes 1.24+, Helm 3.8+, and your own PostgreSQL 16+, Kafka 3.7+ and Redis 7+. The chart
-bundles none of them. CI tests against `postgres:16-alpine`, `apache/kafka:3.7.0` and `redis:7-alpine`.
+Needs Kubernetes 1.24+, Helm 3.8+, and your own PostgreSQL 16+ and Redis 7+. The chart bundles
+neither. CI tests against `postgres:16-alpine` and `redis:7-alpine`.
 
 ## 1. Create secrets
 
@@ -30,9 +30,6 @@ postgresql:
     database: railhook
     username: webhook_user
     existingSecret: railhook-postgresql-secret
-kafka:
-  external:
-    bootstrapServers: "kafka-1:9092,kafka-2:9092"
 redis:
   external:
     host: "redis.example.com"
@@ -63,7 +60,6 @@ email:
 ```bash
 helm install railhook ./railhook -f values-production.yaml \
   --set postgresql.external.host=postgres.prod.local \
-  --set kafka.external.bootstrapServers=kafka.prod.local:9092 \
   --set redis.external.host=redis.prod.local \
   --set ui.ingress.hosts[0].host=hooks.example.com
 kubectl port-forward svc/railhook-ui 8080:80   # without an ingress
@@ -77,7 +73,7 @@ anti-affinity. `values.yaml` has every option.
 | Value | What it does |
 |---|---|
 | `api.replicaCount`, `worker.replicaCount` | Replicas |
-| `kafka.topicPartitions`, `kafka.topicReplicationFactor` | Topics, created by a post-install/upgrade hook job (12 partitions by default) |
+| `worker.env.WEBHOOK_CLAIM_*` | How workers claim due deliveries and forwards from PostgreSQL: rows per endpoint per poll, claim timeout |
 | `backup.enabled`, `backup.schedule`, `backup.retainCount` | Nightly `pg_dump` to a PVC, old dumps pruned |
 | `monitoring.serviceMonitor` | Scrapes the `management` port (api 8082, worker 8081) |
 | `api.pdb`, `worker.pdb`, `ui.pdb` | PodDisruptionBudgets |
