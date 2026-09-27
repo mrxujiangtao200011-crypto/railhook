@@ -29,7 +29,7 @@ For working on Railhook itself: the API, worker and dashboard are built from you
    make up
    ```
 
-   This creates `.env` from `.env.dist` if it does not exist, builds the three services from your tree, starts them with the embedded database and scheduled backups, waits until the API and worker are healthy, and creates the Kafka topics. Don't do any of those steps by hand.
+   This creates `.env` from `.env.dist` if it does not exist, builds the three services from your tree, starts them with the embedded database and scheduled backups, and waits until the API and worker are healthy. Don't do any of those steps by hand.
 
 3. **Open the dashboard**
 
@@ -48,7 +48,7 @@ Once the stack is up, rebuild and restart only the service you changed:
 | `make dev-api` | Rebuilds the API with the build cache, restarts it and follows its logs |
 | `make dev-worker` | The same for the worker |
 | `make dev-ui` | The same for the dashboard image |
-| `make health` | Prints the state of Postgres, Kafka, Redis, the API, the worker and the web port |
+| `make health` | Prints the state of Postgres, Redis, the API, the worker and the web port |
 | `make logs` / `make logs-api` | Follows logs |
 | `make down` | Stops the stack and keeps the data |
 

@@ -13,17 +13,16 @@ import { Aside } from '@astrojs/starlight/components';
 | Docker | Docker Engine 20.10 або новіший; демон має бути запущений і доступний вашому користувачу |
 | Compose | Compose v2, як `docker compose` або окремий `docker-compose` |
 | Пам'ять | Близько 4 ГіБ. Якщо пам'яті від 2 до 4 ГіБ, інсталятор попередить, що системі доведеться використовувати своп; якщо менше ніж 2 ГіБ — зупиниться |
-| Диск | Щонайменше 5 ГіБ вільного місця для образів, а також місце для бази даних і журналу Kafka. Якщо менше ніж 5 ГіБ, інсталятор попередить |
+| Диск | Щонайменше 5 ГіБ вільного місця для образів, а також місце для бази даних. Якщо менше ніж 5 ГіБ, інсталятор попередить |
 | Інструменти | `curl` і `openssl`: ними інсталятор завантажує файли й генерує секрети |
 
-Стек запускає дві JVM, брокер, базу даних і кеш. Типові ліміти пам'яті для кожного контейнера, кожен задається в `.env`:
+Стек запускає дві JVM, базу даних і кеш. Типові ліміти пам'яті для кожного контейнера, кожен задається в `.env`, разом становлять близько 3,1 ГіБ:
 
 | Сервіс | Ліміт | Змінна |
 |---|---|---|
 | `api` | 768m | `API_MEMORY_LIMIT` |
 | `worker` | 768m | `WORKER_MEMORY_LIMIT` |
 | `postgres` | 1G | `POSTGRES_MEMORY_LIMIT` |
-| `kafka` | 1G | `KAFKA_MEMORY_LIMIT` |
 | `redis` | 512m | `REDIS_MEMORY_LIMIT` |
 | `ui` | 128m | `UI_MEMORY_LIMIT` |
 
@@ -49,4 +48,4 @@ import { Aside } from '@astrojs/starlight/components';
 
 ## Kubernetes
 
-Helm-чарт потребує Kubernetes 1.24+ і Helm 3.8+, а також PostgreSQL 16+, Kafka 3.7+ і Redis 7+, які ви надаєте самі. Див. [Kubernetes](/docs/uk/self-hosting/kubernetes/).
+Helm-чарт потребує Kubernetes 1.24+ і Helm 3.8+, а також PostgreSQL 16+ і Redis 7+, які ви надаєте самі. Див. [Kubernetes](/docs/uk/self-hosting/kubernetes/).

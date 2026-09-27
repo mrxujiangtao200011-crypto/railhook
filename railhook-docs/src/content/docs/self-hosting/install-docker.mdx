@@ -16,7 +16,7 @@ Both methods run the same `docker-compose.yml`. The installer also generates sec
        curl -fsSL https://railhook.io/install.sh | bash
        ```
 
-       It checks Docker, Compose, memory, disk and the port, then writes `~/railhook`: a `docker-compose.yml` pinned to the latest release, a `.env` with generated secrets, and a `railhook` helper script. It starts the stack and waits for the API. The first start runs the migrations and creates the Kafka topics, so it can take a few minutes.
+       It checks Docker, Compose, memory, disk and the port, then writes `~/railhook`: a `docker-compose.yml` pinned to the latest release, a `.env` with generated secrets, and a `railhook` helper script. It starts the stack and waits for the API. The first start runs the migrations, so it can take a few minutes.
 
     2. **Open the dashboard**
 
