@@ -6,13 +6,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
 import com.webhook.platform.api.domain.entity.Event;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.DlqItemResponse;
 import com.webhook.platform.api.exception.NotFoundException;
@@ -45,7 +43,6 @@ class DlqServiceTest {
     @Mock private DeliveryAttemptRepository deliveryAttemptRepository;
     @Mock private EventRepository eventRepository;
     @Mock private ProjectRepository projectRepository;
-    @Mock private OutboxMessageRepository outboxMessageRepository;
 
     private DlqService dlqService;
 
@@ -55,8 +52,7 @@ class DlqServiceTest {
     @BeforeEach
     void setUp() {
         dlqService = new DlqService(deliveryRepository, deliveryAttemptRepository, eventRepository,
-                projectRepository, new ObjectMapper(),
-                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()));
+                projectRepository, new ObjectMapper());
     }
 
     private Project projectOwnedBy(UUID orgId) {
@@ -159,7 +155,7 @@ class DlqServiceTest {
     }
 
     @Test
-    void retryDeliveries_resetsDeliveryStateAndCreatesOutboxMessage() {
+    void retryDeliveries_resetsDeliveryStateAndMakesItDue() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
 
         UUID deliveryId = UUID.randomUUID();
@@ -186,13 +182,8 @@ class DlqServiceTest {
         // Restarting the count collided with (delivery_id, attempt_number); headroom comes from maxAttempts.
         assertThat(saved.getAttemptCount()).isEqualTo(7);
         assertThat(saved.getMaxAttempts()).isEqualTo(10);
-        assertThat(saved.getNextRetryAt()).isNull();
+        assertThat(saved.getNextRetryAt()).isNotNull();
         assertThat(saved.getFailedAt()).isNull();
-
-        ArgumentCaptor<OutboxMessage> outboxCaptor = ArgumentCaptor.forClass(OutboxMessage.class);
-        verify(outboxMessageRepository).save(outboxCaptor.capture());
-        assertThat(outboxCaptor.getValue().getAggregateId()).isEqualTo(deliveryId);
-        assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("DeliveryRetry");
     }
 
     @Test
@@ -236,7 +227,6 @@ class DlqServiceTest {
 
         assertThat(retried).isZero();
         verify(deliveryRepository, never()).save(any());
-        verify(outboxMessageRepository, never()).save(any());
     }
 
     @Test

@@ -4,8 +4,6 @@ import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.common.retry.RetryAfter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
-import com.webhook.platform.common.dto.DeliveryMessage;
-import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
@@ -42,7 +40,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -75,7 +72,7 @@ import static org.mockito.Mockito.mock;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration,"
+        "spring.autoconfigure.exclude="
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration"
 })
@@ -349,43 +346,31 @@ class ProjectStatusAttemptIntegrationTest {
         IncomingForwardAttempt row = forwardAttemptRepository.findById(attemptId).orElseThrow();
         IncomingEvent event = incomingEventRepository.findById(row.getIncomingEventId()).orElseThrow();
         IncomingDestination destination = destinationRepository.findById(row.getDestinationId()).orElseThrow();
-        IncomingForwardMessage message = IncomingForwardMessage.builder()
-                .incomingEventId(event.getId())
-                .destinationId(destination.getId())
-                .incomingSourceId(event.getIncomingSourceId())
-                .attemptCount(0)
-                .build();
-        @SuppressWarnings("unchecked")
-        KafkaTemplate<String, IncomingForwardMessage> kafka = mock(KafkaTemplate.class);
+        row.setStatus(ForwardAttemptStatus.PROCESSING);
+        row.setClaimToken(UUID.randomUUID());
+        IncomingForwardAttempt claimed = forwardAttemptRepository.save(row);
         IncomingAttemptStore store = new IncomingAttemptStore(forwardAttemptRepository, projectStatusLookup,
                 new TransactionTemplate(transactionManager), mock(TransformationCacheService.class),
                 new PayloadTransformService(new ObjectMapper(), new SimpleMeterRegistry(), scriptEngine()),
-                encryptionKeyRegistry, new ObjectMapper(), WebClient.builder().build(), kafka,
-                mock(TargetFailureRecorder.class), message, event, destination);
+                encryptionKeyRegistry, new ObjectMapper(), WebClient.builder().build(),
+                mock(TargetFailureRecorder.class), claimed, event, destination);
         runner.run(store, new NoMetrics());
         return forwardAttemptRepository.findById(attemptId).orElseThrow();
     }
 
     private Delivery runDelivery(UUID deliveryId) {
         Delivery row = deliveryRepository.findById(deliveryId).orElseThrow();
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId)
-                .eventId(row.getEventId())
-                .endpointId(row.getEndpointId())
-                .status(row.getStatus().name())
-                .attemptCount(0)
-                .orderingEnabled(false)
-                .build();
-        @SuppressWarnings("unchecked")
-        KafkaTemplate<String, DeliveryMessage> kafka = mock(KafkaTemplate.class);
+        row.setStatus(Delivery.DeliveryStatus.PROCESSING);
+        row.setClaimToken(UUID.randomUUID());
+        Delivery claimed = deliveryRepository.save(row);
         OutgoingAttemptStore store = new OutgoingAttemptStore(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
-                projectStatusLookup, new TransactionTemplate(transactionManager), mock(OrderingBufferService.class), kafka,
+                projectStatusLookup, new TransactionTemplate(transactionManager), mock(OrderingBufferService.class),
                 encryptionKeyRegistry, null, mock(TransformationCacheService.class),
                 new PayloadTransformService(new ObjectMapper(), new SimpleMeterRegistry(), scriptEngine()),
                 new ObjectMapper(), WebClient.builder().build(), mock(TargetFailureRecorder.class),
                 Counter.builder("test").register(new SimpleMeterRegistry()),
-                Clock.systemUTC(), 5, message, false);
+                Clock.systemUTC(), 5, claimed);
         runner.run(store, new NoMetrics());
         return deliveryRepository.findById(deliveryId).orElseThrow();
     }

@@ -5,13 +5,11 @@ import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.api.domain.entity.IncomingSource;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.IncomingDlqItemResponse;
 import com.webhook.platform.api.exception.NotFoundException;
@@ -42,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -60,8 +59,6 @@ class IncomingDlqServiceTest {
     @Mock
     private IncomingDestinationRepository destinationRepository;
     @Mock
-    private OutboxMessageRepository outboxMessageRepository;
-    @Mock
     private ProjectRepository projectRepository;
 
     private IncomingDlqService service;
@@ -78,8 +75,7 @@ class IncomingDlqServiceTest {
     void setUp() {
         TenantContext.set(orgId);
         service = new IncomingDlqService(attemptRepository, eventRepository, sourceRepository,
-                destinationRepository, outboxMessageRepository, projectRepository,
-                new ForwardDispatch(new ObjectMapper()));
+                destinationRepository, projectRepository);
 
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(
                 Project.builder().id(projectId).organizationId(orgId).name("Test").build()));
@@ -139,12 +135,13 @@ class IncomingDlqServiceTest {
 
         assertThat(service.retryForwards(projectId, List.of(attemptId))).isEqualTo(1);
 
-        ArgumentCaptor<OutboxMessage> outbox = ArgumentCaptor.forClass(OutboxMessage.class);
-        verify(outboxMessageRepository).save(outbox.capture());
-        assertThat(outbox.getValue().getKafkaKey()).isEqualTo(destinationId.toString());
-        assertThat(outbox.getValue().getPayload()).contains(destinationId.toString())
-                .doesNotContain(otherDestinationId.toString());
-        assertThat(outbox.getValue().getEventType()).isEqualTo("IncomingForwardDlqRetry");
+        ArgumentCaptor<IncomingForwardAttempt> saved = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
+        verify(attemptRepository, atLeastOnce()).save(saved.capture());
+        assertThat(saved.getAllValues())
+                .filteredOn(a -> a.getStatus() == ForwardAttemptStatus.PENDING)
+                .singleElement()
+                .extracting(IncomingForwardAttempt::getDestinationId)
+                .isEqualTo(destinationId);
     }
 
     // Incoming cannot raise maxAttempts, so continuing at N+1 would be exhausted on its first claim.
@@ -180,7 +177,6 @@ class IncomingDlqServiceTest {
         when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(elsewhere));
 
         assertThat(service.retryForwards(projectId, List.of(attemptId))).isZero();
-        verify(outboxMessageRepository, never()).save(any());
         verify(attemptRepository, never()).save(any());
     }
 

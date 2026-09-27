@@ -11,7 +11,7 @@ import java.util.Set;
 
 /**
  * Fails startup on placeholder secrets and unsafe settings when APP_ENV=production. Runs from
- * {@link PostConstruct}, not {@code ApplicationReadyEvent}: by then the Kafka listeners are
+ * {@link PostConstruct}, not {@code ApplicationReadyEvent}: by then the claim pollers are
  * already delivering webhooks.
  */
 @Component

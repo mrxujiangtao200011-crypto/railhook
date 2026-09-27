@@ -9,12 +9,10 @@ import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.exception.RateLimitExceededException;
 import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.api.domain.entity.IncomingSource;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
@@ -32,7 +30,6 @@ import com.webhook.platform.api.exception.SourceDisabledException;
 import com.webhook.platform.api.exception.SourceNotFoundException;
 import com.webhook.platform.api.service.verification.ReplayDetectionService;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
-import com.webhook.platform.api.service.ForwardDispatch;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -82,8 +79,6 @@ class IngressServiceTest {
     @Mock
     private IncomingForwardAttemptRepository forwardAttemptRepository;
     @Mock
-    private OutboxMessageRepository outboxMessageRepository;
-    @Mock
     private HttpServletRequest httpRequest;
     @Mock
     private RedisRateLimiterService rateLimiterService;
@@ -127,8 +122,7 @@ class IngressServiceTest {
                 List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"));
         service = new IngressService(
                 sourceRepository, eventRepository, destinationRepository,
-                forwardAttemptRepository, outboxMessageRepository,
-                objectMapper, new ForwardDispatch(objectMapper), meterRegistry, verifierFactory, replayDetectionService, rateLimiterService,
+                forwardAttemptRepository, objectMapper, meterRegistry, verifierFactory, replayDetectionService, rateLimiterService,
                 clientIpResolver, transactionManager,
                 encryptionKeyRegistry, entitlementService, quotaCounterService, projectRepository, suspensionCheck, 524288, DEFAULT_RATE_LIMIT
         );
@@ -208,7 +202,6 @@ class IngressServiceTest {
         assertThat(event.getVerified()).isNull();
 
         verify(forwardAttemptRepository, never()).saveAll(any());
-        verify(outboxMessageRepository, never()).saveAll(any());
     }
 
     // A non-UTF-8 body loses bytes as text, so the bytes themselves are kept.
@@ -290,11 +283,6 @@ class IngressServiceTest {
         assertThat(attempts.get(0).getDestinationId()).isEqualTo(destId);
         assertThat(attempts.get(0).getStatus()).isEqualTo(ForwardAttemptStatus.PENDING);
         assertThat(attempts.get(0).getAttemptNumber()).isEqualTo(1);
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<OutboxMessage>> outboxCaptor = ArgumentCaptor.forClass(List.class);
-        verify(outboxMessageRepository).saveAll(outboxCaptor.capture());
-        assertThat(outboxCaptor.getValue()).hasSize(1);
     }
 
     @Test
@@ -361,7 +349,6 @@ class IngressServiceTest {
         verify(transactionManager, never()).getTransaction(any());
         verify(eventRepository, never()).save(any(IncomingEvent.class));
         verify(forwardAttemptRepository, never()).saveAll(any());
-        verify(outboxMessageRepository, never()).saveAll(any());
     }
 
     @Test
@@ -688,7 +675,6 @@ class IngressServiceTest {
         assertThat(outcome).isEqualTo(new IngressOutcome.SlackUrlVerification(
                 "3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P"));
         verify(eventRepository, never()).save(any());
-        verify(outboxMessageRepository, never()).saveAll(any());
         verify(entitlementService, never()).checkEventQuota();
         verify(quotaCounterService, never()).increment();
         verify(replayDetectionService, never()).isReplay(any(), any());

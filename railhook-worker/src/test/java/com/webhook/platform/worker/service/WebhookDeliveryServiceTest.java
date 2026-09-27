@@ -10,8 +10,6 @@ import com.webhook.platform.worker.attempt.ProjectStatusLookup;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.util.PayloadCompression;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.attempt.TransformedBody;
@@ -35,7 +33,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.redisson.api.RedissonClient;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -92,8 +89,6 @@ class WebhookDeliveryServiceTest {
     @Mock
     private OrderingBufferService orderingBufferService;
     @Mock
-    private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
-    @Mock
     private PayloadTransformService payloadTransformService;
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -124,12 +119,16 @@ class WebhookDeliveryServiceTest {
         OutgoingAttemptStoreFactory storeFactory = new OutgoingAttemptStoreFactory(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 activeProjects(),
-                transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
+                transactionTemplate, orderingBufferService, encryptionKeyRegistry,
                 mtlsWebClientCache, transformationCacheService, payloadTransformService,
                 new ObjectMapper(), webClient, mock(TargetFailureRecorder.class), registry, Clock.systemUTC(),
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
         return new WebhookDeliveryService(runner, storeFactory, new DeliveryAttemptMetrics(registry),
-                deliveryRepository, transactionTemplate);
+                deliveryRepository, transactionTemplate, Clock.systemUTC(), 300, 500, 5);
+    }
+
+    private void process(WebhookDeliveryService target, UUID deliveryId) {
+        target.attempt(deliveryRepository.findById(deliveryId).orElseThrow());
     }
 
     // decryptSecret once threw outside the permit's finally, so each failure leaked a permit for good.
@@ -191,13 +190,7 @@ class WebhookDeliveryServiceTest {
                     .build();
             when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId)
-                    .eventId(eventId)
-                    .endpointId(endpointId)
-                    .build();
-
-            localService.processDelivery(message, true);
+            process(localService, deliveryId);
         }
 
         assertTrue(realConcurrencyControl.tryAcquireForTarget(endpointId),
@@ -305,10 +298,7 @@ class WebhookDeliveryServiceTest {
                 return d;
             });
 
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            service.processDelivery(message, true);
+            process(service, deliveryId);
 
             // Lets an unfixed build's background save land, so the test is not racy and leaks no thread.
             Thread.sleep(2000);
@@ -361,17 +351,14 @@ class WebhookDeliveryServiceTest {
         when(deliveryRepository.findById(deliveryId))
                 .thenReturn(Optional.of(claimed), Optional.of(alreadySucceeded));
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-        service.processDelivery(message, true);
+        process(service, deliveryId);
 
         verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
     }
 
-    // The park's own future next_retry_at once made the claim refuse the release message.
+    // The park's own future next_retry_at once kept a released Delivery waiting a full park delay.
     @Test
-    void orderingRelease_makesTheReleasedDeliveryDueBeforePublishingIt() throws Exception {
+    void orderingRelease_makesTheReleasedDeliveryDue() throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         httpServer.createContext("/hook", exchange -> {
             exchange.sendResponseHeaders(200, 0);
@@ -400,141 +387,14 @@ class WebhookDeliveryServiceTest {
                     .build();
             when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-            // Parked a moment ago, so it is not due for another few seconds.
-            Delivery bufferedDelivery = Delivery.builder()
-                    .id(bufferedDeliveryId).eventId(eventId).endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PENDING)
-                    .attemptCount(0).maxAttempts(5).sequenceNumber(3L)
-                    .orderingEnabled(true)
-                    .nextRetryAt(Instant.now().plusSeconds(5))
-                    .updatedAt(Instant.now())
-                    .build();
             when(orderingBufferService.canDeliver(endpointId, 2L)).thenReturn(true);
             when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of(bufferedDeliveryId));
-            when(deliveryRepository.findAllById(List.of(bufferedDeliveryId))).thenReturn(List.of(bufferedDelivery));
             when(deliveryRepository.scheduleIfUnclaimed(eq(bufferedDeliveryId), any())).thenReturn(1);
 
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+            process(service, deliveryId);
 
-            service.processDelivery(message, true);
-
-            InOrder inOrder = inOrder(deliveryRepository, kafkaTemplate);
-            inOrder.verify(deliveryRepository).scheduleIfUnclaimed(eq(bufferedDeliveryId),
+            verify(deliveryRepository).scheduleIfUnclaimed(eq(bufferedDeliveryId),
                     argThat(dueAt -> !dueAt.isAfter(Instant.now())));
-            inOrder.verify(kafkaTemplate).send(eq(KafkaTopics.DELIVERIES_DISPATCH), anyString(),
-                    argThat(published -> bufferedDeliveryId.equals(published.getDeliveryId())));
-        } finally {
-            httpServer.stop(0);
-        }
-    }
-
-    // Another attempt claimed the row, so publishing would be a duplicate nobody can act on.
-    @Test
-    void orderingRelease_releasedDeliveryAlreadyClaimed_publishesNothingForIt() throws Exception {
-        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        httpServer.createContext("/hook", exchange -> {
-            exchange.sendResponseHeaders(200, 0);
-            exchange.getResponseBody().close();
-        });
-        httpServer.start();
-        try {
-            UUID endpointId = UUID.randomUUID();
-            UUID eventId = UUID.randomUUID();
-            UUID deliveryId = UUID.randomUUID();
-            UUID bufferedDeliveryId = UUID.randomUUID();
-
-            Endpoint endpoint = verifiedEndpoint(endpointId,
-                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
-            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
-            Event event = stubEvent(eventId, endpoint.getProjectId());
-            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
-            stubHappyPathPrerequisites(endpoint);
-
-            Delivery delivery = Delivery.builder()
-                    .id(deliveryId).eventId(eventId).endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PROCESSING)
-                    .attemptCount(0).maxAttempts(5).timeoutSeconds(5)
-                    .orderingEnabled(true).sequenceNumber(2L)
-                    .updatedAt(Instant.now())
-                    .build();
-            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-
-            Delivery bufferedDelivery = Delivery.builder()
-                    .id(bufferedDeliveryId).eventId(eventId).endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PROCESSING)
-                    .attemptCount(0).maxAttempts(5).sequenceNumber(3L)
-                    .orderingEnabled(true)
-                    .updatedAt(Instant.now())
-                    .build();
-            when(orderingBufferService.canDeliver(endpointId, 2L)).thenReturn(true);
-            when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of(bufferedDeliveryId));
-            when(deliveryRepository.findAllById(List.of(bufferedDeliveryId))).thenReturn(List.of(bufferedDelivery));
-            when(deliveryRepository.scheduleIfUnclaimed(eq(bufferedDeliveryId), any())).thenReturn(0);
-
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            service.processDelivery(message, true);
-
-            verify(kafkaTemplate, never()).send(eq(KafkaTopics.DELIVERIES_DISPATCH), anyString(),
-                    argThat(published -> bufferedDeliveryId.equals(published.getDeliveryId())));
-        } finally {
-            httpServer.stop(0);
-        }
-    }
-
-    // The SUCCESS write committed in its own transaction before the Kafka call.
-    @Test
-    void markAsSuccess_kafkaSendFailureAfterCommit_doesNotRollBackToPending() throws Exception {
-        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        httpServer.createContext("/hook", exchange -> {
-            exchange.sendResponseHeaders(200, 0);
-            exchange.getResponseBody().close();
-        });
-        httpServer.start();
-        try {
-            UUID endpointId = UUID.randomUUID();
-            UUID eventId = UUID.randomUUID();
-            UUID deliveryId = UUID.randomUUID();
-            UUID bufferedDeliveryId = UUID.randomUUID();
-
-            Endpoint endpoint = verifiedEndpoint(endpointId,
-                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
-            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
-            Event event = stubEvent(eventId, endpoint.getProjectId());
-            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
-            stubHappyPathPrerequisites(endpoint);
-
-            Delivery delivery = Delivery.builder()
-                    .id(deliveryId).eventId(eventId).endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PROCESSING)
-                    .attemptCount(0).maxAttempts(5).timeoutSeconds(5)
-                    .orderingEnabled(true).sequenceNumber(2L)
-                    .updatedAt(Instant.now())
-                    .build();
-            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-
-            Delivery bufferedDelivery = Delivery.builder()
-                    .id(bufferedDeliveryId).eventId(eventId).endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PENDING)
-                    .attemptCount(0).maxAttempts(5).sequenceNumber(3L)
-                    .updatedAt(Instant.now())
-                    .build();
-            when(orderingBufferService.canDeliver(endpointId, 2L)).thenReturn(true);
-            when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of(bufferedDeliveryId));
-            when(deliveryRepository.findAllById(List.of(bufferedDeliveryId))).thenReturn(List.of(bufferedDelivery));
-            when(deliveryRepository.scheduleIfUnclaimed(eq(bufferedDeliveryId), any())).thenReturn(1);
-            when(kafkaTemplate.send(anyString(), anyString(), any()))
-                    .thenThrow(new RuntimeException("producer buffer exhausted"));
-
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            service.processDelivery(message, true);
-
-            verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
-            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
         } finally {
             httpServer.stop(0);
         }
@@ -583,10 +443,7 @@ class WebhookDeliveryServiceTest {
         // Disabled or deleted after being configured.
         when(transformationCacheService.findEnabled(transformationId)).thenReturn(null);
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-        localService.processDelivery(message, true);
+        process(localService, deliveryId);
 
         // The raw payload must never leave the platform.
         verifyNoInteractions(mockWebClient);
@@ -650,10 +507,7 @@ class WebhookDeliveryServiceTest {
         when(payloadTransformService.apply(any(), anyString(), any()))
                 .thenThrow(new PayloadTransformException("Payload transformation failed: broken JSON"));
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-        localService.processDelivery(message, true);
+        process(localService, deliveryId);
 
         verifyNoInteractions(mockWebClient);
 
@@ -692,8 +546,7 @@ class WebhookDeliveryServiceTest {
             delivery.setTimeoutSeconds(timeoutSeconds);
             when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-            service.processDelivery(DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build(), true);
+            process(service, deliveryId);
             return endpointId;
         } finally {
             httpServer.stop(0);
@@ -762,7 +615,7 @@ class WebhookDeliveryServiceTest {
     }
 
     @Test
-    void attemptDelivery_5xxAtMaxAttempts_movesToDlq_publishesDlqEvent() throws Exception {
+    void attemptDelivery_5xxAtMaxAttempts_movesToDlq() throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         httpServer.createContext("/hook", exchange -> {
             exchange.sendResponseHeaders(500, 0);
@@ -785,14 +638,10 @@ class WebhookDeliveryServiceTest {
             Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 4, 5);
             when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            service.processDelivery(message, true);
+            process(service, deliveryId);
 
             verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.DLQ));
             verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
-            verify(kafkaTemplate).send(eq(KafkaTopics.DELIVERIES_DLQ), eq(endpointId.toString()), any());
         } finally {
             httpServer.stop(0);
         }
@@ -822,10 +671,7 @@ class WebhookDeliveryServiceTest {
         Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-        localService.processDelivery(message, true);
+        process(localService, deliveryId);
 
         verifyNoInteractions(mockWebClient);
         // Never acquired, so a release here would desync the permit accounting.
@@ -861,10 +707,7 @@ class WebhookDeliveryServiceTest {
         Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-        localService.processDelivery(message, true);
+        process(localService, deliveryId);
 
         verifyNoInteractions(mockWebClient);
         // URL validation runs before admission, so a refused Delivery spends no permit or token.
@@ -914,19 +757,12 @@ class WebhookDeliveryServiceTest {
                 .thenReturn(Instant.now().minusSeconds(5));
         when(orderingBufferService.isGapTimedOut(any())).thenReturn(false);
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-        localService.processDelivery(message, true);
+        process(localService, deliveryId);
 
         verifyNoInteractions(endpointRepository);
         verify(orderingBufferService).bufferDelivery(endpointId, deliveryId, 10L);
 
-        ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveryRepository).save(captor.capture());
-        assertEquals(Delivery.DeliveryStatus.PENDING, captor.getValue().getStatus());
-        assertTrue(captor.getValue().getOrderingFirstBufferedAt() != null,
-                "must stamp when this delivery first started waiting, for the gap timeout clock");
+        verify(deliveryRepository).parkIfStillClaimed(eq(deliveryId), any(), any(), any());
     }
 
     // A sequence burned by a rolled-back ingest will never arrive, so proceed at once.
@@ -958,10 +794,7 @@ class WebhookDeliveryServiceTest {
             when(deliveryRepository.findOldestPendingCreatedAt(endpointId, 6L, 9L)).thenReturn(null);
             when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of());
 
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            service.processDelivery(message, true);
+            process(service, deliveryId);
 
             verify(endpointRepository).findById(endpointId);
             verify(orderingBufferService, never()).bufferDelivery(any(), any(), anyLong());
@@ -991,19 +824,14 @@ class WebhookDeliveryServiceTest {
         when(deliveryRepository.countGapClosingBefore(eq(endpointId), eq(5L), eq(5L), any(), any()))
                 .thenReturn(1L);
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-        service.processDelivery(message, true);
+        process(service, deliveryId);
 
         verifyNoInteractions(endpointRepository);
         verify(orderingBufferService).bufferDelivery(endpointId, deliveryId, 6L);
         assertEquals(0.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count(),
                 "a gap that is about to close has not timed out");
 
-        ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveryRepository).save(captor.capture());
-        assertEquals(Delivery.DeliveryStatus.PENDING, captor.getValue().getStatus());
+        verify(deliveryRepository).parkIfStillClaimed(eq(deliveryId), any(), any(), any());
     }
 
     // A mocked OrderingBufferService cannot increment, so exactly 1 proves no double count.
@@ -1044,10 +872,7 @@ class WebhookDeliveryServiceTest {
                     .thenReturn(0L);
             when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of());
 
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-            service.processDelivery(message, true);
+            process(service, deliveryId);
 
             verify(endpointRepository).findById(endpointId);
             assertEquals(1.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count());
@@ -1089,8 +914,7 @@ class WebhookDeliveryServiceTest {
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
         stubHappyPathPrerequisites(endpoint);
 
-        service.processDelivery(DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build(), true);
+        process(service, deliveryId);
 
         ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
         verify(payloadTransformService).apply(any(), payloadCaptor.capture(), any());
@@ -1120,8 +944,7 @@ class WebhookDeliveryServiceTest {
         when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(deleted));
         when(deliveryRepository.save(any(Delivery.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.processDelivery(DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build(), true);
+        process(service, deliveryId);
 
         verify(eventRepository, never()).findById(any());
         verifyNoInteractions(payloadTransformService);
@@ -1147,10 +970,7 @@ class WebhookDeliveryServiceTest {
         delivery.setRetryDelays("60,oops,900");
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
-
-        service.processDelivery(message, true);
+        process(service, deliveryId);
 
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(saved.capture());
