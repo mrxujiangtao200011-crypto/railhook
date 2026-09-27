@@ -59,7 +59,7 @@ Railhook signs it and delivers it to every endpoint subscribed to `order.complet
 ## What it does
 
 - Sends each event to every endpoint subscribed to its type. The event is stored in the same
-  transaction as the API call, then delivered through Kafka.
+  transaction as the API call; the worker claims it from Postgres and delivers it.
 - Retries a failed delivery after 1m, 5m, 15m, 1h, 6h and 24h (7 attempts). What still fails
   goes to Failed Messages for bulk retry.
 - Signs every request with HMAC-SHA256 in [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks)

@@ -18,8 +18,7 @@ graph LR
 
     subgraph Railhook
         API["API Service"]
-        DB[("PostgreSQL<br/>Events · Deliveries<br/>Attempts · Outbox")]
-        Kafka["Kafka<br/>dispatch · 6 retry tiers · DLQ"]
+        DB[("PostgreSQL<br/>Events · Deliveries<br/>Attempts")]
         Redis[("Redis<br/>Rate limits · Ordering Buffer<br/>Circuit breaker")]
         Worker["Worker Service"]
     end
@@ -29,10 +28,8 @@ graph LR
 
     App -->|"POST /api/v1/events"| API
     UI  -->|"REST"| API
-    API -->|"Event + Deliveries + Outbox<br/>one transaction"| DB
-    API -->|"announce"| Kafka
-    Kafka --> Worker
-    Worker -->|"Claim, load, sign"| DB
+    API -->|"Event + Deliveries<br/>one transaction"| DB
+    Worker -->|"Claim due Deliveries"| DB
     Worker -->|"turn to send?"| Redis
     Worker -->|"POST + HMAC"| EP1
     Worker -->|"POST + HMAC"| EP2
@@ -48,8 +45,7 @@ graph LR
 
     subgraph Railhook
         API["API Service"]
-        DB[("PostgreSQL<br/>Incoming Events<br/>Forward Attempts · Outbox")]
-        Kafka["Kafka<br/>forward dispatch · retry · DLQ"]
+        DB[("PostgreSQL<br/>Incoming Events<br/>Forward Attempts")]
         Worker["Worker Service"]
     end
 
@@ -60,9 +56,7 @@ graph LR
     GitHub  -->|"POST /ingress/{token}"| API
     Shopify -->|"POST /ingress/{token}"| API
     API -->|"verify signature,<br/>keep as it arrived"| DB
-    API -->|"announce"| Kafka
-    Kafka --> Worker
-    Worker -->|"Claim"| DB
+    Worker -->|"Claim due Forwards"| DB
     Worker -->|"POST + destination auth"| Svc1
     Worker -->|"POST + destination auth"| Svc2
 ```
@@ -74,11 +68,10 @@ shorter Retry Ladder.
 
 | Service | Port | Role |
 |---------|------|------|
-| **API** | `8080` | Event ingestion, webhook ingress, REST API, Outbox announcer |
-| **Worker** | `8081` | Kafka consumer, HTTP delivery, forwarding, retry scheduling |
+| **API** | `8080` | Event ingestion, webhook ingress, REST API |
+| **Worker** | `8081` | Claims due Deliveries and Forwards, HTTP delivery, forwarding, retries |
 | **UI** | `5173` | Admin dashboard (React / Vite / shadcn/ui) |
-| **PostgreSQL** | `5432` | Events, Deliveries, Incoming Events, Attempts, Outbox |
-| **Kafka** | `9092` | Dispatch + 6 retry tiers + forward dispatch/retry + DLQ |
+| **PostgreSQL** | `5432` | Events, Deliveries, Incoming Events, Attempts. The Delivery and Forward rows are the work queue |
 | **Redis** | `6379` | Rate limiting, FIFO ordering, circuit breaker |
 
 ## Data model
@@ -105,8 +98,6 @@ erDiagram
     INCOMING_SOURCES    ||--o{ INCOMING_EVENTS : received
     INCOMING_EVENTS     ||--o{ INCOMING_FORWARD_ATTEMPTS : "obliges one per destination"
     INCOMING_DESTINATIONS ||--o{ INCOMING_FORWARD_ATTEMPTS : "gave rise to"
-
-    PROJECTS ||--o{ OUTBOX_MESSAGES : "has yet to announce"
 
     ORGANIZATIONS {
         uuid id PK
@@ -144,6 +135,7 @@ erDiagram
         text status "PENDING PROCESSING SUCCESS FAILED DLQ"
         bigint sequence_number "endpoint-scoped, stamped at creation"
         uuid claim_token "the fence"
+        timestamptz next_retry_at "when it is due; while PROCESSING, when the Claim expires"
     }
     DELIVERY_ATTEMPTS {
         uuid id PK
@@ -175,12 +167,9 @@ erDiagram
         uuid incoming_event_id FK
         uuid destination_id FK
         text status "PENDING PROCESSING SUCCESS FAILED DLQ"
+        uuid claim_token "the fence"
+        timestamptz next_retry_at "when it is due; while PROCESSING, when the Claim expires"
         uuid replay_session_id FK
-    }
-    OUTBOX_MESSAGES {
-        uuid id PK
-        uuid project_id FK
-        text status "PENDING SENDING PUBLISHED FAILED DEAD"
     }
 ```
 
@@ -195,24 +184,16 @@ sequenceDiagram
     participant App as Your Application
     participant API as API Service
     participant DB as PostgreSQL
-    participant K as Kafka
     participant W as Worker
     participant EP as Endpoint
 
     App->>API: POST /api/v1/events
-    API->>DB: INSERT Event + one Delivery per matching Subscription<br/>+ Outbox row, one transaction
+    API->>DB: INSERT Event + one Delivery per matching Subscription,<br/>one transaction, due now
     API-->>App: 201 Created
 
-    Note over API,DB: The Outbox row is written in the same breath as the work,<br/>so the two cannot disagree about whether it happened.
+    Note over API,DB: The Delivery row is the queue entry,<br/>so accepting the Event and queueing its work cannot disagree.
 
-    loop every 100ms
-        API->>DB: claim PENDING Outbox rows
-        API->>K: produce to deliveries.dispatch
-        API->>DB: mark PUBLISHED
-    end
-
-    K->>W: consume
-    W->>DB: Claim the Delivery (fence token)
+    W->>DB: Claim due Deliveries, a few per endpoint<br/>(FOR UPDATE SKIP LOCKED, fence token)
     W->>EP: POST payload + HMAC signature
 
     alt 2xx
@@ -220,19 +201,19 @@ sequenceDiagram
         W->>DB: SUCCESS, under the fence token
     else 408 / 429 / 5xx / timeout
         EP-->>W: 503
-        W->>DB: record the Attempt, advance the Ladder
-        W->>K: produce to deliveries.retry.1m
+        W->>DB: record the Attempt, advance the Ladder,<br/>PENDING, due in 1m
     else other 4xx
         EP-->>W: 400
         W->>DB: FAILED, retrying cannot fix a rejected request
     else Ladder exhausted
-        W->>K: produce to deliveries.dlq
         W->>DB: DLQ
     end
 ```
 
-Each retry tier is its own Kafka topic (`deliveries.retry.1m`, `.5m`, `.15m`, `.1h`, `.6h`,
-`.24h`), because a sleeping consumer would hold a partition.
+The worker polls every 200 ms when idle and again at once after a full batch. A retry is the same
+row with a later `next_retry_at`; the claim query takes it when it is due. Each poll takes at most
+`WEBHOOK_CLAIM_PER_TARGET` rows per endpoint, round-robin across endpoints, so one endpoint's
+backlog cannot fill a batch.
 
 ## Incoming ingress flow
 
@@ -242,7 +223,6 @@ sequenceDiagram
     participant P as Provider
     participant API as API Service
     participant DB as PostgreSQL
-    participant K as Kafka
     participant W as Worker
     participant D as Destination
 
@@ -257,16 +237,14 @@ sequenceDiagram
         API->>DB: INSERT Incoming Event, verified = false
         API-->>P: 401 Unauthorized
     else valid
-        API->>DB: INSERT Incoming Event (headers, body, IP, verified)<br/>+ one Forward per enabled Destination + Outbox, one transaction
+        API->>DB: INSERT Incoming Event (headers, body, IP, verified)<br/>+ one Forward per enabled Destination, one transaction
         API-->>P: 202 Accepted
-        API->>K: produce to incoming.forward.dispatch
-        K->>W: consume
-        W->>DB: Claim the Forward
+        W->>DB: Claim due Forwards, a few per Destination
         W->>D: POST body + destination auth
         alt 2xx
             W->>DB: SUCCESS
         else failure
-            W->>K: produce to incoming.forward.retry
+            W->>DB: record the Attempt, PENDING, due at the next tier
         end
     end
 ```
@@ -292,16 +270,15 @@ sequenceDiagram
     participant W1 as Worker A
     participant DB as PostgreSQL
     participant W2 as Worker B
-    participant Sweep as Stuck sweep
 
-    W1->>DB: UPDATE … SET status=PROCESSING, claim_token=T1<br/>WHERE status=PENDING
-    DB-->>W1: 1 row, Claim held
+    W1->>DB: SELECT due rows FOR UPDATE SKIP LOCKED<br/>SET status=PROCESSING, claim_token=T1,<br/>next_retry_at=now+300s
+    DB-->>W1: the row, Claim held
     W2->>DB: same statement
-    DB-->>W2: 0 rows, already claimed, go away
+    DB-->>W2: row locked or not due, skipped
 
     Note over W1: Worker A stops responding.
 
-    Sweep->>DB: PROCESSING for too long → back to PENDING, token cleared
+    Note over DB: next_retry_at passes, the row is due again
     W2->>DB: claims it, token T2
 
     W1->>DB: UPDATE … WHERE claim_token = T1
@@ -349,7 +326,7 @@ stateDiagram-v2
 
     PENDING --> PROCESSING : Claim taken
     PROCESSING --> PENDING : Deferral, nothing tried
-    PROCESSING --> PENDING : stuck sweep revokes a lost Claim
+    PROCESSING --> PROCESSING : Claim timed out, claimed again with a new token
 
     PROCESSING --> SUCCESS : 2xx
     PROCESSING --> FAILED : 4xx that retrying cannot fix
@@ -364,8 +341,10 @@ stateDiagram-v2
     FAILED --> [*]
 ```
 
-- `PROCESSING -> PENDING` has three causes: a Deferral, a revoked Claim, a retry. Only a retry
-  advances the Ladder.
+- `PROCESSING -> PENDING` has two causes: a Deferral and a retry. Only a retry advances the
+  Ladder.
+- A Claim whose worker died expires after `WEBHOOK_CLAIM_TIMEOUT_SECONDS` (300s); the row is due
+  again and the next claim replaces the token, which fences the lost holder.
 - `PENDING -> DLQ`: the Ladder ran out, or `StaleDeliveryEscalationService` hit the hard cap
   (default 96h, above the ladder's ~83h worst case). Alert on
   `delivery_oldest_pending_age_seconds`.
@@ -439,8 +418,8 @@ sequenceDiagram
     end
 ```
 
-Parking releases the Claim and clears the fence token. Drain speed of a parked burst depends on
-the retry scheduler's poll cadence, not the buffer's delay.
+Parking releases the Claim and clears the fence token. A parked Delivery is claimed again when
+its `next_retry_at` comes due.
 
 ## Replay is not retry
 
@@ -492,13 +471,13 @@ transaction), native queries, or your own thread pools. The ratchets check these
 - **At-least-once delivery.** An Attempt can succeed at the endpoint and fail to record, so the
   endpoint may see it twice. The `webhook-id` header is the Delivery id and stays the same across
   Attempts; receivers dedupe on it.
-- **The Outbox makes acceptance and announcement agree.** Event, Deliveries and Outbox row are
-  one transaction. If Kafka is down, delivery is late, not lost.
+- **The row is the queue.** The Event and its Deliveries are one transaction, and the worker
+  claims the Deliveries directly, so there is no hand-off between accepting an Event and queueing
+  its work.
 - **Ordering is per endpoint, opt-in, outgoing only.** Off by default.
 
 ### Partitioning
 
-Kafka messages are keyed by endpoint, so one hot endpoint is limited to one consumer.
 `delivery_attempts` and `tunnel_request_log` are time-partitioned in Postgres, so retention is a
 partition detach.
 
@@ -508,17 +487,17 @@ partition detach.
 |---|---|---|
 | **Redis unreachable** | The circuit breaker fails open: calls are allowed and counted. | `circuit_breaker_degraded_total` |
 | **An endpoint is degraded for days** | The Ladder runs out; anything `PENDING` past the hard cap goes to Failed Messages. | `delivery_oldest_pending_age_seconds` |
-| **Retry storm after a mass outage** | `RetryGovernor` applies AIMD to the scheduler batch size, a queue-depth gate and a failure cooldown. | governor gauges |
-| **A worker dies mid-Attempt** | The stuck sweep revokes the Claim; the fence blocks the late write. The endpoint may see a duplicate. | at-least-once, above |
-| **Kafka consumer lag** | Deliveries are late, not lost. | consumer lag dashboard |
+| **Backlog after a mass outage** | Each poll takes a few due rows per endpoint, and the admission limits still apply to each. | `delivery_queue_depth` |
+| **A worker dies mid-Attempt** | The Claim expires after `WEBHOOK_CLAIM_TIMEOUT_SECONDS` and another worker claims the row; the fence blocks the late write. The endpoint may see a duplicate. | at-least-once, above |
+| **Workers fall behind** | Due rows wait in Postgres. Deliveries are late, not lost. | `delivery_oldest_pending_age_seconds` |
 | **A transformation template breaks** | Retryable; the raw payload is never sent instead. | invariant 4 |
-| **Postgres restored from backup** | Postgres, Kafka and Redis disagree. Flush Redis, leave Kafka, let the stuck sweep re-queue. | [OPERATIONS.md](./OPERATIONS.md#disaster-recovery) |
+| **Postgres restored from backup** | Postgres and Redis disagree. Flush Redis; rows restored as `PROCESSING` are claimed again once their Claim expires. | [OPERATIONS.md](./OPERATIONS.md#disaster-recovery) |
 
 ### Scaling limits
 
 API and worker are stateless and have an HPA in the chart. Limits, in the order usually hit:
-Postgres writes on `delivery_attempts`, partition count for one hot endpoint, Redis round-trips
-per Attempt on the ordering path.
+Postgres writes on `delivery_attempts` and the claim query, per-endpoint concurrency for one hot
+endpoint, Redis round-trips per Attempt on the ordering path.
 
 ## Production topology
 
@@ -531,13 +510,11 @@ flowchart TB
         APISvc["api Service"] --> APIPods["api Deployment<br/>HPA · PDB"]
         WorkerPods["worker Deployment<br/>HPA · PDB"]
         Backup["db-backup CronJob"]
-        Topics["kafka-topics Job<br/>runs once on install"]
         NP["NetworkPolicy"]
     end
 
     subgraph Data["Data services, external by default"]
         PG[("PostgreSQL")]
-        KafkaC["Kafka"]
         RedisC[("Redis")]
     end
 
@@ -550,12 +527,9 @@ flowchart TB
     Ingress --> UISvc
     Ingress --> APISvc
     APIPods --> PG
-    APIPods --> KafkaC
     APIPods --> RedisC
     WorkerPods --> PG
-    WorkerPods --> KafkaC
     WorkerPods --> RedisC
-    Topics --> KafkaC
     Backup --> PG
     SM -.->|"scrapes :8082 and :8081"| APIPods
     SM -.-> WorkerPods
@@ -563,7 +537,7 @@ flowchart TB
     Graf -.-> SM
 ```
 
-The chart ships no database. Postgres, Kafka and Redis are external.
+The chart ships no database. Postgres and Redis are external.
 
 ## CLI tunnel flow
 

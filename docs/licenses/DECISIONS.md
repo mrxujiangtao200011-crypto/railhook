@@ -32,22 +32,22 @@ then a choice the operator makes, not one the default distribution ships.
 
 ## Bitnami subcharts (Helm chart) — removed, not pinned
 
-`deploy/helm/railhook/Chart.yaml` used to declare three optional subchart
-dependencies from `https://charts.bitnami.com/bitnami` — postgresql 12.x.x,
-redis 18.x.x and kafka 26.x.x. It now declares `dependencies: []`.
+`deploy/helm/railhook/Chart.yaml` used to declare optional subchart
+dependencies from `https://charts.bitnami.com/bitnami`, among them postgresql
+12.x.x and redis 18.x.x. It now declares `dependencies: []`.
 
-License was never the problem: all three are Apache-2.0, wrapping upstream
-PostgreSQL/Redis/Kafka. Availability was. Bitnami moved its free catalog to a
+License was never the problem: they are Apache-2.0, wrapping upstream
+PostgreSQL and Redis. Availability was. Bitnami moved its free catalog to a
 restricted "Legacy" tier on 2025-08-28, images referenced by those chart
-versions stopped receiving updates, Kafka was dropped from the catalog
-outright, and the AWS-hosted mirror retires 2026-06-10. Re-pinning would have
-been a bet on a catalog that is actively shrinking.
+versions stopped receiving updates, and the AWS-hosted mirror retires
+2026-06-10. Re-pinning would have been a bet on a catalog that is actively
+shrinking.
 
-The chart therefore requires bring-your-own PostgreSQL/Kafka/Redis — see the
+The chart therefore requires bring-your-own PostgreSQL and Redis — see the
 `external:` blocks in `values.yaml` and the Helm README's prerequisites, which
 is how production deployments were documented to work anyway.
 `docker-compose.yml` names the exact images this project is tested against
-(postgres:16-alpine, apache/kafka:3.7.0, redis:7-alpine — none of them
+(postgres:16-alpine, redis:7-alpine — neither of them
 Bitnami) as a reference for a self-managed in-cluster deployment.
 
 There is consequently no third-party license exception to record here for the

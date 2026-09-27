@@ -28,15 +28,12 @@ kubectl create secret generic railhook-redis-secret \
 
 helm install railhook oci://ghcr.io/vadymkykalo/charts/railhook --version <version> \
   --set postgresql.external.host=your-postgres-host \
-  --set kafka.external.bootstrapServers=your-kafka:9092 \
+  --set redis.external.host=your-redis-host \
   --set ui.ingress.hosts[0].host=app.yourdomain.com
 
 # From a clone: helm install railhook ./deploy/helm/railhook \
 #   -f ./deploy/helm/railhook/values-production.yaml --set ...
 ```
-
-A post-install hook creates the topics: `deliveries.dispatch`,
-`deliveries.retry.{1m,5m,15m,1h,6h,24h}`, `deliveries.dlq`.
 
 ### Retry ladder vs. DLQ hard-cap
 
@@ -130,10 +127,11 @@ Both actions are audited as `ORGANIZATION_SUSPENDED` / `ORGANIZATION_REINSTATED`
 
 ## Common Issues
 
-### High Kafka lag
+### Deliveries falling behind
+`delivery_oldest_pending_age_seconds` or `delivery_queue_depth{status="pending"}` keeps rising.
 - Scale workers: `make scale-worker N=5` or `kubectl scale deployment railhook-worker --replicas=5`
 - Check the DB connection pool in the logs
-- Increase `KAFKA_DELIVERY_CONCURRENCY`
+- Raise `WEBHOOK_OUTGOING_POOL_SIZE`; each poll claims as many rows as the pool has free threads
 
 ### Database issues
 - Backup: `make backup-db` (Compose only)
@@ -234,12 +232,9 @@ Then: `install.sh` (or `./railhook start`), stop the stack, `make restore-db FIL
 
 - **Redis: flush it** before starting the worker. Everything in it (rate limits, circuit breakers,
   sequence counters, quota counters) is derived and rebuilds from Postgres.
-- **Kafka: leave it alone.** Messages for rolled-back deliveries are declined at the claim step
-  (`"delivery already claimed or not PENDING"`); a burst of these in the worker log is expected.
-  Do not reset consumer offsets.
-- **Postgres: nothing by hand.** `StuckDeliveryRecoveryService` re-queues stranded `PENDING`
-  deliveries after `stuck-delivery.stranded-pending-threshold-minutes` (60). Watch
-  `delivery_oldest_pending_age_seconds` come down over about an hour.
+- **Postgres: nothing by hand.** Due `PENDING` deliveries are claimed on the worker's next poll.
+  Rows restored as `PROCESSING` are claimed again once their claim expires
+  (`WEBHOOK_CLAIM_TIMEOUT_SECONDS`, 300), so an endpoint may see such an attempt twice.
 
 Events accepted after the dump are lost. If you know the window, tell the affected customers.
 
@@ -290,7 +285,7 @@ test a rolling upgrade where both versions run at once.
 
 Twenty-four shipped migrations build an index with plain `CREATE INDEX` on a table that grows
 without bound (`events`, `deliveries`, `delivery_attempts`, `incoming_events`,
-`incoming_forward_attempts`, `outbox_messages`, `tunnel_request_log`, `audit_log`,
+`incoming_forward_attempts`, `tunnel_request_log`, `audit_log`,
 `usage_daily`). That blocks writes to the table until the build ends. On a large installation the
 upgrade looks hung and ingest stops. They cannot be edited now (Flyway checksums).
 
@@ -332,8 +327,8 @@ of that, production should have:
 - TLS terminated at the ingress or load balancer
 - `AUTH_BCRYPT_STRENGTH` at 12 unless login is measurably slow
 - `AUTH_LOCKOUT_ENABLED=true` unless something in front already limits attempts per account
-- `DB_POOL_MAX_SIZE=20` (API), `WORKER_DB_POOL_MAX_SIZE=40` (worker),
-  `KAFKA_DELIVERY_CONCURRENCY=8` as a starting point for pool sizes
+- `DB_POOL_MAX_SIZE=20` (API), `WORKER_DB_POOL_MAX_SIZE=40` (worker) as a starting point for
+  pool sizes
 
 All variables: `.env.dist`.
 
