@@ -89,10 +89,10 @@ public class IncomingForwardAttempt {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    // A PENDING row without a due time is never claimed.
+    // An active row without a due time is never claimed.
     @PrePersist
-    void dueNowIfPending() {
-        if (nextRetryAt == null && status == ForwardAttemptStatus.PENDING) {
+    void dueNowIfActive() {
+        if (nextRetryAt == null && (status == ForwardAttemptStatus.PENDING || status == ForwardAttemptStatus.PROCESSING)) {
             nextRetryAt = Instant.now();
         }
     }

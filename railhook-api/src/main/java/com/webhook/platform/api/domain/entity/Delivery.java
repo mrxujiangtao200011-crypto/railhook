@@ -152,10 +152,10 @@ public class Delivery {
         this.claimToken = null;
     }
 
-    // A PENDING row without a due time is never claimed.
+    // An active row without a due time is never claimed.
     @PrePersist
-    void dueNowIfPending() {
-        if (nextRetryAt == null && status == DeliveryStatus.PENDING) {
+    void dueNowIfActive() {
+        if (nextRetryAt == null && (status == DeliveryStatus.PENDING || status == DeliveryStatus.PROCESSING)) {
             nextRetryAt = Instant.now();
         }
     }

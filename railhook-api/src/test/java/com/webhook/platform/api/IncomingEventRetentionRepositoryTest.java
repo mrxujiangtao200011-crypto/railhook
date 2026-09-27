@@ -120,8 +120,8 @@ class IncomingEventRetentionRepositoryTest extends AbstractIntegrationTest {
     private void seedForwardAttempt(UUID eventId, int attemptNumber, String status) {
         entityManager.createNativeQuery("""
                 INSERT INTO incoming_forward_attempts (id, organization_id, incoming_event_id, destination_id,
-                                                       attempt_number, status, created_at)
-                VALUES (:id, :org, :eventId, :destinationId, :attemptNumber, :status, NOW())
+                                                       attempt_number, status, created_at, next_retry_at)
+                VALUES (:id, :org, :eventId, :destinationId, :attemptNumber, :status, NOW(), NOW())
                 """)
                 .setParameter("id", UUID.randomUUID())
                 .setParameter("org", organizationId)
