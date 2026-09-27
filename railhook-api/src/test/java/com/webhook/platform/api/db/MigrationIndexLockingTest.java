@@ -30,7 +30,7 @@ class MigrationIndexLockingTest {
     private static final Set<String> UNBOUNDED_TABLES = Set.of(
             "events", "deliveries", "delivery_attempts",
             "incoming_events", "incoming_forward_attempts",
-            "outbox_messages", "tunnel_request_log", "audit_log", "usage_daily");
+            "tunnel_request_log", "audit_log", "usage_daily");
 
     // Frozen: shipped migrations cannot be edited, so this set must not grow.
     private static final Set<String> SHIPPED_WITH_BLOCKING_INDEXES = new TreeSet<>(Set.of(
