@@ -128,6 +128,11 @@ gate. `develop` blocks only force-push and deletion. Commit prefixes: `feat:`, `
 - **Boilerplate is Lombok, not hand-written**: `@RequiredArgsConstructor` with `private final`
   fields for beans, `@Getter`/`@Setter`, `@Slf4j`. Write a constructor only when it computes or
   validates something. No `@Data` on JPA entities; records stay records.
-- Comments explain why, never what: an invariant, a race, a past bug, a library quirk. No comments
-  restating code, no section labels, no links to docs.
+- **No AI slop.** New code carries no comments by default. The exception is one short line naming
+  a WHY the next reader would otherwise break: an invariant, a race, a past bug, a library quirk.
+  No javadoc restating a signature, no section banners, no "Step 1", no links to docs. Commits,
+  PRs, changelog entries and docs state what changed and why in plain words: no "robust",
+  "seamless", "comprehensive", no feature lists, no summary of what the diff already shows.
+  Before every commit, including an agent's, check the added lines:
+  `git diff --cached | grep -E '^\+\s*(//|/\*|\*|#)'` and cut every comment that fails this rule.
 - Operational procedures: `docs/OPERATIONS.md`.
