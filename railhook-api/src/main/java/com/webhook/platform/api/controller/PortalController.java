@@ -1,6 +1,6 @@
 package com.webhook.platform.api.controller;
 
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.PortalDeliveryResponse;
 import com.webhook.platform.api.dto.PortalEndpointRequest;

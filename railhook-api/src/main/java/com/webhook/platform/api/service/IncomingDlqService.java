@@ -138,7 +138,7 @@ public class IncomingDlqService {
                     .status(ForwardAttemptStatus.PENDING)
                     .build());
 
-            attempt.setStatus(ForwardAttemptStatus.FAILED);
+            attempt.setStatus(attempt.getStatus().moveTo(ForwardAttemptStatus.FAILED));
             attemptRepository.save(attempt);
 
             log.info("Retrying DLQ forward: eventId={}, destId={}",

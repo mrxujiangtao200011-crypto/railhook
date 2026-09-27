@@ -4,7 +4,7 @@ import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.api.domain.enums.DeliveryOrigin;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -144,7 +144,7 @@ public class Delivery {
      * it. The headroom comes from maxAttempts, capped at the largest ladder the worker accepts.
      */
     public void returnToLadder(int additionalAttempts) {
-        this.status = DeliveryStatus.PENDING;
+        this.status = status.moveTo(DeliveryStatus.PENDING);
         this.maxAttempts = Math.min(attemptCount + additionalAttempts, RetryLadder.MAX_ATTEMPTS_LIMIT);
         this.nextRetryAt = Instant.now();
         this.failedAt = null;

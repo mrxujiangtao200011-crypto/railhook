@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.repository;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.worker.attempt.OutgoingAttemptStore;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.Endpoint;
@@ -85,11 +86,11 @@ class DeliveryRepositoryTest {
     void claimDue_takesDueRowsAndTimedOutClaimsOnly() {
         createSharedEndpoint();
         Instant now = Instant.now();
-        Delivery due = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(1));
-        Delivery timedOut = createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, now.minusSeconds(1));
-        createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.plusSeconds(300));
-        createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, now.plusSeconds(300));
-        createAndPersistDelivery(Delivery.DeliveryStatus.SUCCESS, null);
+        Delivery due = createAndPersistDelivery(DeliveryStatus.PENDING, now.minusSeconds(1));
+        Delivery timedOut = createAndPersistDelivery(DeliveryStatus.PROCESSING, now.minusSeconds(1));
+        createAndPersistDelivery(DeliveryStatus.PENDING, now.plusSeconds(300));
+        createAndPersistDelivery(DeliveryStatus.PROCESSING, now.plusSeconds(300));
+        createAndPersistDelivery(DeliveryStatus.SUCCESS, null);
         entityManager.flush();
         entityManager.clear();
 
@@ -103,7 +104,7 @@ class DeliveryRepositoryTest {
     void claimDue_stampsAFreshTokenAndTheClaimTimeout() {
         createSharedEndpoint();
         Instant now = Instant.now();
-        Delivery timedOut = createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, now.minusSeconds(1));
+        Delivery timedOut = createAndPersistDelivery(DeliveryStatus.PROCESSING, now.minusSeconds(1));
         UUID lostHolder = UUID.randomUUID();
         timedOut.setClaimToken(lostHolder);
         entityManager.flush();
@@ -112,7 +113,7 @@ class DeliveryRepositoryTest {
 
         Delivery claimed = deliveryRepository.claimDue(now, expiresAt, FROM_START, 10, 10, 10).get(0);
 
-        assertEquals(Delivery.DeliveryStatus.PROCESSING, claimed.getStatus());
+        assertEquals(DeliveryStatus.PROCESSING, claimed.getStatus());
         assertNotNull(claimed.getClaimToken());
         assertNotEquals(lostHolder, claimed.getClaimToken(), "the lost holder must not match the new fence");
         assertEquals(expiresAt.truncatedTo(ChronoUnit.MILLIS), claimed.getNextRetryAt().truncatedTo(ChronoUnit.MILLIS));
@@ -125,9 +126,9 @@ class DeliveryRepositoryTest {
         UUID quietEndpoint = UUID.randomUUID();
         Instant now = Instant.now();
         for (int i = 0; i < 20; i++) {
-            createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(60 + i));
+            createAndPersistDelivery(DeliveryStatus.PENDING, now.minusSeconds(60 + i));
         }
-        Delivery quiet = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(1));
+        Delivery quiet = createAndPersistDelivery(DeliveryStatus.PENDING, now.minusSeconds(1));
         quiet.setEndpointId(quietEndpoint);
         entityManager.flush();
         entityManager.clear();
@@ -142,7 +143,7 @@ class DeliveryRepositoryTest {
     void claimDue_resumesAfterTheCursor() {
         createSharedEndpoint();
         Instant now = Instant.now();
-        createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(1));
+        createAndPersistDelivery(DeliveryStatus.PENDING, now.minusSeconds(1));
         entityManager.flush();
         entityManager.clear();
 
@@ -154,7 +155,7 @@ class DeliveryRepositoryTest {
     void attemptStarting_aReclaimedAttemptDoesNotSpendItsSuccessorsRung() {
         // Matched by id alone, the stale Attempt's increment spent a rung of the successor's ladder.
         createSharedEndpoint();
-        Delivery delivery = createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, null);
+        Delivery delivery = createAndPersistDelivery(DeliveryStatus.PROCESSING, null);
         UUID sweptFence = UUID.randomUUID();
         delivery.setClaimToken(UUID.randomUUID());
         entityManager.flush();
@@ -197,7 +198,7 @@ class DeliveryRepositoryTest {
                 .eventId(UUID.randomUUID())
                 .endpointId(sharedEndpointId)
                 .subscriptionId(UUID.randomUUID())
-                .status(Delivery.DeliveryStatus.PENDING)
+                .status(DeliveryStatus.PENDING)
                 .attemptCount(7)
                 .maxAttempts(10)
                 .orderingEnabled(false)
@@ -213,16 +214,16 @@ class DeliveryRepositoryTest {
         createSharedEndpoint();
         Instant now = Instant.now();
 
-        Delivery dueSoon = orderedDelivery(3L, Delivery.DeliveryStatus.PENDING, now.plusSeconds(20), now);
-        Delivery inFlight = orderedDelivery(4L, Delivery.DeliveryStatus.PROCESSING, null, now.minusSeconds(5));
+        Delivery dueSoon = orderedDelivery(3L, DeliveryStatus.PENDING, now.plusSeconds(20), now);
+        Delivery inFlight = orderedDelivery(4L, DeliveryStatus.PROCESSING, null, now.minusSeconds(5));
         // A later rung: nothing will touch this one for an hour.
-        orderedDelivery(5L, Delivery.DeliveryStatus.PENDING, now.plusSeconds(3600), now);
+        orderedDelivery(5L, DeliveryStatus.PENDING, now.plusSeconds(3600), now);
         // Claimed, then abandoned by whoever held it: PROCESSING, but nobody is attempting it.
-        orderedDelivery(6L, Delivery.DeliveryStatus.PROCESSING, null, now.minusSeconds(600));
+        orderedDelivery(6L, DeliveryStatus.PROCESSING, null, now.minusSeconds(600));
         // Resolved, so not outstanding at all.
-        orderedDelivery(7L, Delivery.DeliveryStatus.SUCCESS, null, now);
+        orderedDelivery(7L, DeliveryStatus.SUCCESS, null, now);
         // Due, but outside the gap being asked about.
-        orderedDelivery(20L, Delivery.DeliveryStatus.PENDING, now, now);
+        orderedDelivery(20L, DeliveryStatus.PENDING, now, now);
 
         entityManager.flush();
         entityManager.clear();
@@ -235,7 +236,7 @@ class DeliveryRepositoryTest {
                         + ") and the one being attempted now (" + inFlight.getSequenceNumber() + ") count");
     }
 
-    private Delivery orderedDelivery(long sequenceNumber, Delivery.DeliveryStatus status,
+    private Delivery orderedDelivery(long sequenceNumber, DeliveryStatus status,
             Instant nextRetryAt, Instant updatedAt) {
         Delivery delivery = Delivery.builder()
                 .organizationId(FIXTURE_ORG)
@@ -255,11 +256,11 @@ class DeliveryRepositoryTest {
         return entityManager.persist(delivery);
     }
 
-    private Delivery createAndPersistDelivery(Delivery.DeliveryStatus status, Instant nextRetryAt) {
+    private Delivery createAndPersistDelivery(DeliveryStatus status, Instant nextRetryAt) {
         return createAndPersistDelivery(status, nextRetryAt, Instant.now());
     }
 
-    private Delivery createAndPersistDelivery(Delivery.DeliveryStatus status, Instant nextRetryAt, Instant updatedAt) {
+    private Delivery createAndPersistDelivery(DeliveryStatus status, Instant nextRetryAt, Instant updatedAt) {
         Delivery delivery = Delivery.builder()
                 .organizationId(FIXTURE_ORG)
                 .id(UUID.randomUUID())

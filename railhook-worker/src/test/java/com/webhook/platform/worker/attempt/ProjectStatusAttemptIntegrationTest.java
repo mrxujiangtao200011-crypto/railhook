@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.attempt;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.common.retry.RetryAfter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,6 +51,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.testcontainers.containers.PostgreSQLContainer;
 
+import java.util.Map;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -86,6 +88,7 @@ class ProjectStatusAttemptIntegrationTest {
     static {
         POSTGRES.start();
         Flyway.configure()
+                .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
                 .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .locations("classpath:db/expected-migrations")
                 .load()
@@ -170,8 +173,8 @@ class ProjectStatusAttemptIntegrationTest {
         Delivery toDeletedProject = runDelivery(pendingDelivery(org, deletedProject, endpoint));
 
         assertThat(received.get()).isZero();
-        assertThat(toDeletedEndpoint.getStatus()).isEqualTo(Delivery.DeliveryStatus.FAILED);
-        assertThat(toDeletedProject.getStatus()).isEqualTo(Delivery.DeliveryStatus.FAILED);
+        assertThat(toDeletedEndpoint.getStatus()).isEqualTo(DeliveryStatus.FAILED);
+        assertThat(toDeletedProject.getStatus()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(toDeletedProject.getAttemptCount()).isZero();
     }
 
@@ -185,7 +188,7 @@ class ProjectStatusAttemptIntegrationTest {
         Delivery deferred = runDelivery(delivery);
 
         assertThat(received.get()).isZero();
-        assertThat(deferred.getStatus()).isEqualTo(Delivery.DeliveryStatus.PENDING);
+        assertThat(deferred.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(deferred.getAttemptCount()).isZero();
         assertThat(deferred.getClaimToken()).isNull();
         // Not re-polled in a hot loop while the suspension stands.
@@ -203,7 +206,7 @@ class ProjectStatusAttemptIntegrationTest {
         Delivery resumed = runDelivery(delivery);
 
         assertThat(received.get()).isEqualTo(1);
-        assertThat(resumed.getStatus()).isEqualTo(Delivery.DeliveryStatus.SUCCESS);
+        assertThat(resumed.getStatus()).isEqualTo(DeliveryStatus.SUCCESS);
         assertThat(resumed.getAttemptCount()).isEqualTo(1);
     }
 
@@ -288,7 +291,7 @@ class ProjectStatusAttemptIntegrationTest {
                 .eventId(event.getId())
                 .endpointId(endpointId)
                 .deliveryOrigin(Delivery.DeliveryOrigin.RULE)
-                .status(Delivery.DeliveryStatus.PENDING)
+                .status(DeliveryStatus.PENDING)
                 .attemptCount(0)
                 .maxAttempts(3)
                 .orderingEnabled(false)
@@ -360,7 +363,7 @@ class ProjectStatusAttemptIntegrationTest {
 
     private Delivery runDelivery(UUID deliveryId) {
         Delivery row = deliveryRepository.findById(deliveryId).orElseThrow();
-        row.setStatus(Delivery.DeliveryStatus.PROCESSING);
+        row.setStatus(DeliveryStatus.PROCESSING);
         row.setClaimToken(UUID.randomUUID());
         Delivery claimed = deliveryRepository.save(row);
         OutgoingAttemptStore store = new OutgoingAttemptStore(

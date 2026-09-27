@@ -2,7 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.enums.AlertType;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;

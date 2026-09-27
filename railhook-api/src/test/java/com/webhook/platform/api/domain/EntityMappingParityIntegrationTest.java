@@ -308,6 +308,7 @@ class EntityMappingParityIntegrationTest {
                 "migration directory not found: " + MIGRATIONS.toAbsolutePath());
 
         Flyway.configure()
+                .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
                 .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .locations("filesystem:" + MIGRATIONS.toAbsolutePath())
                 .load()

@@ -11,7 +11,7 @@ import com.webhook.platform.api.domain.entity.ReplaySession;
 import com.webhook.platform.api.domain.entity.Rule;
 import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.entity.RuleAction;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

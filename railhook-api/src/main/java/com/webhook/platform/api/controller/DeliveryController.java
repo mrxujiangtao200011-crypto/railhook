@@ -1,7 +1,7 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.dto.BulkReplayRequest;
 import com.webhook.platform.api.dto.BulkReplayResponse;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;

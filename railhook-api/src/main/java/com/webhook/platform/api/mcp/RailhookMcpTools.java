@@ -1,7 +1,7 @@
 package com.webhook.platform.api.mcp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EventIngestRequest;

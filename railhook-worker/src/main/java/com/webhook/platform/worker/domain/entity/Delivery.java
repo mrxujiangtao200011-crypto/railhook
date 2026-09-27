@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.domain.entity;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.retry.RetryableStatuses;
 import jakarta.persistence.*;
@@ -122,7 +123,7 @@ public class Delivery {
     private Long version;
 
     public void handBackTo(Instant retryAt) {
-        this.status = DeliveryStatus.PENDING;
+        this.status = status.moveTo(DeliveryStatus.PENDING);
         this.claimToken = null;
         this.nextRetryAt = retryAt;
         this.updatedAt = Instant.now();
@@ -130,7 +131,7 @@ public class Delivery {
 
     public void succeed() {
         Instant now = Instant.now();
-        this.status = DeliveryStatus.SUCCESS;
+        this.status = status.moveTo(DeliveryStatus.SUCCESS);
         this.succeededAt = now;
         this.nextRetryAt = null;
         this.claimToken = null;
@@ -139,7 +140,7 @@ public class Delivery {
 
     public void abandon() {
         Instant now = Instant.now();
-        this.status = DeliveryStatus.DLQ;
+        this.status = status.moveTo(DeliveryStatus.DLQ);
         this.failedAt = now;
         this.nextRetryAt = null;
         this.claimToken = null;
@@ -149,7 +150,7 @@ public class Delivery {
     /** Sets {@code failedAt} like every terminal end; the status says it was not a failure. */
     public void cancel() {
         Instant now = Instant.now();
-        this.status = DeliveryStatus.CANCELLED;
+        this.status = status.moveTo(DeliveryStatus.CANCELLED);
         this.failedAt = now;
         this.nextRetryAt = null;
         this.claimToken = null;
@@ -158,17 +159,13 @@ public class Delivery {
 
     public void failTerminally() {
         Instant now = Instant.now();
-        this.status = DeliveryStatus.FAILED;
+        this.status = status.moveTo(DeliveryStatus.FAILED);
         this.failedAt = now;
         this.nextRetryAt = null;
         this.claimToken = null;
         this.updatedAt = now;
     }
 
-    public enum DeliveryStatus {
-        PENDING, PROCESSING, SUCCESS, FAILED, DLQ,
-        CANCELLED
-    }
 
     public enum DeliveryOrigin {
         SUBSCRIPTION, RULE

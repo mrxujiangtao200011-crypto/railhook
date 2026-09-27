@@ -1,7 +1,7 @@
 package com.webhook.platform.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.ReplaySessionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.attempt;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.enums.SignatureScheme;
@@ -114,7 +115,7 @@ class OutgoingAttemptStoreTest {
         rowIs(processingDelivery());
 
         assertThat(store.finalise(claim(FENCE), new Finalization.Succeeded())).isTrue();
-        assertThat(saved().getStatus()).isEqualTo(Delivery.DeliveryStatus.SUCCESS);
+        assertThat(saved().getStatus()).isEqualTo(DeliveryStatus.SUCCESS);
     }
 
     @Test
@@ -125,7 +126,7 @@ class OutgoingAttemptStoreTest {
         assertThat(store.finalise(claim(FENCE), new Finalization.Retry(at, "500"))).isTrue();
 
         Delivery row = saved();
-        assertThat(row.getStatus()).isEqualTo(Delivery.DeliveryStatus.PENDING);
+        assertThat(row.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(row.getClaimToken()).isNull();
         assertThat(row.getNextRetryAt()).isEqualTo(at);
     }
@@ -135,7 +136,7 @@ class OutgoingAttemptStoreTest {
         rowIs(processingDelivery());
 
         assertThat(store.finalise(claim(FENCE), new Finalization.Abandoned("out of attempts"))).isTrue();
-        assertThat(saved().getStatus()).isEqualTo(Delivery.DeliveryStatus.DLQ);
+        assertThat(saved().getStatus()).isEqualTo(DeliveryStatus.DLQ);
     }
 
     @Test
@@ -145,14 +146,14 @@ class OutgoingAttemptStoreTest {
         assertThat(store.finalise(claim(FENCE), new Finalization.TerminallyFailed("404"))).isTrue();
 
         Delivery row = saved();
-        assertThat(row.getStatus()).isEqualTo(Delivery.DeliveryStatus.FAILED);
+        assertThat(row.getStatus()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(row.getNextRetryAt()).isNull();
     }
 
     @Test
     void aRowThatIsNoLongerProcessingIsNotOverwritten() {
         Delivery row = processingDelivery();
-        row.setStatus(Delivery.DeliveryStatus.SUCCESS);
+        row.setStatus(DeliveryStatus.SUCCESS);
         rowIs(row);
 
         assertThat(store.finalise(claim(FENCE), new Finalization.Retry(Instant.now(), "500"))).isFalse();
@@ -195,7 +196,7 @@ class OutgoingAttemptStoreTest {
     private Delivery processingDelivery() {
         return Delivery.builder()
                 .id(DELIVERY_ID)
-                .status(Delivery.DeliveryStatus.PROCESSING)
+                .status(DeliveryStatus.PROCESSING)
                 .attemptCount(1)
                 .maxAttempts(5)
                 .claimToken(FENCE)
@@ -335,7 +336,7 @@ class OutgoingAttemptStoreTest {
                     .id(UUID.randomUUID())
                     .eventId(event.getId())
                     .endpointId(endpoint.getId())
-                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .status(DeliveryStatus.PROCESSING)
                     .attemptCount(0)
                     .maxAttempts(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS)
                     .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)

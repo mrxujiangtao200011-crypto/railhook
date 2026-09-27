@@ -84,14 +84,14 @@ public class IncomingForwardAttempt {
 
     /** {@code next_retry_at} must be set: a row without one is never claimed. */
     public void handBackTo(Instant retryAt) {
-        this.status = ForwardAttemptStatus.PENDING;
+        this.status = status.moveTo(ForwardAttemptStatus.PENDING);
         this.startedAt = null;
         this.claimToken = null;
         this.nextRetryAt = retryAt;
     }
 
     public void abandon(String reason) {
-        this.status = ForwardAttemptStatus.DLQ;
+        this.status = status.moveTo(ForwardAttemptStatus.DLQ);
         this.finishedAt = Instant.now();
         this.errorMessage = reason;
         this.nextRetryAt = null;

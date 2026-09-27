@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.common.retry.RetryAfter;
 import com.webhook.platform.worker.attempt.TargetFailureRecorder;
 import com.webhook.platform.worker.attempt.AttemptRunner;
@@ -183,7 +184,7 @@ class WebhookDeliveryServiceTest {
                     .id(deliveryId)
                     .eventId(eventId)
                     .endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .status(DeliveryStatus.PROCESSING)
                     .attemptCount(0)
                     .maxAttempts(10)
                     .updatedAt(Instant.now())
@@ -279,18 +280,18 @@ class WebhookDeliveryServiceTest {
 
             Delivery delivery = Delivery.builder()
                     .id(deliveryId).eventId(eventId).endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .status(DeliveryStatus.PROCESSING)
                     .attemptCount(0).maxAttempts(5)
                     .timeoutSeconds(1) // shorter than the slow bookkeeping below
                     .updatedAt(Instant.now())
                     .build();
             when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-            List<Delivery.DeliveryStatus> savedStatuses = Collections.synchronizedList(new ArrayList<>());
+            List<DeliveryStatus> savedStatuses = Collections.synchronizedList(new ArrayList<>());
             AtomicReference<String> successSaveThreadName = new AtomicReference<>();
             when(deliveryRepository.save(any(Delivery.class))).thenAnswer(inv -> {
                 Delivery d = inv.getArgument(0);
-                if (d.getStatus() == Delivery.DeliveryStatus.SUCCESS) {
+                if (d.getStatus() == DeliveryStatus.SUCCESS) {
                     successSaveThreadName.set(Thread.currentThread().getName());
                     Thread.sleep(1500); // slow success bookkeeping — longer than the 1s timeout above
                 }
@@ -303,11 +304,11 @@ class WebhookDeliveryServiceTest {
             // Lets an unfixed build's background save land, so the test is not racy and leaks no thread.
             Thread.sleep(2000);
 
-            assertFalse(savedStatuses.contains(Delivery.DeliveryStatus.PENDING),
+            assertFalse(savedStatuses.contains(DeliveryStatus.PENDING),
                     "a delivery that already received a 2xx response must never be re-scheduled " +
                             "as a duplicate PENDING retry, even when success bookkeeping is slow " +
                             "enough to trip the HTTP timeout");
-            assertTrue(savedStatuses.contains(Delivery.DeliveryStatus.SUCCESS),
+            assertTrue(savedStatuses.contains(DeliveryStatus.SUCCESS),
                     "the 2xx response must still be recorded as SUCCESS");
             assertFalse(successSaveThreadName.get() != null
                             && successSaveThreadName.get().startsWith("reactor-http-nio"),
@@ -337,13 +338,13 @@ class WebhookDeliveryServiceTest {
 
         Delivery claimed = Delivery.builder()
                 .id(deliveryId).eventId(eventId).endpointId(endpointId)
-                .status(Delivery.DeliveryStatus.PROCESSING)
+                .status(DeliveryStatus.PROCESSING)
                 .attemptCount(0).maxAttempts(5).timeoutSeconds(2)
                 .updatedAt(Instant.now())
                 .build();
         Delivery alreadySucceeded = Delivery.builder()
                 .id(deliveryId).eventId(eventId).endpointId(endpointId)
-                .status(Delivery.DeliveryStatus.SUCCESS)
+                .status(DeliveryStatus.SUCCESS)
                 .attemptCount(1).maxAttempts(5)
                 .succeededAt(Instant.now()).updatedAt(Instant.now())
                 .build();
@@ -353,7 +354,7 @@ class WebhookDeliveryServiceTest {
 
         process(service, deliveryId);
 
-        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == DeliveryStatus.PENDING));
     }
 
     // The park's own future next_retry_at once kept a released Delivery waiting a full park delay.
@@ -380,7 +381,7 @@ class WebhookDeliveryServiceTest {
 
             Delivery delivery = Delivery.builder()
                     .id(deliveryId).eventId(eventId).endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .status(DeliveryStatus.PROCESSING)
                     .attemptCount(0).maxAttempts(5).timeoutSeconds(5)
                     .orderingEnabled(true).sequenceNumber(2L)
                     .updatedAt(Instant.now())
@@ -433,7 +434,7 @@ class WebhookDeliveryServiceTest {
                 .id(deliveryId)
                 .eventId(eventId)
                 .endpointId(endpointId)
-                .status(Delivery.DeliveryStatus.PROCESSING)
+                .status(DeliveryStatus.PROCESSING)
                 .attemptCount(0)
                 .maxAttempts(5)
                 .transformationId(transformationId)
@@ -460,7 +461,7 @@ class WebhookDeliveryServiceTest {
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());
         // Retryable: attempt 1 of 5.
-        assertEquals(Delivery.DeliveryStatus.PENDING, deliveryCaptor.getValue().getStatus());
+        assertEquals(DeliveryStatus.PENDING, deliveryCaptor.getValue().getStatus());
 
         assertEquals(1.0, meterRegistry.get("transform_failed_total").counter().count(),
                 "a configured-but-failing transform must be counted, not just warn-logged");
@@ -497,7 +498,7 @@ class WebhookDeliveryServiceTest {
                 .id(deliveryId)
                 .eventId(eventId)
                 .endpointId(endpointId)
-                .status(Delivery.DeliveryStatus.PROCESSING)
+                .status(DeliveryStatus.PROCESSING)
                 .attemptCount(4)
                 .maxAttempts(5)
                 .payloadTemplate("{ this is not valid json")
@@ -513,14 +514,14 @@ class WebhookDeliveryServiceTest {
 
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());
-        assertEquals(Delivery.DeliveryStatus.DLQ, deliveryCaptor.getValue().getStatus(),
+        assertEquals(DeliveryStatus.DLQ, deliveryCaptor.getValue().getStatus(),
                 "a permanently broken template must terminate at DLQ, not retry forever");
     }
 
     private Delivery baseDelivery(UUID id, UUID eventId, UUID endpointId, int attemptCount, int maxAttempts) {
         return Delivery.builder()
                 .id(id).eventId(eventId).endpointId(endpointId)
-                .status(Delivery.DeliveryStatus.PROCESSING)
+                .status(DeliveryStatus.PROCESSING)
                 .attemptCount(attemptCount).maxAttempts(maxAttempts).timeoutSeconds(5)
                 .updatedAt(Instant.now())
                 .build();
@@ -564,8 +565,8 @@ class WebhookDeliveryServiceTest {
     void attemptDelivery_2xxResponse_marksSuccess_noRetryScheduled() throws Exception {
         UUID endpointId = deliverAgainst(answering(200), 5);
 
-        verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
-        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
+        verify(deliveryRepository).save(argThat(d -> d.getStatus() == DeliveryStatus.SUCCESS));
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == DeliveryStatus.PENDING));
         verify(circuitBreakerService).recordSuccess(eq(endpointId), anyLong());
         verify(concurrencyControlService).releaseForTarget(endpointId);
     }
@@ -575,9 +576,9 @@ class WebhookDeliveryServiceTest {
         UUID endpointId = deliverAgainst(answering(404), 5);
 
         // Into Failed Messages, where a person can retry it; never FAILED, which that list omits.
-        verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.DLQ));
-        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
-        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED));
+        verify(deliveryRepository).save(argThat(d -> d.getStatus() == DeliveryStatus.DLQ));
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == DeliveryStatus.PENDING));
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == DeliveryStatus.FAILED));
         verify(circuitBreakerService).recordFailure(eq(endpointId), any());
     }
 
@@ -590,7 +591,7 @@ class WebhookDeliveryServiceTest {
         ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(captor.capture());
         Delivery saved = captor.getValue();
-        assertEquals(Delivery.DeliveryStatus.PENDING, saved.getStatus());
+        assertEquals(DeliveryStatus.PENDING, saved.getStatus());
         long secondsFromNow = saved.getNextRetryAt().getEpochSecond() - before.getEpochSecond();
         assertTrue(secondsFromNow >= 29 && secondsFromNow <= 91,
                 "expected first-tier retry (~30-90s jittered) but was " + secondsFromNow + "s");
@@ -608,8 +609,8 @@ class WebhookDeliveryServiceTest {
             answering(200).handle(exchange);
         }, 1);
 
-        verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
-        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
+        verify(deliveryRepository).save(argThat(d -> d.getStatus() == DeliveryStatus.PENDING));
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == DeliveryStatus.SUCCESS));
         verify(circuitBreakerService).recordFailure(eq(endpointId), any());
         verify(concurrencyControlService).releaseForTarget(endpointId);
     }
@@ -640,8 +641,8 @@ class WebhookDeliveryServiceTest {
 
             process(service, deliveryId);
 
-            verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.DLQ));
-            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
+            verify(deliveryRepository).save(argThat(d -> d.getStatus() == DeliveryStatus.DLQ));
+            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == DeliveryStatus.PENDING));
         } finally {
             httpServer.stop(0);
         }
@@ -679,7 +680,7 @@ class WebhookDeliveryServiceTest {
 
         ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(captor.capture());
-        assertEquals(Delivery.DeliveryStatus.PENDING, captor.getValue().getStatus());
+        assertEquals(DeliveryStatus.PENDING, captor.getValue().getStatus());
         assertTrue(captor.getValue().getNextRetryAt().isAfter(Instant.now()));
     }
 
@@ -716,7 +717,7 @@ class WebhookDeliveryServiceTest {
 
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());
-        assertEquals(Delivery.DeliveryStatus.FAILED, deliveryCaptor.getValue().getStatus());
+        assertEquals(DeliveryStatus.FAILED, deliveryCaptor.getValue().getStatus());
 
         ArgumentCaptor<DeliveryAttempt> attemptCaptor = ArgumentCaptor.forClass(DeliveryAttempt.class);
         verify(deliveryAttemptRepository).save(attemptCaptor.capture());
@@ -729,7 +730,7 @@ class WebhookDeliveryServiceTest {
             Instant orderingFirstBufferedAt) {
         return Delivery.builder()
                 .id(id).eventId(eventId).endpointId(endpointId)
-                .status(Delivery.DeliveryStatus.PROCESSING)
+                .status(DeliveryStatus.PROCESSING)
                 .attemptCount(0).maxAttempts(5).timeoutSeconds(5)
                 .orderingEnabled(true).sequenceNumber(sequenceNumber)
                 .orderingFirstBufferedAt(orderingFirstBufferedAt)
@@ -904,7 +905,7 @@ class WebhookDeliveryServiceTest {
         Endpoint endpoint = verifiedEndpoint(endpointId, projectId);
         Delivery delivery = Delivery.builder()
                 .id(deliveryId).eventId(eventId).endpointId(endpointId)
-                .status(Delivery.DeliveryStatus.PROCESSING)
+                .status(DeliveryStatus.PROCESSING)
                 .attemptCount(0).maxAttempts(5).timeoutSeconds(1)
                 .updatedAt(Instant.now())
                 .build();
@@ -935,7 +936,7 @@ class WebhookDeliveryServiceTest {
 
         Delivery delivery = Delivery.builder()
                 .id(deliveryId).eventId(eventId).endpointId(endpointId)
-                .status(Delivery.DeliveryStatus.PROCESSING)
+                .status(DeliveryStatus.PROCESSING)
                 .attemptCount(0).maxAttempts(5).timeoutSeconds(1)
                 .updatedAt(Instant.now())
                 .build();
@@ -951,7 +952,7 @@ class WebhookDeliveryServiceTest {
         ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository, atLeastOnce()).save(captor.capture());
         assertTrue(captor.getAllValues().stream()
-                        .anyMatch(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED),
+                        .anyMatch(d -> d.getStatus() == DeliveryStatus.FAILED),
                 "a soft-deleted endpoint must terminally fail the delivery");
     }
 
@@ -974,7 +975,7 @@ class WebhookDeliveryServiceTest {
 
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(saved.capture());
-        assertEquals(Delivery.DeliveryStatus.FAILED, saved.getValue().getStatus(),
+        assertEquals(DeliveryStatus.FAILED, saved.getValue().getStatus(),
                 "an unusable ladder must terminate the delivery, not schedule another attempt");
 
         // Nothing was sent, and no permit was ever taken: the check runs before admission.

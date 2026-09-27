@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import javax.sql.DataSource;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +53,7 @@ class UserEmailCaseMigrationIntegrationTest extends AbstractIntegrationTest {
 
     private void migrate(String schema, MigrationVersion target) {
         Flyway.configure()
+                .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
                 .dataSource(dataSource(schema))
                 .schemas(schema)
                 .createSchemas(true)

@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.attempt;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
@@ -356,7 +357,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 log.warn("Delivery {} disappeared during finalisation", claim.deliveryId());
                 return false;
             }
-            if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+            if (fresh.getStatus() != DeliveryStatus.PROCESSING) {
                 log.debug("Delivery {} no longer PROCESSING (status={}), skipping finalisation",
                         fresh.getId(), fresh.getStatus());
                 return false;

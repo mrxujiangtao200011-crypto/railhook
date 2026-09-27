@@ -12,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import com.webhook.platform.api.domain.enums.EndpointHealth;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

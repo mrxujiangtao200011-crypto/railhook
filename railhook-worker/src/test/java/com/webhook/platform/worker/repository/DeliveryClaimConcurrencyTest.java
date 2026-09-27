@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.repository;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import org.junit.jupiter.api.Test;
@@ -69,7 +70,7 @@ class DeliveryClaimConcurrencyTest {
                     .organizationId(UUID.randomUUID())
                     .eventId(UUID.randomUUID())
                     .endpointId(endpointId)
-                    .status(Delivery.DeliveryStatus.PENDING)
+                    .status(DeliveryStatus.PENDING)
                     .attemptCount(0)
                     .maxAttempts(7)
                     .nextRetryAt(now.minusSeconds(60 + i))

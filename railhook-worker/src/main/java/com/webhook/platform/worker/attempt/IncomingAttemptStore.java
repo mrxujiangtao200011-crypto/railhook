@@ -404,7 +404,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 return false;
             }
 
-            attempt.setStatus(statusFor(outcome));
+            attempt.setStatus(attempt.getStatus().moveTo(statusFor(outcome)));
             attempt.setFinishedAt(Instant.now());
             attempt.setNextRetryAt(null);
             applyRecord(attempt);
