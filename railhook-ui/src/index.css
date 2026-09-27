@@ -380,6 +380,7 @@ html, body { overflow-x: clip; }
 @media (max-width: 760px) { .lp-sel { padding: 18px 20px; } }
 
 .lp-flow { display: grid; grid-template-columns: auto 1fr auto 1fr auto; align-items: center; position: relative; z-index: 2; }
+.lp-flow--4 { grid-template-columns: auto 1fr auto 1fr auto 1fr auto; }
 .lp-node {
   display: inline-flex; align-items: center; gap: 8px; padding: 11px 14px; white-space: nowrap;
   background: #fff; color: #000; font: 500 13px/1 theme('fontFamily.mono');
@@ -396,6 +397,12 @@ html, body { overflow-x: clip; }
   background: hsl(var(--highlight)); color: #000; text-align: center; font: 500 10px/14px theme('fontFamily.mono');
 }
 .lp-wire > b.lp-wire-fail { background: #FF7A6B; }
+@media (max-width: 1100px) {
+  .lp-flow--4 { grid-template-columns: 1fr; justify-items: start; }
+  .lp-flow--4 .lp-wire { width: 1px; height: 46px; margin: 0 0 0 22px; }
+  .lp-flow--4 .lp-wire > span { left: 18px; top: 50%; transform: translateY(-50%); }
+  .lp-flow--4 .lp-wire > b { left: -7px; top: 50%; transform: translateY(-50%); }
+}
 @media (max-width: 900px) {
   .lp-flow { grid-template-columns: 1fr; justify-items: start; }
   .lp-wire { width: 1px; height: 46px; margin: 0 0 0 22px; }

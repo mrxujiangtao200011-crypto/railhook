@@ -255,7 +255,7 @@ the rejected request.
 ## The attempt lifecycle
 
 Both directions run `AttemptRunner`, with one `AttemptStore` per direction. The Claim is a type
-parameter, so the Runner cannot read a fence token. Read the Runner's javadoc (five invariants)
+parameter, so the Runner cannot read a fence token. Read the Runner's javadoc (six invariants)
 before changing anything here.
 
 ### Claim and fence
