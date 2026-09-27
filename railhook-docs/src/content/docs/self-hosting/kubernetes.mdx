@@ -1,15 +1,15 @@
 ---
 title: Kubernetes
-description: Install Railhook on Kubernetes with the Helm chart, pointed at your own PostgreSQL, Kafka and Redis.
+description: Install Railhook on Kubernetes with the Helm chart, pointed at your own PostgreSQL and Redis.
 ---
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-The Helm chart runs the API, the worker and the dashboard. You supply PostgreSQL, Kafka and Redis.
+The Helm chart runs the API, the worker and the dashboard. You supply PostgreSQL and Redis.
 
 ## Prerequisites
 
 - Kubernetes 1.24+ and Helm 3.8+
-- PostgreSQL 16+, Kafka 3.7+ and Redis 7+, managed or self-run. `postgres:16-alpine`, `apache/kafka:3.7.0` and `redis:7-alpine` are the images the project tests against.
+- PostgreSQL 16+ and Redis 7+, managed or self-run. `postgres:16-alpine` and `redis:7-alpine` are the images the project tests against.
 
 ## Install
 
@@ -44,10 +44,6 @@ The Helm chart runs the API, the worker and the dashboard. You supply PostgreSQL
        database: railhook
        username: webhook_user
        existingSecret: railhook-postgresql-secret
-
-   kafka:
-     external:
-       bootstrapServers: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
 
    redis:
      external:
@@ -112,7 +108,7 @@ For production defaults (more replicas, autoscaling, disruption budgets, network
 | Topic | Behaviour |
 |---|---|
 | Migrations | Run inside the API pod at startup. Replicas starting together wait on a PostgreSQL advisory lock, so each migration is applied once. A worker pod from a new release waits up to 15 minutes for them before it starts, and its startup probe allows that wait |
-| Kafka topics | Created by a post-install and post-upgrade hook job. Set `kafka.topicPartitions` and `kafka.topicReplicationFactor` |
+| Workers | Each worker claims due deliveries from PostgreSQL with `FOR UPDATE SKIP LOCKED`, so added worker replicas share the work without other coordination. A claim that is not finished within `WEBHOOK_CLAIM_TIMEOUT_SECONDS` (300 by default) can be claimed by another worker |
 | Backups | `backup.enabled: true` adds a CronJob that writes `pg_dump` files to a PVC and prunes old ones |
 | Metrics | On the named `management` port (8082 for the API, 8081 for the worker), never published outside the cluster |
 

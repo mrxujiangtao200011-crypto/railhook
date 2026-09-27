@@ -41,7 +41,7 @@ Both services run `spring.jpa.hibernate.ddl-auto: validate`. Hibernate compares 
 Fine on a configuration table; on one of these it is an outage for the length of the build:
 
 `events` · `deliveries` · `delivery_attempts` · `incoming_events` · `incoming_forward_attempts` ·
-`outbox_messages` · `tunnel_request_log` · `audit_log` · `usage_daily`
+`tunnel_request_log` · `audit_log` · `usage_daily`
 
 For those, two things go together and neither works alone:
 

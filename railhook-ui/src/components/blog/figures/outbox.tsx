@@ -148,7 +148,7 @@ function OutboxPipeline() {
       <text x={212} y={58} fill={SOFT} className={MONO}>
         {f('postgres.tx')}
       </text>
-      {['events', 'deliveries', 'outbox'].map((row, index) => (
+      {['events', 'deliveries'].map((row, index) => (
         <g key={row}>
           <rect
             x={212}
@@ -157,31 +157,23 @@ function OutboxPipeline() {
             height={22}
             rx={4}
             fill={SERIES.brand}
-            opacity={row === 'outbox' ? 0.2 : 0.08}
+            opacity={row === 'deliveries' ? 0.2 : 0.08}
           />
           <text x={222} y={83 + index * 30} fill={CHROME.ink} className={MONO}>
             {f(`postgres.${row}`)}
           </text>
         </g>
       ))}
+      <text x={212} y={150} fill={SERIES.brand} className={cn(MONO, 'font-medium')}>
+        {f('postgres.queue')}
+      </text>
 
-      {box(440, 20, 172, 118, 'publisher')}
+      {box(440, 20, 172, 118, 'poll')}
       {['line0', 'line1', 'line2'].map((line, index) => (
         <text key={line} x={450} y={62 + index * 17} fill={SOFT} className={MONO}>
-          {f(`publisher.${line}`)}
+          {f(`poll.${line}`)}
         </text>
       ))}
-
-      {box(440, 222, 172, 108, 'kafka')}
-      {/* The Kafka mark has no light version, so on ink it sits on a light tile. */}
-      <rect x={584} y={228} width={20} height={20} rx={4} className="fill-transparent dark:fill-foreground" />
-      <image href="/logos/brand/apachekafka.svg" x={586} y={230} width={16} height={16} />
-      <text x={450} y={264} fill={SOFT} className={MONO}>
-        {f('kafka.line0')}
-      </text>
-      <text x={450} y={281} fill={SOFT} className={MONO}>
-        {f('kafka.line1')}
-      </text>
 
       {box(200, 222, 212, 108, 'worker', true)}
       <text x={212} y={264} fill={SOFT} className={MONO}>
@@ -207,16 +199,15 @@ function OutboxPipeline() {
 
       <line x1={166} y1={79} x2={196} y2={79} stroke={CHROME.muted} markerEnd={arrow} />
       <line x1={412} y1={79} x2={436} y2={79} stroke={CHROME.muted} markerEnd={arrow} />
-      <line x1={532} y1={138} x2={532} y2={218} stroke={CHROME.muted} markerEnd={arrow} />
-      <text x={540} y={184} fill={SOFT} className={MONO}>
-        {f('arrow.produce')}
+      <path d="M532,138 L532,276 L416,276" fill="none" stroke={CHROME.muted} markerEnd={arrow} />
+      <text x={540} y={210} fill={SOFT} className={MONO}>
+        {f('arrow.claimed')}
       </text>
-      <line x1={440} y1={276} x2={416} y2={276} stroke={CHROME.muted} markerEnd={arrow} />
       <line x1={200} y1={276} x2={170} y2={276} stroke={CHROME.muted} markerEnd={arrow} />
 
       <line x1={290} y1={218} x2={290} y2={174} stroke={SERIES.brand} strokeWidth={1.5} markerEnd={arrow} />
       <text x={298} y={200} fill={SERIES.brand} className={cn(MONO, 'font-medium')}>
-        {f('arrow.claim')}
+        {f('arrow.fenced')}
       </text>
     </Figure>
   );

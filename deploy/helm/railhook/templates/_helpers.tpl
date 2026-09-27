@@ -58,14 +58,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
-{{- define "railhook.kafka.bootstrapServers" -}}
-{{- if .Values.kafka.enabled }}
-{{- printf "%s-kafka:9092" (include "railhook.fullname" .) }}
-{{- else }}
-{{- .Values.kafka.external.bootstrapServers }}
-{{- end }}
-{{- end }}
-
 {{- define "railhook.redis.host" -}}
 {{- if .Values.redis.enabled }}
 {{- printf "%s-redis-master" (include "railhook.fullname" .) }}

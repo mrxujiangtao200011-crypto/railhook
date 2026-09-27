@@ -38,7 +38,7 @@ Prometheus збирає `/actuator/prometheus` з **порту керуванн�
 
 | Компонент | Адреса | Примітки |
 |---|---|---|
-| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | Overview, Alerts, Errors, Logs, Host, Containers, Uptime, Worker & Circuit Breaker, JVM & Micrometer, Kafka |
+| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | Overview, Alerts, Errors, Logs, Host, Containers, Uptime, Worker & Circuit Breaker, JVM & Micrometer |
 | Prometheus | Лише всередині стеку | Зберігає дані протягом `PROMETHEUS_RETENTION`, типово `15d` |
 | Alertmanager | Лише всередині стеку | Сповіщення `CRITICAL` надходять швидше за попередження; критичне сповіщення, що спрацювало, приглушує відповідне попередження |
 | Loki | Лише всередині стеку | Зберігає логи протягом `LOKI_RETENTION_PERIOD`, типово `168h` (7 днів) |
@@ -61,9 +61,8 @@ Prometheus збирає `/actuator/prometheus` з **порту керуванн�
 
 | Метрика | Як читати |
 |---|---|
-| **`delivery_oldest_pending_age_seconds`** | **Найкращий окремий показник стану**: вік найстарішої незавершеної доставки. Тут видно і ендпоінт, що не відповідає, і збій брокера, і завислий воркер. `forward_oldest_pending_age_seconds` є такою самою метрикою для вхідного напрямку. |
+| **`delivery_oldest_pending_age_seconds`** | **Найкращий окремий показник стану**: вік найстарішої незавершеної доставки. Тут видно і ендпоінт, що не відповідає, і завислий воркер. `forward_oldest_pending_age_seconds` є такою самою метрикою для вхідного напрямку. |
 | `delivery_queue_depth`, `incoming_forward_queue_depth` | Скільки роботи чекає. Стабільне значення нормальне, постійне зростання ні. |
-| `outbox_queue_depth`, `outbox_oldest_pending_age_seconds` | Події, які прийнято, але ще не передано в Kafka. Якщо вік зростає, Kafka недоступна: події не втрачено, але вони нікуди не рухаються. |
 | `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Недоставлені повідомлення, що чекають на рішення людини |
 | `delivery_escalated_to_dlq_total` | Доставки, що потрапили до недоставлених повідомлень через жорсткий ліміт у 96 годин, а не тому, що вичерпали повторні спроби. Ненульове значення означає, що щось працювало погано кілька днів. |
 
@@ -82,7 +81,6 @@ Prometheus збирає `/actuator/prometheus` з **порту керуванн�
 
 | Метрика | Як читати |
 |---|---|
-| `retry_governor_effective_batch` | Розмір пакета планувальника повторних спроб. Якщо він падає до мінімуму, планувальник пригальмовує, бо наступна ланка не справляється. |
 | `webhook_ordering_buffered_total` | Доставки, що чекають, поки завершаться попередні доставки на той самий ендпоінт |
 | **`webhook_ordering_gap_timeout_total`** | Попередня доставка так і не завершилася, тож наступну пропустили, щоб ендпоінт не простоював. Порядок свідомо порушено. Зрідка це нормально, часто ні. |
 | `transform_failed_total` | Трансформація завершилася помилкою |
@@ -92,7 +90,7 @@ Prometheus збирає `/actuator/prometheus` з **порту керуванн�
 
 1. `delivery_oldest_pending_age_seconds` понад кілька годин. Помічає майже все.
 2. `circuit_breaker_degraded_total` зростає. Помічає механізми захисту, які перестали захищати.
-3. `outbox_oldest_pending_age_seconds` понад кілька хвилин. Помічає прийняті події, які так і не почали рухатися. Цього не покаже жодна метрика доставок.
+3. `forward_oldest_pending_age_seconds` понад кілька годин. Помічає вхідні пересилання, які перестали рухатися. Метрика доставок їх не бачить.
 
 ## Готові сповіщення
 
@@ -100,11 +98,10 @@ Prometheus збирає `/actuator/prometheus` з **порту керуванн�
 
 | Що означає | Сповіщення |
 |---|---|
-| Події прийнято, але вони не рухаються | `OutboxOldestPendingAgeHigh`, `OutboxSendingStuck` |
 | Черга зростає | `DeliveryPendingBacklogGrowing`, `DeliveryPendingBacklogHigh`, `DeliveryPendingBacklogCritical`, `IncomingForwardPendingBacklogHigh`, `OldestPendingDeliveryStale`, `OldestPendingDeliveryCritical`, `OldestPendingForwardStale` |
 | Доставки полишають | `DlqDepthGrowing`, `DlqRateHigh`, `IncomingForwardFailureRateHigh`, `DlqActionableBacklog`, `IncomingForwardDlqActionableBacklog` |
 | Механізм захисту спрацьовує або вийшов з ладу | `CircuitBreakerTripsHigh`, `CircuitBreakerRejectionsHigh`, `CircuitBreakerDegraded` |
-| Платформа не справляється | `RetryGovernorCooldown`, `RetryGovernorConsecutiveFailures`, `ApiErrorRateHigh` |
+| Платформа не справляється | `ApiErrorRateHigh` |
 | Процес не працює | `ApiDown`, `WorkerDown` |
 
 `DlqActionableBacklog` і `IncomingForwardDlqActionableBacklog` вимагають втручання людини: вони зникають, коли хтось повторює або очищає недоставлені повідомлення. `CircuitBreakerDegraded` відрізняється від інших сповіщень про circuit breaker: воно означає, що circuit breaker **не** працює.
@@ -115,4 +112,4 @@ Prometheus збирає `/actuator/prometheus` з **порту керуванн�
 
 ## Трасування
 
-Його немає. Railhook не експортує дані в OpenTelemetry, тож повільну доставку не вдасться простежити як один трейс від приймання через Kafka до спроби.
+Його немає. Railhook не експортує дані в OpenTelemetry, тож повільну доставку не вдасться простежити як один трейс від приймання до спроби.

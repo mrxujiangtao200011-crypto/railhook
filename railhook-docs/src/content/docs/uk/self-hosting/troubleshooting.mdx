@@ -9,7 +9,7 @@ import { Aside } from '@astrojs/starlight/components';
 ```bash
 ./railhook doctor        # machine and configuration checks
 ./railhook status        # containers and their health
-./railhook logs api      # or worker, ui, postgres, kafka, redis
+./railhook logs api      # or worker, ui, postgres, redis
 ```
 
 ## Встановлення
@@ -44,7 +44,7 @@ import { Aside } from '@astrojs/starlight/components';
 | `docker logs webhook-api` нічого не знаходить | Починаючи з 2.16.0, API не має фіксованої назви контейнера | Використовуйте `docker compose logs api` |
 
 <Aside type="tip">
-Після відновлення серія `delivery already claimed or not PENDING` у лозі воркера очікувана: воркер відхиляє застарілі повідомлення Kafka.
+Доставка, яку залишив у роботі воркер, що впав, або відновлення з резервної копії, лишається в роботі, доки не мине час її захоплення: `WEBHOOK_CLAIM_TIMEOUT_SECONDS`, типово 300. Після цього її знову забирає будь-який воркер.
 </Aside>
 
 ## Досі не працює

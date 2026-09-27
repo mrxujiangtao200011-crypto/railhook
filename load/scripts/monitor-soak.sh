@@ -11,7 +11,7 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 if [ ! -f "$OUT_FILE" ]; then
-  echo "timestamp,api_hikari_active,api_hikari_pending,worker_hikari_active,worker_hikari_pending,api_jvm_used_mb,worker_jvm_used_mb,outbox_pending,outbox_oldest_pending_age_s,redis_dbsize" > "$OUT_FILE"
+  echo "timestamp,api_hikari_active,api_hikari_pending,worker_hikari_active,worker_hikari_pending,api_jvm_used_mb,worker_jvm_used_mb,due_deliveries,oldest_due_age_s,redis_dbsize" > "$OUT_FILE"
 fi
 
 echo "Sampling every ${INTERVAL_SECONDS}s into $OUT_FILE — Ctrl-C to stop."
@@ -35,14 +35,14 @@ while true; do
   api_jvm_mb=$(awk -v b="${api_jvm_bytes:-0}" 'BEGIN { printf "%.1f", b/1048576 }')
   worker_jvm_mb=$(awk -v b="${worker_jvm_bytes:-0}" 'BEGIN { printf "%.1f", b/1048576 }')
 
-  outbox_row=$($DOCKER_COMPOSE exec -T postgres psql -U "${POSTGRES_USER:-webhook_user}" -d "${POSTGRES_DB:-webhook_platform}" -t -A -c \
-    "SELECT count(*), COALESCE(EXTRACT(EPOCH FROM (now() - min(created_at))), 0) FROM outbox_messages WHERE status = 'PENDING';" 2>/dev/null || echo "|")
-  outbox_pending=$(echo "$outbox_row" | cut -d'|' -f1)
-  outbox_age=$(echo "$outbox_row" | cut -d'|' -f2)
+  due_row=$($DOCKER_COMPOSE exec -T postgres psql -U "${POSTGRES_USER:-webhook_user}" -d "${POSTGRES_DB:-webhook_platform}" -t -A -c \
+    "SELECT count(*), COALESCE(EXTRACT(EPOCH FROM (now() - min(next_retry_at))), 0) FROM deliveries WHERE status IN ('PENDING', 'PROCESSING') AND next_retry_at <= now();" 2>/dev/null || echo "|")
+  due_count=$(echo "$due_row" | cut -d'|' -f1)
+  due_age=$(echo "$due_row" | cut -d'|' -f2)
 
   redis_dbsize=$($DOCKER_COMPOSE exec -T redis redis-cli -a "${REDIS_PASSWORD:-webhook_redis_pass}" --no-auth-warning DBSIZE 2>/dev/null | tr -d '\r')
 
-  echo "${ts},${api_active},${api_pending},${worker_active},${worker_pending},${api_jvm_mb},${worker_jvm_mb},${outbox_pending},${outbox_age},${redis_dbsize}" | tee -a "$OUT_FILE"
+  echo "${ts},${api_active},${api_pending},${worker_active},${worker_pending},${api_jvm_mb},${worker_jvm_mb},${due_count},${due_age},${redis_dbsize}" | tee -a "$OUT_FILE"
 
   sleep "$INTERVAL_SECONDS"
 done

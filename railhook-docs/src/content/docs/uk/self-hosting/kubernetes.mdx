@@ -1,15 +1,15 @@
 ---
 title: Kubernetes
-description: Встановіть Railhook у Kubernetes за допомогою Helm-чарта й підключіть його до власних PostgreSQL, Kafka та Redis.
+description: Встановіть Railhook у Kubernetes за допомогою Helm-чарта й підключіть його до власних PostgreSQL і Redis.
 ---
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Helm-чарт запускає API, воркер і панель керування. PostgreSQL, Kafka і Redis надаєте ви.
+Helm-чарт запускає API, воркер і панель керування. PostgreSQL і Redis надаєте ви.
 
 ## Що потрібно
 
 - Kubernetes 1.24+ і Helm 3.8+
-- PostgreSQL 16+, Kafka 3.7+ і Redis 7+, керовані або розгорнуті вами. Проєкт тестується з образами `postgres:16-alpine`, `apache/kafka:3.7.0` і `redis:7-alpine`.
+- PostgreSQL 16+ і Redis 7+, керовані або розгорнуті вами. Проєкт тестується з образами `postgres:16-alpine` і `redis:7-alpine`.
 
 ## Встановлення
 
@@ -44,10 +44,6 @@ Helm-чарт запускає API, воркер і панель керуван�
        database: railhook
        username: webhook_user
        existingSecret: railhook-postgresql-secret
-
-   kafka:
-     external:
-       bootstrapServers: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
 
    redis:
      external:
@@ -112,7 +108,7 @@ email:
 | Тема | Поведінка |
 |---|---|
 | Міграції | Виконуються в поді API під час запуску. Репліки, що стартують разом, чекають на advisory lock PostgreSQL, тож кожна міграція застосовується один раз. Под воркера нового релізу чекає на них до 15 хвилин, перш ніж запуститися, і його startup probe розрахована на це очікування |
-| Топіки Kafka | Створюються hook-завданням (Job) після встановлення та оновлення. Налаштовуються через `kafka.topicPartitions` і `kafka.topicReplicationFactor` |
+| Воркери | Кожен воркер забирає з PostgreSQL доставки, час яких настав, через `FOR UPDATE SKIP LOCKED`, тож додані репліки воркера ділять роботу без іншої координації. Захоплення, не завершене за `WEBHOOK_CLAIM_TIMEOUT_SECONDS` (типово 300), може забрати інший воркер |
 | Резервні копії | `backup.enabled: true` додає CronJob, який записує файли `pg_dump` на PVC і видаляє старі |
 | Метрики | На іменованому порту `management` (8082 для API, 8081 для воркера); за межі кластера ніколи не публікуються |
 

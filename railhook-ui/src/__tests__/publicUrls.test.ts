@@ -13,7 +13,7 @@ describe('public URLs follow the public origin', () => {
   const envDist = read('.env.dist');
   const configmap = read('deploy/helm/railhook/templates/configmap.yaml');
 
-  const INTERNAL = /https?:\/\/(api|worker|ui|postgres|redis|kafka)(:\d+)?\b/;
+  const INTERNAL = /https?:\/\/(api|worker|ui|postgres|redis)(:\d+)?\b/;
 
   it.each(['TEST_ENDPOINT_BASE_URL', 'WEBHOOK_INGRESS_BASE_URL'])(
     'Compose defaults %s to APP_BASE_URL, not to a container name',

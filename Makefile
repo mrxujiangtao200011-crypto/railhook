@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs monitoring-check-queries ratchets types-check docs-dev docs-build docs-check seo-check prerender version-check version-set
+.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs monitoring-check-queries ratchets types-check docs-dev docs-build docs-check seo-check prerender version-check version-set
 
 .DEFAULT_GOAL := help
 
@@ -196,10 +196,6 @@ version-set: ## Set the version everywhere (usage: make version-set VERSION=2.3.
 	@if [ -z "$(VERSION)" ]; then echo "$(RED)Usage: make version-set VERSION=2.3.0$(NC)"; exit 1; fi
 	@scripts/set-version.sh $(VERSION)
 
-##@ Kafka
-create-topics: ## Create the Kafka topics again (kafka-init already does it on every start)
-	@$(DOCKER_COMPOSE) up --no-deps --force-recreate kafka-init
-
 ##@ Monitoring
 logs: ## Follow logs for all services
 	@$(DOCKER_COMPOSE) logs -f
@@ -244,7 +240,6 @@ wait-healthy: ## Wait until API and Worker are healthy (max WAIT_TIMEOUT seconds
 
 health: ## Check health of all services
 	@echo "Postgres: $$(docker exec webhook-postgres pg_isready -U webhook_user 2>/dev/null && echo 'UP' || echo 'DOWN')"
-	@echo "Kafka:    $$(docker exec webhook-kafka nc -z localhost 9092 2>/dev/null && echo 'UP' || echo 'DOWN')"
 	@echo "Redis:    $$(docker exec webhook-redis redis-cli -a $${REDIS_PASSWORD:-webhook_redis_pass} ping 2>/dev/null | grep -q PONG && echo 'UP' || echo 'DOWN')"
 	@echo "API:      $$($(DOCKER_COMPOSE) exec -T api wget -q -O - http://localhost:8082/actuator/health/liveness 2>/dev/null | jq -r .status 2>/dev/null || echo 'DOWN')"
 	@echo "Worker:   $$($(DOCKER_COMPOSE) exec -T worker wget -q -O - http://localhost:8081/actuator/health/liveness 2>/dev/null | jq -r .status 2>/dev/null || echo 'DOWN')"

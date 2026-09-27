@@ -38,7 +38,7 @@ On Kubernetes the Helm chart wires this up: its `ServiceMonitor` scrapes the por
 
 | Component | Address | Notes |
 |---|---|---|
-| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | Overview, Alerts, Errors, Logs, Host, Containers, Uptime, Worker & Circuit Breaker, JVM & Micrometer, Kafka |
+| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | Overview, Alerts, Errors, Logs, Host, Containers, Uptime, Worker & Circuit Breaker, JVM & Micrometer |
 | Prometheus | Inside the stack only | Keeps `PROMETHEUS_RETENTION`, default `15d` |
 | Alertmanager | Inside the stack only | `CRITICAL` alerts route faster than warnings; a firing critical alert suppresses the matching warning |
 | Loki | Inside the stack only | Keeps logs for `LOKI_RETENTION_PERIOD`, default `168h` (7 days) |
@@ -61,9 +61,8 @@ On Kubernetes the Helm chart wires this up: its `ServiceMonitor` scrapes the por
 
 | Metric | Reading it |
 |---|---|
-| **`delivery_oldest_pending_age_seconds`** | **The best single health signal**: the age of the oldest unresolved delivery. A dead endpoint, a broker outage and a stuck worker all show up here. `forward_oldest_pending_age_seconds` is the incoming twin. |
+| **`delivery_oldest_pending_age_seconds`** | **The best single health signal**: the age of the oldest unresolved delivery. A dead endpoint and a stuck worker both show up here. `forward_oldest_pending_age_seconds` is the incoming twin. |
 | `delivery_queue_depth`, `incoming_forward_queue_depth` | Work waiting. Steady is fine; always rising is not. |
-| `outbox_queue_depth`, `outbox_oldest_pending_age_seconds` | Events accepted but not yet handed to Kafka. A rising age means Kafka is unreachable: the events are safe, but not moving. |
 | `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Failed messages waiting for a person |
 | `delivery_escalated_to_dlq_total` | Deliveries moved to failed messages by the 96-hour hard cap rather than by running out of retries. Non-zero means something was degraded for days. |
 
@@ -82,7 +81,6 @@ When a limiter or circuit breaker holds a delivery back, nothing is sent and no 
 
 | Metric | Reading it |
 |---|---|
-| `retry_governor_effective_batch` | The retry scheduler's batch size. Falling toward its floor means it is backing off from a struggling downstream. |
 | `webhook_ordering_buffered_total` | Deliveries waiting for earlier ones to the same endpoint |
 | **`webhook_ordering_gap_timeout_total`** | An earlier delivery never resolved, so a later one was released to keep the endpoint moving. Order was knowingly broken. Rare is expected; frequent is not. |
 | `transform_failed_total` | A transformation failed |
@@ -92,7 +90,7 @@ When a limiter or circuit breaker holds a delivery back, nothing is sent and no 
 
 1. `delivery_oldest_pending_age_seconds` above a few hours. Catches almost everything.
 2. `circuit_breaker_degraded_total` increasing. Catches protections that stopped protecting.
-3. `outbox_oldest_pending_age_seconds` above a few minutes. Catches accepted events that never started moving, which no delivery metric shows.
+3. `forward_oldest_pending_age_seconds` above a few hours. Catches incoming forwards that stopped moving, which the delivery metric does not see.
 
 ## Shipped alerts
 
@@ -100,11 +98,10 @@ The same rules ship in `monitoring/prometheus/alerts.yml` for Compose and in the
 
 | What it means | Alerts |
 |---|---|
-| Events accepted but not moving | `OutboxOldestPendingAgeHigh`, `OutboxSendingStuck` |
 | The backlog is growing | `DeliveryPendingBacklogGrowing`, `DeliveryPendingBacklogHigh`, `DeliveryPendingBacklogCritical`, `IncomingForwardPendingBacklogHigh`, `OldestPendingDeliveryStale`, `OldestPendingDeliveryCritical`, `OldestPendingForwardStale` |
 | Deliveries are being abandoned | `DlqDepthGrowing`, `DlqRateHigh`, `IncomingForwardFailureRateHigh`, `DlqActionableBacklog`, `IncomingForwardDlqActionableBacklog` |
 | A protection is engaging, or has failed | `CircuitBreakerTripsHigh`, `CircuitBreakerRejectionsHigh`, `CircuitBreakerDegraded` |
-| The platform is struggling | `RetryGovernorCooldown`, `RetryGovernorConsecutiveFailures`, `ApiErrorRateHigh` |
+| The platform is struggling | `ApiErrorRateHigh` |
 | A process is down | `ApiDown`, `WorkerDown` |
 
 `DlqActionableBacklog` and `IncomingForwardDlqActionableBacklog` are the ones that need a person: they clear when someone retries or purges the failed messages. `CircuitBreakerDegraded` is the odd one out among the breaker alerts: it means the breaker is **not** working.
@@ -115,4 +112,4 @@ In production the API and worker log single-line JSON that includes the correlat
 
 ## Tracing
 
-There is none. Railhook has no OpenTelemetry export, so a slow delivery cannot be followed from ingestion through Kafka to the attempt as one trace.
+There is none. Railhook has no OpenTelemetry export, so a slow delivery cannot be followed from ingestion to the attempt as one trace.

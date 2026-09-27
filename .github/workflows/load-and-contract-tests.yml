@@ -80,9 +80,9 @@ jobs:
         if: ${{ inputs.run_soak_smoke == true }}
         run: k6 run -e TARGET_RPS=10 -e DURATION=60s load/soak.js
 
-      - name: Outbox depth snapshot
+      - name: Delivery backlog snapshot
         if: always()
-        run: ./load/scripts/outbox-depth.sh || true
+        run: ./load/scripts/queue-depth.sh || true
 
       - name: Dump logs on failure
         if: failure()
