@@ -9,7 +9,7 @@ From the install directory:
 ```bash
 ./railhook doctor        # machine and configuration checks
 ./railhook status        # containers and their health
-./railhook logs api      # or worker, ui, postgres, kafka, redis
+./railhook logs api      # or worker, ui, postgres, redis
 ```
 
 ## Installing
@@ -44,7 +44,7 @@ From the install directory:
 | `docker logs webhook-api` finds nothing | The API has no fixed container name since 2.16.0 | Use `docker compose logs api` |
 
 <Aside type="tip">
-After a restore, a burst of `delivery already claimed or not PENDING` in the worker log is expected: stale Kafka messages are being declined.
+A delivery left in progress by a worker that crashed, or by a restore, stays in progress until its claim times out: `WEBHOOK_CLAIM_TIMEOUT_SECONDS`, 300 by default. Then any worker claims it again.
 </Aside>
 
 ## Still stuck

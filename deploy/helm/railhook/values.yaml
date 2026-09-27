@@ -98,7 +98,11 @@ worker:
   env:
     APP_ENV: production
     LOG_LEVEL: INFO
-    KAFKA_DELIVERY_CONCURRENCY: "8"
+    WEBHOOK_CLAIM_ENABLED: "true"
+    WEBHOOK_CLAIM_IDLE_POLL_MS: "200"
+    WEBHOOK_CLAIM_TIMEOUT_SECONDS: "300"
+    WEBHOOK_CLAIM_PER_TARGET: "5"
+    WEBHOOK_CLAIM_MAX_TARGETS: "500"
     DB_POOL_MAX_SIZE: "30"
     DB_POOL_MIN_IDLE: "20"
   
@@ -248,18 +252,6 @@ postgresql:
     existingSecret: railhook-postgresql-secret
     existingSecretPasswordKey: password
 
-# The chart deploys no Kafka: point `external` at your own cluster.
-kafka:
-  enabled: false
-  # A post-install hook creates every topic. Turn it off when topics are provisioned out of
-  # band or ACLs forbid clients creating them.
-  createTopics: true
-  topicPartitions: 12
-  topicReplicationFactor: 1  # Set to 3 for production multi-broker clusters
-
-  external:
-    bootstrapServers: ""  # e.g., kafka-1:9092,kafka-2:9092,kafka-3:9092
-
 # The chart deploys no Redis: point `external` at your own instance.
 redis:
   enabled: false
@@ -342,7 +334,7 @@ networkPolicy:
   policyTypes:
     - Ingress
     - Egress
-  # Where PostgreSQL, Kafka and Redis live outside this namespace. Set [] only if all three run
+  # Where PostgreSQL and Redis live outside this namespace. Set [] only if both run
   # as pods beside the application, or the policy denies the connections.
   dependencyEgressCidrs:
     - 10.0.0.0/8

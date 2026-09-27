@@ -1094,7 +1094,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
+        "w": 12,
         "x": 12,
         "y": 28
       },
@@ -1115,56 +1115,6 @@
         }
       ],
       "title": "Total Delivery Attempts",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "railhook-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 28
-      },
-      "id": 22,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "targets": [
-        {
-          "expr": "outbox_queue_depth{status=\"pending\"}",
-          "legendFormat": "Pending"
-        },
-        {
-          "expr": "outbox_queue_depth{status=\"failed\"}",
-          "legendFormat": "Failed"
-        },
-        {
-          "expr": "outbox_queue_depth{status=\"dead\"}",
-          "legendFormat": "Dead"
-        }
-      ],
-      "title": "Outbox Queue Depth",
       "type": "stat"
     },
     {
@@ -1279,118 +1229,6 @@
         "x": 0,
         "y": 43
       },
-      "id": 104,
-      "title": "Outbox Publisher",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "railhook-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 15,
-            "lineWidth": 2
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 44
-      },
-      "id": 40,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "outbox_queue_depth{status=\"pending\"}",
-          "legendFormat": "Pending"
-        },
-        {
-          "expr": "outbox_queue_depth{status=\"failed\"}",
-          "legendFormat": "Failed"
-        },
-        {
-          "expr": "outbox_queue_depth{status=\"dead\"}",
-          "legendFormat": "Dead"
-        }
-      ],
-      "title": "Outbox Queue Depth",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "railhook-prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 2
-          },
-          "unit": "s"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 44
-      },
-      "id": 41,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "expr": "outbox_oldest_pending_age_seconds",
-          "legendFormat": "Oldest Pending Age"
-        },
-        {
-          "expr": "rate(outbox_publish_latency_seconds_sum[5m]) / rate(outbox_publish_latency_seconds_count[5m])",
-          "legendFormat": "Avg Publish Latency"
-        }
-      ],
-      "title": "Outbox Publish Latency & Staleness",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 52
-      },
       "id": 105,
       "title": "Event Ingestion",
       "type": "row"
@@ -1414,7 +1252,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 53
+        "y": 44
       },
       "id": 50,
       "options": {
@@ -1466,7 +1304,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 53
+        "y": 44
       },
       "id": 51,
       "options": {

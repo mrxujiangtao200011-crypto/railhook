@@ -46,7 +46,7 @@ from .types import (
     PortalSessionCreateParams,
 )
 
-__version__ = "2.32.2"
+__version__ = "3.0.0"
 
 # Backward-compatible aliases
 WebhookPlatform = Railhook

@@ -7,11 +7,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
-import com.webhook.platform.api.service.DeliveryDispatch;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.api.service.workflow.NodeExecutor;
@@ -40,7 +39,6 @@ public class DeliveryNodeExecutor implements NodeExecutor {
     private final EntitlementService entitlementService;
     private final QuotaCounterService quotaCounterService;
     private final ObjectMapper objectMapper;
-    private final DeliveryDispatch deliveryDispatch;
     private final long maxPayloadSizeBytes;
     private final int compressionThresholdBytes;
 
@@ -53,7 +51,6 @@ public class DeliveryNodeExecutor implements NodeExecutor {
             EntitlementService entitlementService,
             QuotaCounterService quotaCounterService,
             ObjectMapper objectMapper,
-            DeliveryDispatch deliveryDispatch,
             PlatformTransactionManager transactionManager,
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
             @Value("${webhook.payload-compression-threshold-bytes:1024}") int compressionThresholdBytes) {
@@ -63,7 +60,6 @@ public class DeliveryNodeExecutor implements NodeExecutor {
         this.entitlementService = entitlementService;
         this.quotaCounterService = quotaCounterService;
         this.objectMapper = objectMapper;
-        this.deliveryDispatch = deliveryDispatch;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
         this.compressionThresholdBytes = compressionThresholdBytes;
         this.txTemplate = new TransactionTemplate(transactionManager);
@@ -103,7 +99,7 @@ public class DeliveryNodeExecutor implements NodeExecutor {
                     ? nodeConfig.get("eventType").asText() : DEFAULT_EVENT_TYPE;
             Event event = buildEvent(endpoint.getProjectId(), eventType, input);
 
-            // The Delivery and its Outbox row commit together; this pool has no ambient transaction.
+            // The Event and its Delivery commit together; this pool has no ambient transaction.
             Delivery delivery = txTemplate.execute(tx -> {
                 Event saved = eventRepository.saveAndFlush(event);
                 Delivery created = deliveryRepository.save(Delivery.builder()
@@ -117,8 +113,6 @@ public class DeliveryNodeExecutor implements NodeExecutor {
                         .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)
                         .retryableStatuses(RetryableStatuses.DEFAULT_SPEC)
                         .build());
-                deliveryDispatch.announce(created, endpoint.getProjectId(),
-                        DeliveryDispatch.Reason.WORKFLOW_CREATED);
                 return created;
             });
             chargeQuota();

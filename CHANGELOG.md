@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-09-28
+
+### Removed
+
+- Kafka. The api writes a delivery or forward row and the worker claims due rows from PostgreSQL, so the stack is PostgreSQL, Redis, api, worker and ui. The outbox table, its publisher, the retry scheduler, the stuck and stranded sweeps and the DLQ topics are gone with it.
+
+### Changed
+
+- The worker claims at most a few rows per endpoint or destination per poll and moves through targets in turn, so one target's backlog no longer delays the others.
+- A claim that is not finished within `WEBHOOK_CLAIM_TIMEOUT_SECONDS` is taken again under a new token; the lost holder can no longer write its outcome.
+- Delivery and forward statuses change only along an explicit table of allowed transitions.
+
+### Fixed
+
+- Parking an ordered delivery behind its predecessor is fenced by its claim token.
+- A forward whose event or destination disappeared is failed only while its claim still holds.
+- `./railhook upgrade` removes containers of services a release dropped.
+
 ## [2.32.2] - 2026-09-26
 
 ### Fixed

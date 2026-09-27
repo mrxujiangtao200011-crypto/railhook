@@ -360,8 +360,6 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM incoming_forward_attempts WHERE organization_id = ? "
                         + "AND (status IN ('PENDING', 'PROCESSING') OR next_retry_at IS NOT NULL)",
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isZero();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_messages WHERE project_id = ?",
-                Integer.class, DemoTenant.PROJECT_ID)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM workflow_executions WHERE organization_id = ? "
                         + "AND (status NOT IN ('COMPLETED', 'FAILED') OR resume_at IS NOT NULL)",
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isZero();

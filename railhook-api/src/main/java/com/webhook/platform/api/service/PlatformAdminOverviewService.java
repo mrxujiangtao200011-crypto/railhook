@@ -2,7 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.common.demo.DemoTenant;
 import com.webhook.platform.api.domain.entity.User;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;

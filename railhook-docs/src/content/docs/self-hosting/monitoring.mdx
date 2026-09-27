@@ -28,7 +28,7 @@ Metrics are on management ports inside the Docker network only, with no credenti
 
 They are not proxied to the public port because they would reveal endpoint names and traffic volume.
 
-Both services always publish them, so any existing Prometheus can scrape these ports: HTTP latency buckets, Kafka client metrics, and counters for events ingested, deliveries created, rules matched and retention cleanup. Labels stay bounded: no organization, project or endpoint ids.
+Both services always publish them, so any existing Prometheus can scrape these ports: HTTP latency buckets and counters for events ingested, deliveries created, rules matched and retention cleanup. Labels stay bounded: no organization, project or endpoint ids.
 
 ## The bundled stack
 
@@ -133,7 +133,7 @@ printf '%s\n' MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem \
 | Host | Node Exporter Full: CPU, memory, disks, network, file systems |
 | Containers | CPU, memory against the Compose limit, network and restarts per container |
 | Uptime | Probe status, uptime over the range, response time, TLS days left, backups |
-| Worker & Circuit Breaker, JVM & Micrometer, Kafka | The platform's internals |
+| Worker & Circuit Breaker, JVM & Micrometer | The platform's internals |
 
 ### Alerts it sends
 
@@ -166,7 +166,6 @@ The stack finds the platform's Docker network by its Compose label; set `RAILHOO
 |---|---|
 | `delivery_oldest_pending_age_seconds` | The age of the oldest unfinished delivery. Every kind of trouble shows up here. `forward_oldest_pending_age_seconds` is the incoming twin |
 | `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Deliveries and forwards that ran out of retries and need a person |
-| `outbox_oldest_pending_age_seconds` | Accepted events that have not reached Kafka yet |
 | `circuit_breaker_degraded_total` | Redis was unreachable and the breaker let calls through unprotected |
 
 ## Kubernetes

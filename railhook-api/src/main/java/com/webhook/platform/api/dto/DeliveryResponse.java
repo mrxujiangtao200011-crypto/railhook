@@ -1,7 +1,7 @@
 package com.webhook.platform.api.dto;
 
 import com.webhook.platform.api.domain.entity.Delivery;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

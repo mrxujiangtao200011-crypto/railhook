@@ -29,13 +29,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
-// A sweep committed between finalise's read and its UPDATE was overwritten.
+// A reclaim committed between finalise's read and its UPDATE was overwritten.
 @DataJpaTest
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration,"
+        "spring.autoconfigure.exclude="
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,"
                 + "org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration"
 })
@@ -64,7 +64,7 @@ class IncomingAttemptStoreFinaliseConcurrencyTest {
     private PlatformTransactionManager transactionManager;
 
     @Test
-    void aSweepCommittedAfterTheReadIsNotOverwrittenAndQueuesNoSuccessor() {
+    void aReclaimCommittedAfterTheReadIsNotOverwrittenAndQueuesNoSuccessor() {
         UUID eventId = UUID.randomUUID();
         UUID destinationId = UUID.randomUUID();
         UUID fence = UUID.randomUUID();
@@ -75,23 +75,25 @@ class IncomingAttemptStoreFinaliseConcurrencyTest {
                 .attemptNumber(1)
                 .status(ForwardAttemptStatus.PROCESSING)
                 .startedAt(Instant.now().minusSeconds(600))
+                .nextRetryAt(Instant.now().minusSeconds(300))
                 .claimToken(fence)
                 .build());
 
-        TransactionTemplate sweep = new TransactionTemplate(transactionManager);
-        sweep.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        TransactionTemplate reclaim = new TransactionTemplate(transactionManager);
+        reclaim.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         IncomingForwardAttemptRepository interleaved =
                 mock(IncomingForwardAttemptRepository.class, delegatesTo(attemptRepository));
         doAnswer(invocation -> {
             List<IncomingForwardAttempt> read = attemptRepository.findForwardAttempts(
                     invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2));
-            // The stuck sweep takes the row back between the store's read and its write.
-            sweep.execute(status -> attemptRepository.resetStuckForwardAttempts(Instant.now().plusSeconds(60)));
+            // The claim timed out, so another poller takes the row between the store's read and its write.
+            reclaim.execute(status -> attemptRepository.claimDue(Instant.now(), Instant.now().plusSeconds(300),
+                    new UUID(0L, 0L), 10, 10, 10));
             return read;
         }).when(interleaved).findForwardAttempts(any(), any(), any());
 
         IncomingAttemptStore store = new IncomingAttemptStore(interleaved, null,
-                new TransactionTemplate(transactionManager), null, null, null, null, null, null, null,
+                new TransactionTemplate(transactionManager), null, null, null, null, null, null,
                 null, null, null);
         IncomingAttemptStore.Claim claim = new IncomingAttemptStore.Claim(eventId, destinationId, 1, fence, null);
 
@@ -100,9 +102,8 @@ class IncomingAttemptStoreFinaliseConcurrencyTest {
 
         assertThat(applied).as("the Claim lost the row before it wrote").isFalse();
         List<IncomingForwardAttempt> rows = attemptRepository.findForwardAttempts(eventId, destinationId, null);
-        assertThat(rows).as("no successor beside the row the sweep handed back").hasSize(1);
-        assertThat(rows.get(0).getStatus()).isEqualTo(ForwardAttemptStatus.PENDING);
-        assertThat(rows.get(0).getClaimToken()).isNull();
-        assertThat(rows.get(0).getNextRetryAt()).isNotNull();
+        assertThat(rows).as("no successor beside the reclaimed row").hasSize(1);
+        assertThat(rows.get(0).getStatus()).isEqualTo(ForwardAttemptStatus.PROCESSING);
+        assertThat(rows.get(0).getClaimToken()).isNotNull().isNotEqualTo(fence);
     }
 }

@@ -6,7 +6,6 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Entity
@@ -83,30 +82,16 @@ public class IncomingForwardAttempt {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    /** Truncated to microseconds as Postgres stores it, or the CAS on started_at never matches. */
-    public void claimForRetry() {
-        this.status = ForwardAttemptStatus.PROCESSING;
-        this.startedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
-        this.nextRetryAt = null;
-    }
-
-    /** {@code next_retry_at} must be set: the scheduler ignores rows without one. */
+    /** {@code next_retry_at} must be set: a row without one is never claimed. */
     public void handBackTo(Instant retryAt) {
-        this.status = ForwardAttemptStatus.PENDING;
+        this.status = status.moveTo(ForwardAttemptStatus.PENDING);
         this.startedAt = null;
         this.claimToken = null;
         this.nextRetryAt = retryAt;
     }
 
     public void abandon(String reason) {
-        this.status = ForwardAttemptStatus.DLQ;
-        this.finishedAt = Instant.now();
-        this.errorMessage = reason;
-        this.nextRetryAt = null;
-    }
-
-    public void failWith(String reason) {
-        this.status = ForwardAttemptStatus.FAILED;
+        this.status = status.moveTo(ForwardAttemptStatus.DLQ);
         this.finishedAt = Instant.now();
         this.errorMessage = reason;
         this.nextRetryAt = null;

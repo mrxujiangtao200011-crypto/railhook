@@ -7,7 +7,7 @@ import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.PortalSession;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;

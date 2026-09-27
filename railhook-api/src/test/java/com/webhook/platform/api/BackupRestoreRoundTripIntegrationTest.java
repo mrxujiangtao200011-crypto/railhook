@@ -4,16 +4,13 @@ import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.Organization;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.domain.entity.Project;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
-import com.webhook.platform.api.domain.enums.OutboxStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
@@ -27,7 +24,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -45,7 +41,6 @@ class BackupRestoreRoundTripIntegrationTest extends AbstractIntegrationTest {
     @Autowired private EndpointRepository endpointRepository;
     @Autowired private EventRepository eventRepository;
     @Autowired private DeliveryRepository deliveryRepository;
-    @Autowired private OutboxMessageRepository outboxMessageRepository;
     @Autowired private PlanRepository planRepository;
     @Autowired private EncryptionKeyRegistry encryptionKeyRegistry;
 
@@ -78,14 +73,7 @@ class BackupRestoreRoundTripIntegrationTest extends AbstractIntegrationTest {
                 .status(DeliveryStatus.PROCESSING)
                 .claimToken(fence)
                 .lastAttemptAt(Instant.now().minusSeconds(3600))
-                .build());
-
-        OutboxMessage unannounced = outboxMessageRepository.save(OutboxMessage.builder()
-                .aggregateType("Event").aggregateId(event.getId())
-                .eventType("payment.succeeded").payload("{}")
-                .kafkaTopic("deliveries.dispatch").kafkaKey(endpoint.getId().toString())
-                .projectId(project.getId())
-                .status(OutboxStatus.PENDING).retryCount(0)
+                .nextRetryAt(Instant.now().minusSeconds(3300))
                 .build());
 
         dumpAndRestore();
@@ -110,22 +98,11 @@ class BackupRestoreRoundTripIntegrationTest extends AbstractIntegrationTest {
                     .isEqualTo(fence.toString());
 
             assertThat(readOne(restored,
-                    "SELECT status FROM outbox_messages WHERE id = ?", unannounced.getId()))
-                    .as("an accepted Event that was never announced is still announceable")
-                    .isEqualTo("PENDING");
-
-            // Only the stuck sweep will move it: Kafka knows nothing of a database that went back in time.
-            try (Statement sweep = restored.createStatement()) {
-                int recovered = sweep.executeUpdate(
-                        "UPDATE deliveries SET status = 'PENDING', claim_token = NULL, next_retry_at = now() "
-                                + "WHERE status = 'PROCESSING' AND last_attempt_at < now() - interval '5 minutes'");
-                assertThat(recovered)
-                        .as("a restore leaves in-flight work claimed by a worker that no longer exists")
-                        .isGreaterThanOrEqualTo(1);
-            }
-            assertThat(readOne(restored,
-                    "SELECT status FROM deliveries WHERE id = ?", inFlight.getId()))
-                    .isEqualTo("PENDING");
+                    "SELECT count(*) FROM deliveries WHERE id = ? AND status = 'PROCESSING' "
+                            + "AND next_retry_at <= now()", inFlight.getId()))
+                    .as("a restore leaves in-flight work claimed by a worker that no longer exists; "
+                            + "its claim has timed out, so the next claim takes it")
+                    .isEqualTo("1");
         }
     }
 

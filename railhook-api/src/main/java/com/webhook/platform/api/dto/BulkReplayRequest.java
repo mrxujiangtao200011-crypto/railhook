@@ -1,6 +1,6 @@
 package com.webhook.platform.api.dto;
 
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;

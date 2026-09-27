@@ -27,7 +27,6 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.webhook.platform.api.service.AuthRateLimiterService;
-import com.webhook.platform.api.service.OutboxPublisherService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.SequenceGeneratorService;
 import com.webhook.platform.api.service.TestEndpointCleanupService;
@@ -39,7 +38,7 @@ import org.springframework.test.annotation.DirtiesContext;
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration,org.redisson.spring.starter.RedissonAutoConfigurationV2"
+        "spring.autoconfigure.exclude=org.redisson.spring.starter.RedissonAutoConfigurationV2"
     }
 )
 @Testcontainers
@@ -58,8 +57,6 @@ public class DataRetentionIntegrationTest {
     @MockitoBean
     private RedisRateLimiterService redisRateLimiterService;
 
-    @MockitoBean
-    private OutboxPublisherService outboxPublisherService;
 
     @MockitoBean
     private TestEndpointCleanupService testEndpointCleanupService;
@@ -172,8 +169,8 @@ public class DataRetentionIntegrationTest {
         
         jdbcTemplate.execute("SET session_replication_role = replica");
         jdbcTemplate.update(
-            "INSERT INTO deliveries (id, event_id, endpoint_id, subscription_id, organization_id, status, attempt_count, max_attempts, ordering_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            deliveryId, eventId, endpointId, subscriptionId, FIXTURE_ORG, "PENDING", 0, 5, false, now, now
+            "INSERT INTO deliveries (id, event_id, endpoint_id, subscription_id, organization_id, status, attempt_count, max_attempts, ordering_enabled, created_at, updated_at, next_retry_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            deliveryId, eventId, endpointId, subscriptionId, FIXTURE_ORG, "PENDING", 0, 5, false, now, now, now
         );
         jdbcTemplate.execute("SET session_replication_role = DEFAULT");
         

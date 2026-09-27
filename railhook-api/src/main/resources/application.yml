@@ -50,8 +50,7 @@ spring:
     scheduling:
       pool:
         # Spring Boot defaults this to 1, so a single slow @Scheduled job (e.g. the
-        # materialized-view REFRESH) blocks every other cron on the JVM, including
-        # OutboxPublisherService's 1s dispatch poll - no event reaches Kafka while it runs.
+        # materialized-view REFRESH) blocks every other cron on the JVM.
         size: ${SCHEDULING_POOL_SIZE:8}
 
   data:
@@ -100,16 +99,10 @@ spring:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
+    # The default holds the lock in an open transaction, which CREATE INDEX CONCURRENTLY waits on forever.
+    postgresql:
+      transactional-lock: false
   
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      # Everything a producer actually runs on is built in KafkaProducerConfig, which assembles
-      # its own property map - so acks and retries written here were never read by anything. The
-      # two below are, through @Value on that class, and they are the two an operator has reason
-      # to move: how long a send may keep trying, and how long it may block the caller.
-      delivery-timeout-ms: ${KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS:120000}
-      max-block-ms: ${KAFKA_PRODUCER_MAX_BLOCK_MS:10000}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -139,7 +132,7 @@ management:
       # when-authorized, not always. The aggregate /actuator/health is reachable anonymously
       # (SecurityConfig permits it) and the UI's nginx proxies it straight through to the
       # public port, so `always` published component names, the database product and version,
-      # and Redis/Kafka reachability to anyone who asked. Everything that actually consumes
+      # and Redis reachability to anyone who asked. Everything that actually consumes
       # health here — the Compose healthchecks, the Helm probes, `make health`, install.sh's
       # wait loop — reads the liveness/readiness probe groups, which still return their status
       # either way.
@@ -177,21 +170,6 @@ management:
     # reachable from outside the trusted docker network.
     port: ${MANAGEMENT_PORT:${SERVER_PORT:8080}}
     address: ${MANAGEMENT_ADDRESS:0.0.0.0}
-
-outbox:
-  publisher:
-    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
-    retry-interval-ms: ${OUTBOX_RETRY_INTERVAL_MS:30000}
-    cleanup-interval-ms: ${OUTBOX_CLEANUP_INTERVAL_MS:3600000}
-    batch-size: ${OUTBOX_BATCH_SIZE:100}
-    max-retries: ${OUTBOX_MAX_RETRIES:5}
-    dead-retention-days: ${OUTBOX_DEAD_RETENTION_DAYS:90}
-    sending-recovery-seconds: ${OUTBOX_SENDING_RECOVERY_SECONDS:300}
-    batch-send-timeout-seconds: ${OUTBOX_BATCH_SEND_TIMEOUT_SECONDS:30}
-    max-per-project: ${OUTBOX_MAX_PER_PROJECT:30}
-    # Rows sharing one Kafka key — one endpoint — per batch. With the 1s poll above this is the
-    # per-endpoint announcement ceiling: ten events a second, whatever batch-size says.
-    max-per-key: ${OUTBOX_MAX_PER_KEY:10}
 
 data-retention:
   delivery-attempts-retention-days: ${DATA_RETENTION_ATTEMPTS_DAYS:90}

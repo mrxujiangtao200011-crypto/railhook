@@ -37,7 +37,6 @@ class NativeQueryTenantPredicateTest {
             "DeliveryAttemptRepository.deleteExcessAttemptsPerDelivery",
             "IncomingEventRepository.deleteOldIncomingEvents",
             "EventRepository.deleteOldEvents",
-            "OutboxMessageRepository.deleteOldPublishedMessages",
             // Resolved alert history for every organization at once.
             "AlertEventRepository.deleteResolvedBefore",
 
@@ -49,14 +48,6 @@ class NativeQueryTenantPredicateTest {
             "EventRepository.estimatedDeliveryRowCount",
 
             // The outbox claims and settles every organization's messages in one batch.
-            "OutboxMessageRepository.findOldestPendingCreatedAt",
-            "OutboxMessageRepository.findPendingBatchForUpdate",
-            "OutboxMessageRepository.findFailedMessagesForRetry",
-            "OutboxMessageRepository.batchMarkPublished",
-            "OutboxMessageRepository.batchMarkFailed",
-            "OutboxMessageRepository.promoteExhaustedToDead",
-            "OutboxMessageRepository.recoverStuckSendingMessages",
-            "OutboxMessageRepository.deadLetterStuckSendingMessages",
             "WorkflowTriggerOutboxRepository.claimBatch",
 
             // Rebuilds the high-water mark for every endpoint on the instance.

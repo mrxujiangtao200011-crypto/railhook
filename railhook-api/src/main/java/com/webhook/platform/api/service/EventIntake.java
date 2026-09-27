@@ -7,7 +7,7 @@ import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.enums.DeliveryOrigin;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.rules.RuleEngineService;
 import com.webhook.platform.common.retry.RetryLadderDefaults;

@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>Invariants. Each was once broken in one direction:
  *
  * <ol>
- *   <li>No DB, Redis or Kafka work inside the reactive chain. A write there can trip the HTTP
+ *   <li>No DB or Redis work inside the reactive chain. A write there can trip the HTTP
  *       timeout and run the failure path over a SUCCESS already written. After the chain, a
  *       failure to write down a 2xx must not turn it into a retry.</li>
  *   <li>No successor Attempt unless {@link AttemptStore#finalise} reports it wrote.</li>
@@ -243,14 +243,14 @@ public class AttemptRunner {
         }
     }
 
-    /** A throw is left to the stuck sweep; propagating it recorded the Attempt twice. */
+    /** A throw is left to the claim timeout; propagating it recorded the Attempt twice. */
     private <C> boolean finaliseOrLeaveToSweep(AttemptStore<C> store, C claim, AttemptContext ctx,
             Finalization outcome) {
         try {
             return store.finalise(claim, outcome);
         } catch (Exception e) {
-            log.error("{}: the outcome would not finalise: {} — the obligation stays claimed and the "
-                    + "stuck sweep owns it", ctx.description(), e.getMessage(), e);
+            log.error("{}: the outcome would not finalise: {} — the obligation stays claimed "
+                    + "until its claim times out", ctx.description(), e.getMessage(), e);
             return false;
         }
     }
@@ -333,7 +333,7 @@ public class AttemptRunner {
                 }
             } catch (Exception e) {
                 log.error("{}: delivered, but the success would not finalise: {} — the obligation "
-                        + "stays claimed and the stuck sweep owns it", ctx.description(), e.getMessage(), e);
+                        + "stays claimed until its claim times out", ctx.description(), e.getMessage(), e);
             }
             return;
         }

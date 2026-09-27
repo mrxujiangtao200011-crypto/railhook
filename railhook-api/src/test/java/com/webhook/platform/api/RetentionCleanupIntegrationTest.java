@@ -196,8 +196,8 @@ class RetentionCleanupIntegrationTest extends AbstractIntegrationTest {
     private void seedDelivery(UUID deliveryId, UUID eventId, String status) {
         entityManager.createNativeQuery("""
                 INSERT INTO deliveries (id, organization_id, event_id, endpoint_id, status,
-                                        attempt_count, max_attempts, created_at)
-                VALUES (:id, :org, :eventId, :endpointId, :status, 1, 6, NOW())
+                                        attempt_count, max_attempts, created_at, next_retry_at)
+                VALUES (:id, :org, :eventId, :endpointId, :status, 1, 6, NOW(), NOW())
                 """)
                 .setParameter("id", deliveryId)
                 .setParameter("org", organizationId)

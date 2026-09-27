@@ -3,6 +3,24 @@
 Only the releases that need something from you are listed. Everything else upgrades with
 `./railhook upgrade` (Compose) or `helm upgrade`.
 
+## v3.0.0
+
+- Kafka is gone. The worker takes due deliveries and forwards straight from PostgreSQL.
+  `./railhook upgrade v3.0.0` removes the `kafka` and `kafka-init` containers. The topics'
+  volume is left behind; delete it once you are on 3.0:
+
+  ```bash
+  docker volume rm railhook_kafka_data
+  ```
+
+- Remove the `KAFKA_*`, `OUTBOX_*`, `RETRY_SCHEDULER_*`, `STUCK_DELIVERY_*`, `STUCK_FORWARD_*` and
+  `INCOMING_FORWARD_RETRY_*` lines from `.env`; nothing reads them. The worker's new settings are
+  `WEBHOOK_CLAIM_*` in `.env.dist`.
+- Helm: the chart no longer takes a `kafka:` block or runs a topics job. External PostgreSQL and
+  Redis are all it needs.
+- Deliveries and forwards that were in flight when you upgraded are taken again after
+  `WEBHOOK_CLAIM_TIMEOUT_SECONDS` (5 minutes).
+
 ## v2.32.0
 
 - API errors that carried the generic `client_error` or `server_error` now carry a specific code

@@ -2,8 +2,8 @@ apiVersion: v2
 name: railhook
 description: Self-hosted webhook infrastructure platform
 type: application
-version: 2.32.2
-appVersion: "2.32.2"
+version: 3.0.0
+appVersion: "3.0.0"
 keywords:
   - webhooks
   - event-delivery
@@ -15,6 +15,6 @@ sources:
 maintainers:
   - name: Railhook maintainers
     url: https://github.com/vadymkykalo/railhook/issues
-# Bring-your-own PostgreSQL/Kafka/Redis: the Bitnami subcharts were dropped when Bitnami
+# Bring-your-own PostgreSQL/Redis: the Bitnami subcharts were dropped when Bitnami
 # retired its free catalog.
 dependencies: []

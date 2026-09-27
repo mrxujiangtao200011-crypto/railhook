@@ -4,13 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Event;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.RuleAction.ActionType;
 import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventResponse;
@@ -54,8 +52,6 @@ class EventServiceTest {
     @Mock
     private DeliveryRepository deliveryRepository;
     @Mock
-    private OutboxMessageRepository outboxMessageRepository;
-    @Mock
     private SequenceGeneratorService sequenceGeneratorService;
     @Mock
     private PayloadSchemaValidator payloadSchemaValidator;
@@ -97,9 +93,7 @@ class EventServiceTest {
                 projectRepository,
                 new EventIntake(subscriptionMatchingCache, ruleEngineService, entitlementService, objectMapper),
                 deliveryRepository,
-                outboxMessageRepository,
                 objectMapper,
-                new DeliveryDispatch(outboxMessageRepository, objectMapper),
                 new SimpleMeterRegistry(),
                 sequenceGeneratorService,
                 new SchemaValidationGate(payloadSchemaValidator, objectMapper));
@@ -123,9 +117,6 @@ class EventServiceTest {
             assertThat(d.getEndpointId()).isEqualTo(wildcard.getEndpointId());
             assertThat(d.getSubscriptionId()).isEqualTo(wildcard.getId());
         });
-        ArgumentCaptor<List<OutboxMessage>> outbox = ArgumentCaptor.captor();
-        verify(outboxMessageRepository).saveAll(outbox.capture());
-        assertThat(outbox.getValue()).hasSize(1);
     }
 
     @Test
@@ -142,7 +133,6 @@ class EventServiceTest {
 
         assertThat(response.getDeliveriesCreated()).isZero();
         verify(deliveryRepository, never()).saveAll(anyList());
-        verify(outboxMessageRepository, never()).saveAll(anyList());
     }
 
     @Test

@@ -6,7 +6,7 @@ import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.domain.entity.Project;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
@@ -115,7 +115,7 @@ class StrandedSequenceRepositoryTest extends AbstractIntegrationTest {
     void backfillRunsWithoutACallerTransaction() {
         Delivery ordered = delivery(true, null, DeliveryStatus.PENDING, Instant.now());
 
-        int updated = deliveryRepository.updateSequenceNumber(ordered.getId(), 7L);
+        int updated = deliveryRepository.updateSequenceNumber(ordered.getId(), 7L, Instant.now());
 
         assertThat(updated).isEqualTo(1);
         assertThat(deliveryRepository.findById(ordered.getId()).orElseThrow().getSequenceNumber()).isEqualTo(7L);

@@ -5,19 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.service.workflow.StepResult;
-import com.webhook.platform.api.service.DeliveryDispatch;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
-import com.webhook.platform.common.constants.KafkaTopics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -45,8 +41,6 @@ class DeliveryNodeExecutorTest {
     @Mock
     private DeliveryRepository deliveryRepository;
     @Mock
-    private OutboxMessageRepository outboxMessageRepository;
-    @Mock
     private EventRepository eventRepository;
     @Mock
     private EntitlementService entitlementService;
@@ -67,8 +61,7 @@ class DeliveryNodeExecutorTest {
             return e;
         });
         executor = new DeliveryNodeExecutor(endpointRepository, deliveryRepository, eventRepository,
-                entitlementService, quotaCounterService, mapper,
-                new DeliveryDispatch(outboxMessageRepository, mapper), transactionManager, 262144L, 1024);
+                entitlementService, quotaCounterService, mapper, transactionManager, 262144L, 1024);
     }
 
     private JsonNode json(String raw) throws Exception {
@@ -81,7 +74,7 @@ class DeliveryNodeExecutorTest {
 
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
         assertThat(result.errorMessage()).contains("endpointId is required");
-        verifyNoInteractions(endpointRepository, deliveryRepository, outboxMessageRepository, eventRepository);
+        verifyNoInteractions(endpointRepository, deliveryRepository, eventRepository);
     }
 
     @Test
@@ -105,7 +98,7 @@ class DeliveryNodeExecutorTest {
         StepResult result = executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), json("{}"));
 
         assertThat(result.status()).isEqualTo(StepStatus.SKIPPED);
-        verifyNoInteractions(deliveryRepository, outboxMessageRepository, eventRepository);
+        verifyNoInteractions(deliveryRepository, eventRepository);
     }
 
     // The node read the Event from _eventId, which nothing set, so every delivery node failed in production.
@@ -145,13 +138,6 @@ class DeliveryNodeExecutorTest {
         assertThat(savedDelivery.getEndpointId()).isEqualTo(endpointId);
         assertThat(savedDelivery.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(savedDelivery.getEventId()).isEqualTo(savedEvent.getId());
-
-        ArgumentCaptor<OutboxMessage> outboxCaptor = ArgumentCaptor.forClass(OutboxMessage.class);
-        verify(outboxMessageRepository).save(outboxCaptor.capture());
-        OutboxMessage outbox = outboxCaptor.getValue();
-        assertThat(outbox.getAggregateId()).isEqualTo(deliveryId);
-        assertThat(outbox.getKafkaTopic()).isEqualTo(KafkaTopics.DELIVERIES_DISPATCH);
-        assertThat(outbox.getProjectId()).isEqualTo(projectId);
     }
 
     // A customer-controlled _eventId could point the Delivery at another organization's Event.
@@ -187,33 +173,6 @@ class DeliveryNodeExecutorTest {
         StepResult result = executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), json("{}"));
 
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
-        verifyNoInteractions(eventRepository, deliveryRepository, outboxMessageRepository);
-    }
-
-    @Test
-    @DisplayName("the Delivery and its announcement are one transaction, or neither")
-    void theDeliveryAndItsOutboxRowCommitTogether() throws Exception {
-        // Two auto-commits left a PENDING Delivery without its Outbox row, which nothing dispatches.
-        UUID endpointId = UUID.randomUUID();
-        Endpoint endpoint = new Endpoint();
-        endpoint.setId(endpointId);
-        endpoint.setProjectId(UUID.randomUUID());
-        endpoint.setUrl("https://receiver.example.test/hook");
-        endpoint.setEnabled(true);
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
-        when(deliveryRepository.save(any(Delivery.class))).thenAnswer(call -> {
-            Delivery d = call.getArgument(0);
-            d.setId(UUID.randomUUID());
-            return d;
-        });
-        when(outboxMessageRepository.save(any()))
-                .thenThrow(new DataIntegrityViolationException("outbox insert failed"));
-
-        StepResult result = executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), json("{}"));
-
-        assertThat(result.status())
-                .as("the node reports the failure rather than claiming a delivery nobody will make")
-                .isNotEqualTo(StepStatus.SUCCESS);
-        verify(transactionManager).rollback(any());
+        verifyNoInteractions(eventRepository, deliveryRepository);
     }
 }

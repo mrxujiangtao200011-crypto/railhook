@@ -22,7 +22,6 @@ class ProductionSafetyValidatorTest {
         ReflectionTestUtils.setField(v, "encryptionKey", STRONG_KEY);
         ReflectionTestUtils.setField(v, "encryptionSalt", STRONG_SALT);
         ReflectionTestUtils.setField(v, "allowPrivateIps", false);
-        ReflectionTestUtils.setField(v, "kafkaBootstrapServers", "kafka.internal:9092");
         return v;
     }
 
@@ -32,8 +31,8 @@ class ProductionSafetyValidatorTest {
         Method check = ProductionSafetyValidator.class.getMethod("validateProductionConfig");
 
         assertTrue(check.isAnnotationPresent(PostConstruct.class),
-                "validateProductionConfig must run from @PostConstruct. On ApplicationReadyEvent the Kafka "
-                        + "listeners have already started, so a worker configured with a placeholder encryption "
+                "validateProductionConfig must run from @PostConstruct. On ApplicationReadyEvent the claim "
+                        + "pollers have already started, so a worker configured with a placeholder encryption "
                         + "key and the SSRF guard off does not just sit there being wrong — it delivers webhooks "
                         + "before the check throws.");
     }
@@ -85,26 +84,14 @@ class ProductionSafetyValidatorTest {
     }
 
     @Test
-    @DisplayName("a broker still pointing at localhost fails startup")
-    void localhostBrokerFails() {
-        ProductionSafetyValidator v = productionValidator();
-        ReflectionTestUtils.setField(v, "kafkaBootstrapServers", "localhost:9092");
-
-        IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
-        assertTrue(e.getMessage().contains("KAFKA_BOOTSTRAP_SERVERS"), e.getMessage());
-    }
-
-    @Test
     @DisplayName("every violation is reported at once, not one per restart")
     void allViolationsReportedTogether() {
         ProductionSafetyValidator v = productionValidator();
         ReflectionTestUtils.setField(v, "encryptionKey", "changeme");
         ReflectionTestUtils.setField(v, "allowPrivateIps", true);
-        ReflectionTestUtils.setField(v, "kafkaBootstrapServers", "");
 
         IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
         assertTrue(e.getMessage().contains("WEBHOOK_ENCRYPTION_KEY"), e.getMessage());
         assertTrue(e.getMessage().contains("WEBHOOK_ALLOW_PRIVATE_IPS"), e.getMessage());
-        assertTrue(e.getMessage().contains("KAFKA_BOOTSTRAP_SERVERS"), e.getMessage());
     }
 }

@@ -167,13 +167,13 @@ jobs:
           kubectl create secret generic railhook-redis-secret \
             --from-literal=password="$(openssl rand -base64 32)"
 
-      - name: Stand up PostgreSQL, Kafka and Redis
+      - name: Stand up PostgreSQL and Redis
         run: |
           set -e
           kubectl apply -f deploy/ci/kind-dependencies.yaml
 
           # One deadline each: a shared clock blames the healthy ones for the slow one's time.
-          for d in postgres kafka redis; do
+          for d in postgres redis; do
             if ! kubectl wait --for=condition=available --timeout=4m "deployment/$d"; then
               echo "::error::$d never became available"
               kubectl logs "deployment/$d" --tail=100 || true
@@ -188,7 +188,6 @@ jobs:
           helm install railhook deploy/helm/railhook \
             --wait --timeout 15m \
             --set postgresql.external.host=postgres \
-            --set kafka.external.bootstrapServers=kafka:9092 \
             --set redis.external.host=redis \
             --set api.image.repository=railhook-api \
             --set api.image.tag=test \
@@ -869,8 +868,8 @@ jobs:
 
       - name: Nothing else is bound to the host
         run: |
-          # The single-port promise: Postgres, Kafka, Redis and the API stay inside the Docker network.
-          for p in 5432 9092 6379 8082 5173; do
+          # The single-port promise: Postgres, Redis and the API stay inside the Docker network.
+          for p in 5432 6379 8082 5173; do
             if curl -s -o /dev/null --max-time 2 "http://localhost:$p" 2>/dev/null \
                || nc -z localhost "$p" 2>/dev/null; then
               echo "::error::port $p is published to the host; only the web port should be"

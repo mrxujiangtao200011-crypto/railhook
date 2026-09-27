@@ -2,7 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Project;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.DashboardStatsResponse;
 import com.webhook.platform.api.dto.OnboardingStatusResponse;

@@ -9,7 +9,6 @@ import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
@@ -53,8 +52,6 @@ class IncomingEventServiceTest {
     @Mock
     private IncomingDestinationRepository destinationRepository;
     @Mock
-    private OutboxMessageRepository outboxMessageRepository;
-    @Mock
     private ProjectRepository projectRepository;
     @Mock
     private PlatformTransactionManager txManager;
@@ -82,8 +79,8 @@ class IncomingEventServiceTest {
 
         service = new IncomingEventService(
                 eventRepository, sourceRepository, forwardAttemptRepository,
-                destinationRepository, outboxMessageRepository, projectRepository,
-                objectMapper, new ForwardDispatch(objectMapper), txManager, piiMaskingService
+                destinationRepository, projectRepository,
+                objectMapper, txManager, piiMaskingService
         );
         project = Project.builder().id(projectId).organizationId(orgId).name("Test").build();
         source = IncomingSource.builder()
@@ -123,15 +120,12 @@ class IncomingEventServiceTest {
                 .build();
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of(dest));
         when(forwardAttemptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(outboxMessageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         int replayed = service.replayEvent(eventId, auth);
 
         assertThat(replayed).isEqualTo(1);
         verify(forwardAttemptRepository).save(argThat(a ->
                 a.getStatus() == ForwardAttemptStatus.PENDING && a.getAttemptNumber() == 1));
-        verify(outboxMessageRepository).save(argThat(o ->
-                o.getEventType().equals("IncomingForwardReplay")));
     }
 
     @Test

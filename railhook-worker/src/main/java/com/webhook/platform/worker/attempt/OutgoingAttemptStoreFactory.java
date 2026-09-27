@@ -1,8 +1,8 @@
 package com.webhook.platform.worker.attempt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.domain.repository.EndpointRepository;
@@ -15,7 +15,6 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -32,7 +31,6 @@ public class OutgoingAttemptStoreFactory {
     private final ProjectStatusLookup projectStatusLookup;
     private final TransactionTemplate transactionTemplate;
     private final OrderingBufferService orderingBufferService;
-    private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final MtlsWebClientCache mtlsWebClientCache;
     private final TransformationCacheService transformationCacheService;
@@ -57,7 +55,6 @@ public class OutgoingAttemptStoreFactory {
             ProjectStatusLookup projectStatusLookup,
             TransactionTemplate transactionTemplate,
             OrderingBufferService orderingBufferService,
-            KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             EncryptionKeyRegistry encryptionKeyRegistry,
             MtlsWebClientCache mtlsWebClientCache,
             TransformationCacheService transformationCacheService,
@@ -75,7 +72,6 @@ public class OutgoingAttemptStoreFactory {
         this.projectStatusLookup = projectStatusLookup;
         this.transactionTemplate = transactionTemplate;
         this.orderingBufferService = orderingBufferService;
-        this.kafkaTemplate = kafkaTemplate;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.mtlsWebClientCache = mtlsWebClientCache;
         this.transformationCacheService = transformationCacheService;
@@ -89,12 +85,12 @@ public class OutgoingAttemptStoreFactory {
         this.orderingBufferRescheduleDelaySeconds = orderingBufferRescheduleDelaySeconds;
     }
 
-    public OutgoingAttemptStore create(DeliveryMessage message, boolean isRetry) {
+    public OutgoingAttemptStore create(Delivery claimed) {
         return new OutgoingAttemptStore(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
-                projectStatusLookup, transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
+                projectStatusLookup, transactionTemplate, orderingBufferService, encryptionKeyRegistry,
                 mtlsWebClientCache, transformationCacheService, payloadTransformService,
                 objectMapper, outgoingWebClient, targetFailureRecorder, orderingGapTimeoutCounter, clock,
-                orderingBufferRescheduleDelaySeconds, message, isRetry);
+                orderingBufferRescheduleDelaySeconds, claimed);
     }
 }

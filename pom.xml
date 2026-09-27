@@ -6,11 +6,11 @@
 
     <groupId>com.webhook.platform</groupId>
     <artifactId>railhook</artifactId>
-    <version>2.32.2</version>
+    <version>3.0.0</version>
     <packaging>pom</packaging>
 
     <name>Webhook Platform</name>
-    <description>Event Delivery Platform with Kafka and Spring Boot</description>
+    <description>Webhook delivery platform</description>
 
     <modules>
         <module>railhook-common</module>

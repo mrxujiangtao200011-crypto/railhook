@@ -1,16 +1,12 @@
 package com.webhook.platform.worker.service;
 
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -31,7 +27,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class StaleForwardEscalationService {
 
     private final IncomingForwardAttemptRepository attemptRepository;
-    private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
     private final TransactionTemplate transactionTemplate;
     private final Duration hardCapAge;
     private final int escalationBatchSize;
@@ -40,13 +35,11 @@ public class StaleForwardEscalationService {
 
     public StaleForwardEscalationService(
             IncomingForwardAttemptRepository attemptRepository,
-            @Qualifier("incomingForwardKafkaTemplate") KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate,
             TransactionTemplate transactionTemplate,
             MeterRegistry meterRegistry,
             @Value("${forward.escalation.hard-cap-hours:24}") long hardCapHours,
             @Value("${forward.escalation.batch-size:100}") int escalationBatchSize) {
         this.attemptRepository = attemptRepository;
-        this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
         this.hardCapAge = Duration.ofHours(hardCapHours);
         this.escalationBatchSize = escalationBatchSize;
@@ -85,10 +78,10 @@ public class StaleForwardEscalationService {
         try {
             Instant cutoff = Instant.now().minus(hardCapAge);
 
-            List<IncomingForwardAttempt> escalated = transactionTemplate.execute(tx -> {
+            Integer escalated = transactionTemplate.execute(tx -> {
                 List<UUID> staleIds = attemptRepository.findStaleForwardAttemptIds(cutoff, escalationBatchSize);
                 if (staleIds.isEmpty()) {
-                    return List.<IncomingForwardAttempt>of();
+                    return 0;
                 }
 
                 List<IncomingForwardAttempt> stale = attemptRepository.findAllById(staleIds);
@@ -100,35 +93,13 @@ public class StaleForwardEscalationService {
 
                 log.warn("Hard-cap escalation: moved {} stale forwards (started before {}) to DLQ",
                         stale.size(), cutoff);
-                return stale;
+                return stale.size();
             });
-
-            if (escalated == null || escalated.isEmpty()) {
-                return;
-            }
-            escalatedCounter.increment(escalated.size());
-
-            // Outside the transaction: a Kafka failure must not roll back the committed DLQ write.
-            for (IncomingForwardAttempt attempt : escalated) {
-                publishDlqNotification(attempt);
+            if (escalated != null && escalated > 0) {
+                escalatedCounter.increment(escalated);
             }
         } catch (Exception e) {
             log.error("Forward escalation cycle failed: {}", e.getMessage(), e);
-        }
-    }
-
-    private void publishDlqNotification(IncomingForwardAttempt attempt) {
-        try {
-            kafkaTemplate.send(KafkaTopics.INCOMING_FORWARD_DLQ, attempt.getDestinationId().toString(),
-                    IncomingForwardMessage.builder()
-                            .incomingEventId(attempt.getIncomingEventId())
-                            .destinationId(attempt.getDestinationId())
-                            .attemptCount(attempt.getAttemptNumber())
-                            .replaySessionId(attempt.getReplaySessionId())
-                            .build());
-        } catch (Exception e) {
-            log.error("Failed to publish DLQ notification for escalated forward eventId={}, destId={}: {}",
-                    attempt.getIncomingEventId(), attempt.getDestinationId(), e.getMessage(), e);
         }
     }
 }

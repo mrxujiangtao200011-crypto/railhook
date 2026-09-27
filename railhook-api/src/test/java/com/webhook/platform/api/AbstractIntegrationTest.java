@@ -1,7 +1,6 @@
 package com.webhook.platform.api;
 
 import com.webhook.platform.api.service.AuthRateLimiterService;
-import com.webhook.platform.api.service.OutboxPublisherService;
 import com.webhook.platform.api.service.RedisTunnelCoordinator;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.SequenceGeneratorService;
@@ -29,7 +28,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration,org.redisson.spring.starter.RedissonAutoConfigurationV2"
+                "spring.autoconfigure.exclude=org.redisson.spring.starter.RedissonAutoConfigurationV2"
         }
 )
 @Testcontainers
@@ -49,8 +48,6 @@ public abstract class AbstractIntegrationTest {
     @MockitoBean
     protected RedisRateLimiterService redisRateLimiterService;
 
-    @MockitoBean
-    protected OutboxPublisherService outboxPublisherService;
 
     @MockitoBean
     protected TestEndpointCleanupService testEndpointCleanupService;

@@ -116,7 +116,7 @@ check_system() {
     resolve_compose || die "Docker Compose is not available (tried 'docker compose' and 'docker-compose'): https://docs.docker.com/compose/install/"
     say "Docker $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo '?'), using '${COMPOSE_CMD}'"
 
-    # Two JVMs, Kafka, Postgres and Redis: below 2 GiB they do not all start.
+    # Two JVMs, Postgres and Redis: below 2 GiB they do not all start.
     local mem_gb disk_gb target="$INSTALL_DIR" p
     mem_gb=$(awk '/MemTotal/ {print int($2 / 1048576)}' /proc/meminfo 2>/dev/null || true)
     while [ ! -d "$target" ]; do target=$(dirname "$target"); done
@@ -451,12 +451,13 @@ case "${1:-help}" in
         active=$(compose config --services)
         up_one() {
             printf '%s\n' "$active" | grep -qx "$1" || return 0
-            compose up -d --no-deps "$1" || { echo "Could not start $1; see ./railhook logs $1" >&2; exit 1; }
+            compose up -d --no-deps "${@:2}" "$1" || { echo "Could not start $1; see ./railhook logs $1" >&2; exit 1; }
         }
-        for svc in postgres kafka redis ui caddy; do up_one "$svc"; done
+        for svc in postgres redis ui caddy; do up_one "$svc"; done
         # Only the API runs migrations, and a new worker validates the schema when it starts.
         roll_api || { echo "The API did not come up; the worker was left as it was." >&2; exit 1; }
-        up_one worker
+        # Removes containers of services the new compose file dropped, such as Kafka before 3.0.
+        up_one worker --remove-orphans
         echo "Upgraded from ${from}. To roll the images back, set the *_IMAGE_TAG lines in .env to ${from}"
         echo "and run ./railhook start. The schema does not roll back; restore the backup for that." ;;
     backup)

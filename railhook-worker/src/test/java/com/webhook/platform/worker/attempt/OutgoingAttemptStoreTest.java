@@ -1,8 +1,8 @@
 package com.webhook.platform.worker.attempt;
 
+import com.webhook.platform.common.enums.DeliveryStatus;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.enums.SignatureScheme;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
@@ -28,7 +28,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -65,7 +64,6 @@ class OutgoingAttemptStoreTest {
     @Mock private EndpointRepository endpointRepository;
     @Mock private EventRepository eventRepository;
     @Mock private OrderingBufferService orderingBufferService;
-    @Mock private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     @Mock private EncryptionKeyRegistry encryptionKeyRegistry;
     @Mock private MtlsWebClientCache mtlsWebClientCache;
     @Mock private TransformationCacheService transformationCacheService;
@@ -82,19 +80,19 @@ class OutgoingAttemptStoreTest {
 
         store = new OutgoingAttemptStore(
                 deliveryRepository, null, null, null, null, transactionTemplate,
-                null, null, null, null, null, null, null, null, null, null, Clock.systemUTC(), 5,
-                DeliveryMessage.builder().deliveryId(DELIVERY_ID).build(), false);
+                null, null, null, null, null, null, null, null, null, Clock.systemUTC(), 5,
+                Delivery.builder().id(DELIVERY_ID).build());
     }
 
-    private OutgoingAttemptStore storeFor(DeliveryMessage message, boolean retry, ObjectMapper objectMapper) {
+    private OutgoingAttemptStore storeFor(Delivery claimed, ObjectMapper objectMapper) {
         return new OutgoingAttemptStore(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 activeProjects(),
-                transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
+                transactionTemplate, orderingBufferService, encryptionKeyRegistry,
                 mtlsWebClientCache, transformationCacheService, payloadTransformService,
                 objectMapper, WebClient.builder().build(), null,
                 Counter.builder("test").register(new SimpleMeterRegistry()),
-                Clock.systemUTC(), 5, message, retry);
+                Clock.systemUTC(), 5, claimed);
     }
 
     // Every Project active: project status is not what this test is about.
@@ -117,7 +115,7 @@ class OutgoingAttemptStoreTest {
         rowIs(processingDelivery());
 
         assertThat(store.finalise(claim(FENCE), new Finalization.Succeeded())).isTrue();
-        assertThat(saved().getStatus()).isEqualTo(Delivery.DeliveryStatus.SUCCESS);
+        assertThat(saved().getStatus()).isEqualTo(DeliveryStatus.SUCCESS);
     }
 
     @Test
@@ -128,7 +126,7 @@ class OutgoingAttemptStoreTest {
         assertThat(store.finalise(claim(FENCE), new Finalization.Retry(at, "500"))).isTrue();
 
         Delivery row = saved();
-        assertThat(row.getStatus()).isEqualTo(Delivery.DeliveryStatus.PENDING);
+        assertThat(row.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(row.getClaimToken()).isNull();
         assertThat(row.getNextRetryAt()).isEqualTo(at);
     }
@@ -138,7 +136,7 @@ class OutgoingAttemptStoreTest {
         rowIs(processingDelivery());
 
         assertThat(store.finalise(claim(FENCE), new Finalization.Abandoned("out of attempts"))).isTrue();
-        assertThat(saved().getStatus()).isEqualTo(Delivery.DeliveryStatus.DLQ);
+        assertThat(saved().getStatus()).isEqualTo(DeliveryStatus.DLQ);
     }
 
     @Test
@@ -148,14 +146,14 @@ class OutgoingAttemptStoreTest {
         assertThat(store.finalise(claim(FENCE), new Finalization.TerminallyFailed("404"))).isTrue();
 
         Delivery row = saved();
-        assertThat(row.getStatus()).isEqualTo(Delivery.DeliveryStatus.FAILED);
+        assertThat(row.getStatus()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(row.getNextRetryAt()).isNull();
     }
 
     @Test
     void aRowThatIsNoLongerProcessingIsNotOverwritten() {
         Delivery row = processingDelivery();
-        row.setStatus(Delivery.DeliveryStatus.SUCCESS);
+        row.setStatus(DeliveryStatus.SUCCESS);
         rowIs(row);
 
         assertThat(store.finalise(claim(FENCE), new Finalization.Retry(Instant.now(), "500"))).isFalse();
@@ -198,7 +196,7 @@ class OutgoingAttemptStoreTest {
     private Delivery processingDelivery() {
         return Delivery.builder()
                 .id(DELIVERY_ID)
-                .status(Delivery.DeliveryStatus.PROCESSING)
+                .status(DeliveryStatus.PROCESSING)
                 .attemptCount(1)
                 .maxAttempts(5)
                 .claimToken(FENCE)
@@ -308,10 +306,7 @@ class OutgoingAttemptStoreTest {
         }
 
         private Sent send(Delivery delivery) {
-            when(deliveryRepository.claimForProcessingAndReturn(eq(delivery.getId()), any(UUID.class), any(Instant.class)))
-                    .thenReturn(delivery);
-            OutgoingAttemptStore store = storeFor(
-                    DeliveryMessage.builder().deliveryId(delivery.getId()).build(), false, objectMapper);
+            OutgoingAttemptStore store = storeFor(delivery, objectMapper);
 
             ClaimResult<OutgoingAttemptStore.Claim> result = store.claim();
             assertThat(result).isInstanceOf(ClaimResult.Claimed.class);
@@ -341,7 +336,7 @@ class OutgoingAttemptStoreTest {
                     .id(UUID.randomUUID())
                     .eventId(event.getId())
                     .endpointId(endpoint.getId())
-                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .status(DeliveryStatus.PROCESSING)
                     .attemptCount(0)
                     .maxAttempts(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS)
                     .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)
@@ -350,83 +345,6 @@ class OutgoingAttemptStoreTest {
                     .idempotencyKey(idempotencyKey)
                     .customHeaders(customHeaders)
                     .build();
-        }
-    }
-
-    // Reading the fence off the row let every copy of a retry message believe it owned the row.
-    @Nested
-    @MockitoSettings(strictness = Strictness.LENIENT)
-    class OutgoingRetryClaim {
-
-        private UUID deliveryId;
-        private UUID schedulerToken;
-
-        @BeforeEach
-        void newIds() {
-            deliveryId = UUID.randomUUID();
-            schedulerToken = UUID.randomUUID();
-        }
-
-        private OutgoingAttemptStore retryStoreFor(DeliveryMessage message) {
-            return storeFor(message, true, new ObjectMapper());
-        }
-
-        private DeliveryMessage retryMessage(UUID claimToken) {
-            return DeliveryMessage.builder()
-                    .deliveryId(deliveryId)
-                    .eventId(UUID.randomUUID())
-                    .endpointId(UUID.randomUUID())
-                    .subscriptionId(UUID.randomUUID())
-                    .status(Delivery.DeliveryStatus.PROCESSING.name())
-                    .attemptCount(2)
-                    .claimToken(claimToken)
-                    .build();
-        }
-
-        private Delivery processingRow() {
-            return Delivery.builder()
-                    .id(deliveryId)
-                    .status(Delivery.DeliveryStatus.PROCESSING)
-                    .claimToken(UUID.randomUUID())
-                    .orderingEnabled(false)
-                    .build();
-        }
-
-        @Test
-        void aSecondDeliveryOfTheSameRetryMessageClaimsNothing() {
-            // The first copy won the swap, so this token matches nothing.
-            when(deliveryRepository.claimRetryForProcessing(eq(deliveryId), eq(schedulerToken), any(UUID.class)))
-                    .thenReturn(null);
-
-            ClaimResult<OutgoingAttemptStore.Claim> result =
-                    retryStoreFor(retryMessage(schedulerToken)).claim();
-
-            assertInstanceOf(ClaimResult.NotClaimed.class, result,
-                    "the loser of the CAS must not go on to POST the webhook a second time");
-            // The claim must be a conditional swap on the published token, never a fence read off the row.
-            verify(deliveryRepository).claimRetryForProcessing(eq(deliveryId), eq(schedulerToken), any(UUID.class));
-            verify(deliveryRepository, never()).findById(deliveryId);
-        }
-
-        @Test
-        void aMessageWithoutATokenStillWorksAcrossARollingDeploy() {
-            // From a worker before the token travelled with the message; dropping these strands in-flight retries.
-            Delivery delivery = Delivery.builder()
-                    .id(deliveryId)
-                    .status(Delivery.DeliveryStatus.PROCESSING)
-                    .claimToken(schedulerToken)
-                    .orderingEnabled(false)
-                    .build();
-            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-            when(endpointRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
-
-            ClaimResult<OutgoingAttemptStore.Claim> result =
-                    retryStoreFor(retryMessage(null)).claim();
-
-            // Finalising re-reads the row under its fence, hence atLeastOnce.
-            verify(deliveryRepository, atLeastOnce()).findById(deliveryId);
-            verify(deliveryRepository, never()).claimRetryForProcessing(any(), any(), any());
-            assertInstanceOf(ClaimResult.NotClaimed.class, result);
         }
     }
 }
