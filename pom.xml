@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
 
     <name>Webhook Platform</name>
-    <description>Event Delivery Platform with Kafka and Spring Boot</description>
+    <description>Event Delivery Platform with PostgreSQL and Spring Boot</description>
 
     <modules>
         <module>railhook-common</module>
