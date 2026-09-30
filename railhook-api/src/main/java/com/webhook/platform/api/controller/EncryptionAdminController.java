@@ -33,7 +33,7 @@ public class EncryptionAdminController {
 
     @Operation(
             summary = "Rotate encryption keys",
-            description = "Re-encrypts all secrets (endpoints, incoming sources, incoming destinations) "
+            description = "Re-encrypts all secrets (endpoints, incoming sources, incoming destinations, alert rule keys) "
                     + "with the currently active encryption key version, across ALL tenants. "
                     + "Requires the platform-admin operator credential (X-Platform-Admin-Token)."
     )
@@ -55,6 +55,7 @@ public class EncryptionAdminController {
                     .endpointsRotated(result.endpointsRotated())
                     .sourcesRotated(result.sourcesRotated())
                     .destinationsRotated(result.destinationsRotated())
+                    .alertRulesRotated(result.alertRulesRotated())
                     .errors(result.errors())
                     .build();
 

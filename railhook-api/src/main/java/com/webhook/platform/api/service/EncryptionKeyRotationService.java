@@ -1,8 +1,10 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingSource;
+import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
@@ -32,6 +34,7 @@ public class EncryptionKeyRotationService {
     private final EndpointRepository endpointRepository;
     private final IncomingSourceRepository incomingSourceRepository;
     private final IncomingDestinationRepository incomingDestinationRepository;
+    private final AlertRuleRepository alertRuleRepository;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final TransactionTemplate transactionTemplate;
     private final LockingTaskExecutor lockingTaskExecutor;
@@ -46,6 +49,7 @@ public class EncryptionKeyRotationService {
             EndpointRepository endpointRepository,
             IncomingSourceRepository incomingSourceRepository,
             IncomingDestinationRepository incomingDestinationRepository,
+            AlertRuleRepository alertRuleRepository,
             EncryptionKeyRegistry encryptionKeyRegistry,
             TransactionTemplate transactionTemplate,
             LockingTaskExecutor lockingTaskExecutor,
@@ -53,6 +57,7 @@ public class EncryptionKeyRotationService {
         this.endpointRepository = endpointRepository;
         this.incomingSourceRepository = incomingSourceRepository;
         this.incomingDestinationRepository = incomingDestinationRepository;
+        this.alertRuleRepository = alertRuleRepository;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.transactionTemplate = transactionTemplate;
         this.lockingTaskExecutor = lockingTaskExecutor;
@@ -89,17 +94,20 @@ public class EncryptionKeyRotationService {
         AtomicInteger endpointsRotated = new AtomicInteger();
         AtomicInteger sourcesRotated = new AtomicInteger();
         AtomicInteger destinationsRotated = new AtomicInteger();
+        AtomicInteger alertRulesRotated = new AtomicInteger();
         AtomicInteger errors = new AtomicInteger();
 
         rotateEndpoints(activeVersion, endpointsRotated, errors);
         rotateIncomingSources(activeVersion, sourcesRotated, errors);
         rotateIncomingDestinations(activeVersion, destinationsRotated, errors);
+        rotateAlertRules(activeVersion, alertRulesRotated, errors);
 
         RotationResult result = new RotationResult(
                 activeVersion,
                 endpointsRotated.get(),
                 sourcesRotated.get(),
                 destinationsRotated.get(),
+                alertRulesRotated.get(),
                 errors.get()
         );
 
@@ -240,11 +248,41 @@ public class EncryptionKeyRotationService {
         incomingDestinationRepository.save(dest);
     }
 
+    private void rotateAlertRules(int targetVersion, AtomicInteger rotated, AtomicInteger errors) {
+        int page = 0;
+        while (true) {
+            Page<AlertRule> batch = alertRuleRepository.findAll(PageRequest.of(page, BATCH_SIZE));
+            if (batch.isEmpty()) break;
+
+            for (AlertRule rule : batch) {
+                if (rule.getIntegrationKeyEncrypted() == null || rule.getEncryptionKeyVersion() == targetVersion) {
+                    continue;
+                }
+                try {
+                    transactionTemplate.executeWithoutResult(status -> {
+                        reEncrypt(rule.getEncryptionKeyVersion(), rule::getIntegrationKeyEncrypted,
+                                rule::getIntegrationKeyIv, rule::setIntegrationKeyEncrypted, rule::setIntegrationKeyIv);
+                        rule.setEncryptionKeyVersion(targetVersion);
+                        alertRuleRepository.save(rule);
+                    });
+                    rotated.incrementAndGet();
+                } catch (Exception e) {
+                    errors.incrementAndGet();
+                    log.error("Failed to rotate alert rule {}: {}", rule.getId(), e.getMessage());
+                }
+            }
+
+            if (!batch.hasNext()) break;
+            page++;
+        }
+    }
+
     public record RotationResult(
             int targetVersion,
             int endpointsRotated,
             int sourcesRotated,
             int destinationsRotated,
+            int alertRulesRotated,
             int errors
     ) {}
 }

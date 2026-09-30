@@ -80,7 +80,7 @@ class AlertNotificationAfterCommitIntegrationTest extends AbstractIntegrationTes
             tx.setRollbackOnly();
         }));
 
-        verify(notificationService, never()).dispatch(any(), any());
+        verify(notificationService, never()).dispatch(any(), any(), any());
         assertThat(storedAlerts()).isZero();
     }
 
@@ -91,11 +91,11 @@ class AlertNotificationAfterCommitIntegrationTest extends AbstractIntegrationTes
             // Its own connection, outside the alert's transaction: it sees only committed rows.
             visibleWhenDispatched.set(storedAlerts());
             return null;
-        }).when(notificationService).dispatch(any(), any());
+        }).when(notificationService).dispatch(any(), any(), any());
 
         TenantContext.runAs(organizationId, () -> alertService.fireAlert(rule, 80.0, "80% of deliveries failed"));
 
-        verify(notificationService, times(1)).dispatch(any(), any());
+        verify(notificationService, times(1)).dispatch(any(), any(), any());
         assertThat(visibleWhenDispatched.get()).isEqualTo(1L);
     }
 

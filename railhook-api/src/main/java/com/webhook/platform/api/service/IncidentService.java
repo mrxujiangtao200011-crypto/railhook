@@ -2,11 +2,13 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.entity.Incident;
 import com.webhook.platform.api.domain.entity.IncidentTimeline;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
 import com.webhook.platform.api.domain.enums.IncidentStatus;
 import com.webhook.platform.api.domain.enums.IncidentTimelineType;
+import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.domain.repository.IncidentRepository;
 import com.webhook.platform.api.domain.repository.IncidentTimelineRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
@@ -25,7 +27,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,6 +41,7 @@ public class IncidentService {
     private final IncidentRepository incidentRepository;
     private final IncidentTimelineRepository timelineRepository;
     private final ProjectRepository projectRepository;
+    private final AlertRuleRepository ruleRepository;
 
     @Transactional(readOnly = true)
     public Page<IncidentResponse> listIncidents(UUID projectId, boolean openOnly, int page, int size) {
@@ -47,7 +54,10 @@ public class IncidentService {
             incidents = incidentRepository.findByProjectIdOrderByCreatedAtDesc(
                     projectId, PageRequest.of(page, Math.min(size, 100)));
         }
-        return incidents.map(IncidentResponse::of);
+        Map<UUID, String> ruleNames = ruleRepository.findAllById(incidents.getContent().stream()
+                        .map(Incident::getAlertRuleId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(AlertRule::getId, AlertRule::getName));
+        return incidents.map(incident -> IncidentResponse.of(incident, ruleNames.get(incident.getAlertRuleId())));
     }
 
     @Transactional(readOnly = true)
@@ -55,7 +65,9 @@ public class IncidentService {
         validateProjectAccess(projectId);
         Incident incident = incidentRepository.findByIdAndProjectId(incidentId, projectId)
                 .orElseThrow(() -> new NotFoundException("Incident not found"));
-        IncidentResponse response = IncidentResponse.of(incident);
+        String ruleName = incident.getAlertRuleId() == null ? null
+                : ruleRepository.findById(incident.getAlertRuleId()).map(AlertRule::getName).orElse(null);
+        IncidentResponse response = IncidentResponse.of(incident, ruleName);
         List<IncidentTimeline> timeline = timelineRepository.findByIncidentIdOrderByCreatedAtAsc(incidentId);
         response.setTimeline(timeline.stream().map(this::toTimelineEntry).toList());
         return response;
@@ -89,6 +101,41 @@ public class IncidentService {
 
         log.debug("Created incident '{}' for project {}", incident.getTitle(), projectId);
         return getIncident(projectId, incident.getId());
+    }
+
+    @Transactional
+    public Incident recordAlertFiring(AlertRule rule, String message) {
+        Optional<Incident> open = incidentRepository.findByAlertRuleIdAndStatusNot(rule.getId(), IncidentStatus.RESOLVED);
+        Incident incident = open.orElseGet(() -> incidentRepository.save(Incident.builder()
+                .projectId(rule.getProjectId())
+                .alertRuleId(rule.getId())
+                .title(rule.getName())
+                .severity(rule.getSeverity())
+                .status(IncidentStatus.OPEN)
+                .build()));
+        timelineRepository.save(IncidentTimeline.builder()
+                .incidentId(incident.getId())
+                .entryType(open.isPresent() ? IncidentTimelineType.FAILURE : IncidentTimelineType.STATUS_CHANGE)
+                .title(open.isPresent() ? "Alert rule fired again" : "Opened automatically by alert rule " + rule.getName())
+                .detail(message)
+                .build());
+        return incident;
+    }
+
+    @Transactional
+    public Optional<Incident> resolveClearedAlert(AlertRule rule) {
+        Optional<Incident> open = incidentRepository.findByAlertRuleIdAndStatusNot(rule.getId(), IncidentStatus.RESOLVED);
+        open.ifPresent(incident -> {
+            incident.setStatus(IncidentStatus.RESOLVED);
+            incident.setResolvedAt(Instant.now());
+            incident.setAutoResolved(true);
+            timelineRepository.save(IncidentTimeline.builder()
+                    .incidentId(incident.getId())
+                    .entryType(IncidentTimelineType.STATUS_CHANGE)
+                    .title("Resolved automatically: the alert condition no longer holds")
+                    .build());
+        });
+        return open;
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Incident")

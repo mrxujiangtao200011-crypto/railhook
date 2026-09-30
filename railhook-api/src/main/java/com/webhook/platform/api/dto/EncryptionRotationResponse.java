@@ -15,5 +15,6 @@ public class EncryptionRotationResponse {
     private int endpointsRotated;
     private int sourcesRotated;
     private int destinationsRotated;
+    private int alertRulesRotated;
     private int errors;
 }
