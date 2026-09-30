@@ -2,11 +2,13 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.enums.AlertType;
+import com.webhook.platform.api.domain.enums.IncidentStatus;
 import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
+import com.webhook.platform.api.domain.repository.IncidentRepository;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,6 +51,7 @@ class AlertEvaluatorServiceTest {
     @Mock private AlertEventRepository eventRepository;
     @Mock private DeliveryRepository deliveryRepository;
     @Mock private DeliveryAttemptRepository attemptRepository;
+    @Mock private IncidentRepository incidentRepository;
     @Mock private AlertService alertService;
 
     @InjectMocks private AlertEvaluatorService evaluator;
@@ -120,6 +123,21 @@ class AlertEvaluatorServiceTest {
         when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(7L);
         evaluator.evaluate();
         verify(alertService).fireAlert(eq(rule), eq(7.0), anyString());
+    }
+
+    @Test
+    @DisplayName("a cleared condition resolves the rule's incident even after a person resolved the alert itself")
+    void clearingResolvesTheIncidentAfterTheAlertWasResolvedByHand() {
+        AlertRule rule = rule(AlertType.DLQ_THRESHOLD, 5.0);
+        given(rule);
+        when(eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId())).thenReturn(false);
+        when(incidentRepository.existsByAlertRuleIdAndStatusNot(rule.getId(), IncidentStatus.RESOLVED))
+                .thenReturn(true);
+        when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(0L);
+
+        evaluator.evaluate();
+
+        verify(alertService).resolveRecovered(rule);
     }
 
     @Test

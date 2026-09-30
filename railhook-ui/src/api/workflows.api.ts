@@ -48,6 +48,7 @@ export interface WorkflowResponse {
   triggerType: TriggerType;
   triggerConfig: Record<string, unknown>;
   version: number;
+  nextRunAt: string | null;
   createdAt: string;
   updatedAt: string;
   totalExecutions: number;
@@ -73,6 +74,7 @@ export interface WorkflowExecutionResponse {
   id: string;
   workflowId: string;
   triggerEventId: string | null;
+  scheduledFor: string | null;
   status: ExecutionStatus;
   triggerData: unknown;
   startedAt: string;
@@ -117,6 +119,11 @@ export const workflowsApi = {
   getExecution: (projectId: string, workflowId: string, executionId: string): Promise<WorkflowExecutionResponse> =>
     http.get<WorkflowExecutionResponse>(
       `/api/v1/projects/${projectId}/workflows/${workflowId}/executions/${executionId}`
+    ),
+
+  previewSchedule: (projectId: string, cron: string, timezone: string): Promise<string[]> =>
+    http.get<string[]>(
+      `/api/v1/projects/${projectId}/workflows/schedule-preview?${new URLSearchParams({ cron, timezone })}`
     ),
 
   trigger: (projectId: string, workflowId: string, testPayload?: Record<string, unknown>): Promise<WorkflowExecutionResponse> =>

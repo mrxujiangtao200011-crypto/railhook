@@ -48,6 +48,13 @@ public class Incident {
     @Column(name = "rca_notes", columnDefinition = "TEXT")
     private String rcaNotes;
 
+    @Column(name = "alert_rule_id")
+    private UUID alertRuleId;
+
+    @Column(name = "auto_resolved", nullable = false)
+    @Builder.Default
+    private Boolean autoResolved = false;
+
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 

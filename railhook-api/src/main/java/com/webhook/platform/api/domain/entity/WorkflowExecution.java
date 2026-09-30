@@ -34,6 +34,9 @@ public class WorkflowExecution {
     @Column(name = "trigger_event_id")
     private UUID triggerEventId;
 
+    @Column(name = "scheduled_for")
+    private Instant scheduledFor;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     @Builder.Default

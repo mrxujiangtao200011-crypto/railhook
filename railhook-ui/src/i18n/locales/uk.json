@@ -12,7 +12,9 @@
       "EMAIL": "Email",
       "IN_APP": "У застосунку",
       "SLACK": "Slack",
-      "WEBHOOK": "Вебхук"
+      "WEBHOOK": "Вебхук",
+      "PAGERDUTY": "PagerDuty",
+      "OPSGENIE": "Opsgenie"
     },
     "columns": {
       "details": "Деталі",
@@ -47,7 +49,16 @@
       "threshold": "Поріг",
       "type": "Тип сповіщення",
       "webhookUrl": "Webhook URL",
-      "window": "Вікно (хв)"
+      "window": "Вікно (хв)",
+      "pagerDutyRoutingKey": "Routing key PagerDuty",
+      "pagerDutyHint": "Додайте до сервісу PagerDuty інтеграцію Events API v2 і вставте її routing key: правило викликає чергового, коли спрацьовує, і знімає виклик, коли умова минає.",
+      "opsgenieApiKey": "API-ключ Opsgenie",
+      "opsgenieHint": "Додайте до команди в Opsgenie API-інтеграцію і вставте її ключ: правило створює сповіщення, коли спрацьовує, і закриває його, коли умова минає.",
+      "opsgenieRegion": "Регіон Opsgenie",
+      "opsgenieRegions": {
+        "US": "США (api.opsgenie.com)",
+        "EU": "ЄС (api.eu.opsgenie.com)"
+      }
     },
     "history": {
       "desc": "Усі сповіщення цього проєкту, найновіші вгорі",
@@ -131,7 +142,9 @@
     "windowMinutes_other": "{{count}} хвилин"
   },
   "analytics": {
+    "apply": "Застосувати",
     "avgLatency": "Сер. затримка",
+    "custom": "Свій",
     "deliveriesPerSec": "доставок/с",
     "endpointPerformance": "Продуктивність ендпоінтів",
     "endpointPerformanceDesc": "Стан і метрики",
@@ -150,7 +163,13 @@
     "eventTypes": "Типи подій",
     "eventTypesDesc": "Розподіл за типом",
     "eventTypesSeries": "Події",
+    "export": {
+      "csv": "Експорт CSV",
+      "failed": "Не вдалося експортувати аналітику",
+      "hint": "CSV містить рядок на кожну годину чи день обраного діапазону, далі рядок на кожен ендпоінт."
+    },
     "failed": "Невдалі",
+    "from": "Від",
     "latencyPercentiles": "Перцентилі затримки",
     "latencyPercentilesDesc": "Розподіл часу відповіді",
     "latencySeries": "Затримка",
@@ -183,7 +202,8 @@
       "failedHint": "{{percent}}% усіх доставок",
       "latencyHint": "p95 {{p95}} · p99 {{p99}}",
       "successRateHint": "Доставлено {{delivered}} із {{total}}"
-    }
+    },
+    "to": "До"
   },
   "apiKeys": {
     "activeKey": "Активний",
@@ -1535,7 +1555,7 @@
       "OPEN": "Відкритий",
       "RESOLVED": "Закритий"
     },
-    "subtitle": "Групуйте пов'язані збої, фіксуйте зроблене й записуйте причину.",
+    "subtitle": "Правило сповіщень, важливіше за Info, спрацювавши, відкриває тут інцидент і закриває його, коли умова минає. Фіксуйте зроблене й записуйте причину.",
     "tiles": {
       "allClear": "Усе гаразд",
       "critical": "Критичні",
@@ -1555,7 +1575,9 @@
       "rcaSaved": "Нотатки RCA збережено",
       "statusUpdated": "Статус оновлено",
       "updateFailed": "Не вдалося оновити інцидент"
-    }
+    },
+    "openedByRule": "Відкрито правилом сповіщень {{name}}",
+    "autoResolved": "Закрито автоматично"
   },
   "incomingDestinations": {
     "create": "Додати призначення",
@@ -3643,6 +3665,7 @@
       "notFound": "Воркфлоу не знайдено",
       "runNow": "Запустити",
       "save": "Зберегти",
+      "scheduledRun": "За розкладом",
       "statsAvg": "Середнє",
       "statsFailed": "Невдалі",
       "statsRate": "Успішність",
@@ -3677,6 +3700,7 @@
     "nameLabel": "Назва",
     "namePlaceholder": "Назва воркфлоу",
     "newWorkflow": "Новий воркфлоу",
+    "nextRun": "Наступний запуск {{date}}",
     "noWorkflows": "Воркфлоу ще немає",
     "noWorkflowsHint": "Створіть перший воркфлоу, щоб автоматизувати обробку подій вебхуків",
     "nodeConfig": {
@@ -3700,6 +3724,8 @@
       "createEndpoint": "+ Створити новий ендпоінт",
       "createSubscription": "+ Створити підписку",
       "createTransformation": "Нова трансформація",
+      "cron": "Cron-вираз",
+      "cronHint": "хвилина година день-місяця місяць день-тижня, напр. 0 9 * * 1-5",
       "delaySeconds": "Затримка (секунди)",
       "delaySecondsHint": "1–300 секунд",
       "description": "Опис",
@@ -3723,6 +3749,7 @@
       "more": "ще",
       "newEndpoint": "Новий ендпоінт",
       "newTransformation": "Нова трансформація",
+      "nextRuns": "Наступні запуски",
       "noApiKeys": "Немає активних API-ключів — створіть ключ нижче",
       "noEndpointsYet": "Ендпоінтів ще немає",
       "noSubscriptions": "Немає активних підписок — події не доставлятимуться",
@@ -3732,6 +3759,8 @@
       "projectId": "ID проєкту",
       "projectIdHint": "UUID цільового проєкту (події + підписки + доставки)",
       "savedTemplateHint": "Вирази JSONPath: ${$.customer.email}. Шаблон зберігається в проєкті, і його можна використовувати також у правилах.",
+      "scheduleHelp": "Запускає воркфлоу в ці моменти; після простою пропущені запуски виконуються один раз.",
+      "schedulePreviewFailed": "Не вдалося перевірити розклад",
       "selectEndpoint": "Оберіть ендпоінт...",
       "selectTransformation": "Оберіть трансформацію…",
       "subscriptionCreateFailed": "Не вдалося створити підписку",
@@ -3741,6 +3770,7 @@
       "template": "Шаблон (JSON)",
       "templateHint": "Використовуйте плейсхолдери {{field.path}}",
       "timeout": "Тайм-аут (секунди)",
+      "timezone": "Часовий пояс",
       "transformSource": "Звідки береться структура",
       "transformSourceHint": "Збережену трансформацію можна використовувати повторно, і пишуть її як ${$.path}. Шаблон тут одноразовий, і пишуть його як {{field.path}}. Текст з одного в іншому нічого не робить.",
       "transformSourceInline": "На місці",
@@ -3751,6 +3781,7 @@
       "transformationHint": "Збережена трансформація цього проєкту, той самий список, що й у діях правил.",
       "transformationName": "Назва",
       "transformationNamePlaceholder": "Сплощити клієнта",
+      "triggerType": "Тригер",
       "url": "URL",
       "useCurrentProject": "Поточний",
       "webhookUrl": "URL вебхука"

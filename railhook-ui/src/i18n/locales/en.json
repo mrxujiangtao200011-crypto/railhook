@@ -12,7 +12,9 @@
       "EMAIL": "Email",
       "IN_APP": "In-App",
       "SLACK": "Slack",
-      "WEBHOOK": "Webhook"
+      "WEBHOOK": "Webhook",
+      "PAGERDUTY": "PagerDuty",
+      "OPSGENIE": "Opsgenie"
     },
     "columns": {
       "details": "Details",
@@ -47,7 +49,16 @@
       "threshold": "Threshold",
       "type": "Alert Type",
       "webhookUrl": "Webhook URL",
-      "window": "Window (min)"
+      "window": "Window (min)",
+      "pagerDutyRoutingKey": "PagerDuty routing key",
+      "pagerDutyHint": "Add an Events API v2 integration to a PagerDuty service and paste its routing key: the rule pages when it fires and resolves the page when the condition clears.",
+      "opsgenieApiKey": "Opsgenie API key",
+      "opsgenieHint": "Add an API integration to an Opsgenie team and paste its key: the rule creates an alert when it fires and closes it when the condition clears.",
+      "opsgenieRegion": "Opsgenie region",
+      "opsgenieRegions": {
+        "US": "US (api.opsgenie.com)",
+        "EU": "EU (api.eu.opsgenie.com)"
+      }
     },
     "history": {
       "desc": "Every alert this project has raised, newest first",
@@ -131,7 +142,9 @@
     "windowMinutes_other": "{{count}} minutes"
   },
   "analytics": {
+    "apply": "Apply",
     "avgLatency": "Avg Latency",
+    "custom": "Custom",
     "deliveriesPerSec": "deliveries/sec",
     "endpointPerformance": "Endpoint Performance",
     "endpointPerformanceDesc": "Health status and metrics",
@@ -150,7 +163,13 @@
     "eventTypes": "Event Types",
     "eventTypesDesc": "Distribution by type",
     "eventTypesSeries": "Events",
+    "export": {
+      "csv": "Export CSV",
+      "failed": "Couldn't export analytics",
+      "hint": "The CSV has one row per hour or day of the selected range, then one row per endpoint."
+    },
     "failed": "Failed",
+    "from": "From",
     "latencyPercentiles": "Latency Percentiles",
     "latencyPercentilesDesc": "Response time distribution",
     "latencySeries": "Latency",
@@ -183,7 +202,8 @@
       "failedHint": "{{percent}}% of all deliveries",
       "latencyHint": "p95 {{p95}} · p99 {{p99}}",
       "successRateHint": "{{delivered}} of {{total}} delivered"
-    }
+    },
+    "to": "To"
   },
   "apiKeys": {
     "activeKey": "Active",
@@ -1535,7 +1555,7 @@
       "OPEN": "Open",
       "RESOLVED": "Resolved"
     },
-    "subtitle": "Group related failures, track what was done, and write down why.",
+    "subtitle": "An alert rule above Info opens an incident here when it fires and resolves it when the condition clears. Track what was done and write down why.",
     "tiles": {
       "allClear": "All clear",
       "critical": "Critical",
@@ -1555,7 +1575,9 @@
       "rcaSaved": "RCA notes saved",
       "statusUpdated": "Status updated",
       "updateFailed": "Failed to update incident"
-    }
+    },
+    "openedByRule": "Opened by alert rule {{name}}",
+    "autoResolved": "Resolved automatically"
   },
   "incomingDestinations": {
     "create": "Add Destination",
@@ -3643,6 +3665,7 @@
       "notFound": "Workflow not found",
       "runNow": "Run Now",
       "save": "Save",
+      "scheduledRun": "Scheduled",
       "statsAvg": "Avg",
       "statsFailed": "Failed",
       "statsRate": "Rate",
@@ -3677,6 +3700,7 @@
     "nameLabel": "Name",
     "namePlaceholder": "Workflow name",
     "newWorkflow": "New Workflow",
+    "nextRun": "Next run {{date}}",
     "noWorkflows": "No workflows yet",
     "noWorkflowsHint": "Create your first workflow to automate webhook events",
     "nodeConfig": {
@@ -3700,6 +3724,8 @@
       "createEndpoint": "+ Create new endpoint",
       "createSubscription": "+ Create subscription",
       "createTransformation": "New transformation",
+      "cron": "Cron expression",
+      "cronHint": "minute hour day-of-month month day-of-week, e.g. 0 9 * * 1-5",
       "delaySeconds": "Delay (seconds)",
       "delaySecondsHint": "1–300 seconds",
       "description": "Description",
@@ -3723,6 +3749,7 @@
       "more": "more",
       "newEndpoint": "New Endpoint",
       "newTransformation": "New transformation",
+      "nextRuns": "Next runs",
       "noApiKeys": "No active API keys — create one below",
       "noEndpointsYet": "No endpoints created yet",
       "noSubscriptions": "No active subscriptions — events won't be delivered",
@@ -3732,6 +3759,8 @@
       "projectId": "Project ID",
       "projectIdHint": "UUID of the target project (events + subscriptions + deliveries)",
       "savedTemplateHint": "JSONPath expressions: ${$.customer.email}. Saved to the project and usable from rules too.",
+      "scheduleHelp": "Runs the workflow at these times; after downtime, missed runs fire once.",
+      "schedulePreviewFailed": "Could not check the schedule",
       "selectEndpoint": "Select endpoint...",
       "selectTransformation": "Select a transformation…",
       "subscriptionCreateFailed": "Failed to create subscription",
@@ -3741,6 +3770,7 @@
       "template": "Template (JSON)",
       "templateHint": "Use {{field.path}} placeholders",
       "timeout": "Timeout (seconds)",
+      "timezone": "Time zone",
       "transformSource": "Where the shape comes from",
       "transformSourceHint": "A saved transformation is reusable and written in ${$.path}. A template here is one-off and written in {{field.path}}. Text from one does nothing in the other.",
       "transformSourceInline": "Inline",
@@ -3751,6 +3781,7 @@
       "transformationHint": "A saved transformation of this project, the same list a rule action uses.",
       "transformationName": "Name",
       "transformationNamePlaceholder": "Flatten the customer",
+      "triggerType": "Trigger",
       "url": "URL",
       "useCurrentProject": "Current",
       "webhookUrl": "Webhook URL"

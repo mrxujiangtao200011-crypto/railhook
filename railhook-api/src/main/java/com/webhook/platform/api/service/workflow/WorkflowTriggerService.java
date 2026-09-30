@@ -15,7 +15,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** Runs from the trigger outbox; a unique (workflow_id, trigger_event_id) index makes redelivery harmless. */
@@ -49,6 +51,42 @@ public class WorkflowTriggerService {
     /** Throws on failure so the outbox can retry. */
     public void triggerWorkflowsSync(UUID projectId, UUID eventId, String eventType, String eventPayload, int depth) {
         doTriggerWorkflows(projectId, eventId, eventType, eventPayload, depth);
+    }
+
+    public void triggerScheduledSync(UUID workflowId, Instant scheduledFor) {
+        Workflow workflow = workflowRepository.findById(workflowId).orElse(null);
+        if (workflow == null || !workflow.getEnabled() || workflow.getTriggerType() != Workflow.TriggerType.SCHEDULE) {
+            return;
+        }
+        TenantContext.runAs(workflow.getOrganizationId(), () -> triggerScheduledOne(workflow, scheduledFor));
+    }
+
+    private void triggerScheduledOne(Workflow workflow, Instant scheduledFor) {
+        if (executionRepository.existsByWorkflowIdAndScheduledFor(workflow.getId(), scheduledFor)) {
+            return;
+        }
+        JsonNode trigger = objectMapper.valueToTree(Map.of("scheduledFor", scheduledFor.toString()));
+        WorkflowExecution execution;
+        try {
+            execution = executionRepository.save(WorkflowExecution.builder()
+                    .workflowId(workflow.getId())
+                    .scheduledFor(scheduledFor)
+                    .triggerData(trigger.toString())
+                    .build());
+        } catch (DataIntegrityViolationException e) {
+            if (!executionRepository.existsByWorkflowIdAndScheduledFor(workflow.getId(), scheduledFor)) {
+                throw e;
+            }
+            return;
+        }
+
+        log.info("Triggering scheduled workflow '{}' (id={}) for {}", workflow.getName(), workflow.getId(), scheduledFor);
+        try {
+            setCurrentDepth(0);
+            workflowEngine.execute(execution.getId(), workflow.getDefinition(), trigger);
+        } finally {
+            clearCurrentDepth();
+        }
     }
 
     /** @deprecated use {@link #triggerWorkflowsSync} through the outbox. */

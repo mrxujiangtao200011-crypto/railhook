@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { History, Play, Square, Loader2, RefreshCw } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
+import { fromLocalDatetime, toLocalDatetime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
@@ -50,16 +51,6 @@ function quickRange(key: string): { from: string; to: string } {
   };
   const span = spans[key] ?? spans['24h'];
   return { from: new Date(now.getTime() - span).toISOString(), to };
-}
-
-function toLocalDatetime(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function fromLocalDatetime(local: string): string {
-  return new Date(local).toISOString();
 }
 
 function formatDuration(ms: number): string {

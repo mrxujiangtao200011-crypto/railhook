@@ -10,7 +10,10 @@ import { transformationsApi } from '../../api/transformations.api';
 import { subscriptionsApi } from '../../api/subscriptions.api';
 import { apiKeysApi } from '../../api/apiKeys.api';
 import { queryKeys, useEventTypes } from '../../api/queries';
-import { showSuccess, showApiError } from '../../lib/toast';
+import { showSuccess, showApiError, resolveErrorMessage } from '../../lib/toast';
+import { formatDateTime } from '../../lib/date';
+import { useDebounced } from '../../hooks/useDebounced';
+import { workflowsApi, type TriggerType } from '../../api/workflows.api';
 import { cn } from '../../lib/utils';
 import JsonEditor from '../JsonEditor';
 import ConditionTreeEditor, { mkGroup } from '../ConditionTreeEditor';
@@ -23,6 +26,7 @@ interface NodeConfigPanelProps {
 }
 
 const inputCls = 'w-full text-sm';
+const TRIGGER_TYPES: TriggerType[] = ['WEBHOOK_EVENT', 'SCHEDULE', 'MANUAL'];
 const inputErrCls = 'w-full text-sm !border-halt focus:!border-halt';
 
 export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigPanelProps) {
@@ -70,15 +74,34 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
 
         {nodeType === 'webhookTrigger' && (
           <>
-            <Field label={t('workflows.nodeConfig.eventTypePattern')} hint={t('workflows.nodeConfig.eventTypePatternHint')}>
-              <input
-                value={String(d.eventTypePattern || '')}
-                onChange={(e) => updateField('eventTypePattern', e.target.value)}
-                placeholder="*"
+            <Field label={t('workflows.nodeConfig.triggerType')}>
+              <select
+                value={String(d.triggerType || 'WEBHOOK_EVENT')}
+                onChange={(e) => updateField('triggerType', e.target.value)}
                 className={inputCls}
-              />
+              >
+                {TRIGGER_TYPES.map((type) => <option key={type} value={type}>{t(`workflows.triggerTypes.${type}`)}</option>)}
+              </select>
             </Field>
-            <ApiKeyInfo />
+            {d.triggerType === 'SCHEDULE' ? (
+              <ScheduleFields
+                cron={String(d.cron || '')}
+                timezone={String(d.timezone || '')}
+                onChange={updateField}
+              />
+            ) : (
+              <>
+                <Field label={t('workflows.nodeConfig.eventTypePattern')} hint={t('workflows.nodeConfig.eventTypePatternHint')}>
+                  <input
+                    value={String(d.eventTypePattern || '')}
+                    onChange={(e) => updateField('eventTypePattern', e.target.value)}
+                    placeholder="*"
+                    className={inputCls}
+                  />
+                </Field>
+                <ApiKeyInfo />
+              </>
+            )}
           </>
         )}
 
@@ -800,6 +823,56 @@ function withFieldId(children: React.ReactNode, id: string): React.ReactNode {
     return node;
   };
   return React.Children.map(children, visit);
+}
+
+function ScheduleFields({ cron, timezone, onChange }: {
+  cron: string; timezone: string; onChange: (key: string, value: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { projectId } = useParams<{ projectId: string }>();
+  const settledCron = useDebounced(cron.trim());
+  const settledZone = useDebounced(timezone.trim() || 'UTC');
+  const preview = useQuery({
+    queryKey: queryKeys.workflows.schedulePreview(projectId!, settledCron, settledZone),
+    queryFn: () => workflowsApi.previewSchedule(projectId!, settledCron, settledZone),
+    enabled: !!projectId && settledCron !== '',
+    retry: false,
+  });
+
+  return (
+    <>
+      <p className="text-xs text-muted-foreground">{t('workflows.nodeConfig.scheduleHelp')}</p>
+      <Field
+        label={t('workflows.nodeConfig.cron')}
+        hint={t('workflows.nodeConfig.cronHint')}
+        required
+        error={preview.isError ? resolveErrorMessage(preview.error, 'workflows.nodeConfig.schedulePreviewFailed') : undefined}
+      >
+        <input
+          value={cron}
+          onChange={(e) => onChange('cron', e.target.value)}
+          placeholder="0 9 * * 1-5"
+          className={cn(inputCls, 'font-mono')}
+        />
+      </Field>
+      <Field label={t('workflows.nodeConfig.timezone')}>
+        <input
+          value={timezone}
+          onChange={(e) => onChange('timezone', e.target.value)}
+          placeholder="UTC"
+          className={inputCls}
+        />
+      </Field>
+      {preview.data && (
+        <div className="space-y-1">
+          <span className="mono-label">{t('workflows.nodeConfig.nextRuns')}</span>
+          <ul className="space-y-0.5 font-mono text-xs">
+            {preview.data.map((run) => <li key={run}>{formatDateTime(run)}</li>)}
+          </ul>
+        </div>
+      )}
+    </>
+  );
 }
 
 function Field({ label, hint, required, error, children }: {

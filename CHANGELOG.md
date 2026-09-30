@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-09-30
+
+### Added
+
+- Analytics takes a custom `from`/`to` range of up to 90 days besides the 24h, 7d and 30d presets, and `GET /api/v1/dashboard/projects/{projectId}/analytics/export` returns the same numbers as CSV: one row per hour or day, then one row per endpoint. The analytics page has a range picker and an Export CSV button.
+- `PAGERDUTY` and `OPSGENIE` alert channels. A rule triggers a PagerDuty event or creates an Opsgenie alert when it fires, and resolves or closes it when the condition clears. The routing key or API key is stored encrypted, never returned, and included in key rotation (`alertRulesRotated` in the rotation response).
+- Workflows with the `SCHEDULE` trigger now run. `triggerConfig` takes a 5-field `cron` and an IANA `timezone` (default `UTC`), both checked on save. After downtime a missed schedule runs once, not once per missed tick, and a tick runs once even with several API instances. The workflow response has `nextRunAt`, a run has `scheduledFor`, and `GET /api/v1/projects/{projectId}/workflows/schedule-preview` returns the next three run times. The editor sets the schedule on the trigger node.
+
+### Changed
+
+- An unknown analytics `period` is refused with `400` instead of falling back to 24h.
+- A `WARNING` alert rule opens an incident when it fires too, not only a `CRITICAL` one; `INFO` rules open none and cannot page. Further firings are added to the open incident's timeline, and the incident is resolved automatically when the evaluator sees the condition clear. The Incidents page shows the rule that opened an incident and whether it was resolved automatically.
+
+### Fixed
+
+- Analytics hourly and daily buckets are cut in UTC. They followed the database session's time zone while still being labelled UTC.
+
 ## [3.3.1] - 2026-09-30
 
 ### Added

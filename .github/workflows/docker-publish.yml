@@ -93,7 +93,6 @@ jobs:
           tags: |
             type=raw,value=${{ needs.resolve-version.outputs.version }}
             type=raw,value=latest
-            type=sha,format=short
 
       - name: Build and push (multi-arch, SBOM + provenance attached)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7

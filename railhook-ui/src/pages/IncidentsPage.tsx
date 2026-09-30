@@ -246,10 +246,18 @@ export default function IncidentsPage() {
                           label={t(`alerts.severities.${incident.severity}`)}
                           icon={false}
                         />
+                        {incident.autoResolved && (
+                          <StatusBadge kind="ok" label={t('incidents.autoResolved')} icon={false} />
+                        )}
                         <span className="text-[11px] text-muted-foreground">
                           {formatRelativeTime(incident.createdAt)}
                         </span>
                       </span>
+                      {incident.alertRuleName && (
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          {t('incidents.openedByRule', { name: incident.alertRuleName })}
+                        </span>
+                      )}
                     </span>
                     {isExpanded
                       ? <ChevronUp className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden />

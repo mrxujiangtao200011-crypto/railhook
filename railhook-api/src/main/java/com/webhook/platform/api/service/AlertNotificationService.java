@@ -2,7 +2,9 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.AlertEvent;
 import com.webhook.platform.api.domain.entity.AlertRule;
+import com.webhook.platform.api.domain.entity.Incident;
 import com.webhook.platform.api.domain.enums.AlertChannel;
+import com.webhook.platform.api.domain.enums.OpsgenieRegion;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -12,11 +14,13 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import com.webhook.platform.common.http.SsrfProtectionCustomizer;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.security.UrlValidator;
 import reactor.netty.http.client.HttpClient;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,11 +31,13 @@ public class AlertNotificationService {
 
     private final WebClient webClient;
     private final EmailService emailService;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean enabled;
 
     public AlertNotificationService(
             WebClient.Builder webClientBuilder,
             EmailService emailService,
+            EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${app.alerts.notifications-enabled:false}") boolean enabled,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
@@ -42,11 +48,12 @@ public class AlertNotificationService {
                 .defaultHeader("User-Agent", "Railhook-Alerts/1.0")
                 .build();
         this.emailService = emailService;
+        this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.enabled = enabled;
     }
 
     @Async
-    public void dispatch(AlertRule rule, AlertEvent event) {
+    public void dispatch(AlertRule rule, AlertEvent event, Incident incident) {
         if (rule.getMuted()) {
             log.debug("Skipping notification for muted rule '{}'", rule.getName());
             return;
@@ -84,12 +91,118 @@ public class AlertNotificationService {
                 case SLACK -> sendSlack(rule, event);
                 case WEBHOOK -> sendWebhook(rule, event);
                 case EMAIL -> sendEmail(rule, event);
+                case PAGERDUTY -> sendPagerDuty(rule, pagerDutyTrigger(rule, event, incident));
+                case OPSGENIE -> sendOpsgenie(rule, opsgenieUrl(rule, ""), opsgenieCreate(rule, event, incident));
                 default -> log.warn("Unknown alert channel: {}", channel);
             }
         } catch (Exception e) {
             log.error("Failed to send {} notification for rule '{}': {}",
                     channel, rule.getName(), failureOf(e));
         }
+    }
+
+    @Async
+    public void dispatchResolved(AlertRule rule, Incident incident) {
+        AlertChannel channel = rule.getChannel();
+        if (channel != AlertChannel.PAGERDUTY && channel != AlertChannel.OPSGENIE) {
+            return;
+        }
+        if (!enabled) {
+            log.info("Alert notification (dry-run): {} resolve for rule '{}'", channel, rule.getName());
+            return;
+        }
+        try {
+            if (channel == AlertChannel.PAGERDUTY) {
+                sendPagerDuty(rule, Map.of(
+                        "routing_key", integrationKey(rule),
+                        "event_action", "resolve",
+                        "dedup_key", dedupKey(incident)));
+            } else {
+                sendOpsgenie(rule, opsgenieUrl(rule, "/" + dedupKey(incident) + "/close?identifierType=alias"),
+                        Map.of("source", "Railhook", "note", "The alert condition no longer holds"));
+            }
+        } catch (Exception e) {
+            log.error("Failed to send {} resolve for rule '{}': {}", channel, rule.getName(), failureOf(e));
+        }
+    }
+
+    // Stable per incident, so the resolve closes exactly the page its trigger opened.
+    private static String dedupKey(Incident incident) {
+        return "railhook-incident-" + incident.getId();
+    }
+
+    private String integrationKey(AlertRule rule) {
+        return encryptionKeyRegistry.decrypt(rule.getIntegrationKeyEncrypted(), rule.getIntegrationKeyIv(),
+                rule.getEncryptionKeyVersion());
+    }
+
+    private Map<String, Object> pagerDutyTrigger(AlertRule rule, AlertEvent event, Incident incident) {
+        String summary = event.getTitle() + (event.getMessage() != null ? ": " + event.getMessage() : "");
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("rule", rule.getName());
+        details.put("alertType", rule.getAlertType().name());
+        details.put("currentValue", event.getCurrentValue());
+        details.put("thresholdValue", event.getThresholdValue());
+        return Map.of(
+                "routing_key", integrationKey(rule),
+                "event_action", "trigger",
+                "dedup_key", dedupKey(incident),
+                "payload", Map.of(
+                        "summary", truncate(summary, 1024),
+                        "source", "railhook/project/" + rule.getProjectId(),
+                        "severity", switch (event.getSeverity()) {
+                            case CRITICAL -> "critical";
+                            case WARNING -> "warning";
+                            case INFO -> "info";
+                        },
+                        "custom_details", details));
+    }
+
+    private Map<String, Object> opsgenieCreate(AlertRule rule, AlertEvent event, Incident incident) {
+        return Map.of(
+                "message", truncate(event.getTitle(), 130),
+                "alias", dedupKey(incident),
+                "description", event.getMessage() != null ? event.getMessage() : "",
+                "source", "Railhook",
+                "priority", switch (event.getSeverity()) {
+                    case CRITICAL -> "P1";
+                    case WARNING -> "P3";
+                    case INFO -> "P5";
+                });
+    }
+
+    private static String opsgenieUrl(AlertRule rule, String path) {
+        String host = rule.getOpsgenieRegion() == OpsgenieRegion.EU ? "api.eu.opsgenie.com" : "api.opsgenie.com";
+        return "https://" + host + "/v2/alerts" + path;
+    }
+
+    private void sendPagerDuty(AlertRule rule, Map<String, Object> body) {
+        webClient.post()
+                .uri("https://events.pagerduty.com/v2/enqueue")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .toBodilessEntity()
+                .timeout(Duration.ofSeconds(10))
+                .block();
+        log.info("PagerDuty {} sent for rule '{}'", body.get("event_action"), rule.getName());
+    }
+
+    private void sendOpsgenie(AlertRule rule, String url, Map<String, Object> body) {
+        webClient.post()
+                .uri(url)
+                .header("Authorization", "GenieKey " + integrationKey(rule))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .toBodilessEntity()
+                .timeout(Duration.ofSeconds(10))
+                .block();
+        log.info("Opsgenie notification sent for rule '{}'", rule.getName());
+    }
+
+    private static String truncate(String text, int max) {
+        return text.length() <= max ? text : text.substring(0, max);
     }
 
     // A response exception's message carries the full URL, and a Slack webhook URL is its own credential.

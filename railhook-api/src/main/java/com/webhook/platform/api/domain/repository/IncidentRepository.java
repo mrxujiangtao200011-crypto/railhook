@@ -16,6 +16,8 @@ public interface IncidentRepository extends JpaRepository<Incident, UUID> {
     Page<Incident> findByProjectIdOrderByCreatedAtDesc(UUID projectId, Pageable pageable);
     Page<Incident> findByProjectIdAndStatusNotOrderByCreatedAtDesc(UUID projectId, IncidentStatus excludeStatus, Pageable pageable);
     Optional<Incident> findByIdAndProjectId(UUID id, UUID projectId);
+    Optional<Incident> findByAlertRuleIdAndStatusNot(UUID alertRuleId, IncidentStatus excludeStatus);
+    boolean existsByAlertRuleIdAndStatusNot(UUID alertRuleId, IncidentStatus excludeStatus);
     long countByProjectIdAndStatusNot(UUID projectId, IncidentStatus excludeStatus);
 
     long countByProjectIdAndStatus(UUID projectId, IncidentStatus status);

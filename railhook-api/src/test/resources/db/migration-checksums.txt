@@ -10,3 +10,5 @@
 # new migration instead. See the class javadoc for the one case where changing a
 # line is legitimate.
 V001__schema.sql  caaf92d74b04818e0359c660080d8a3eeb1f897a620a8821e315c3c5f3efc0b2
+V002__alert_incidents_and_oncall_channels.sql  517c23a65925b86f090f342abdebf1b705811277196658a2de881977331e079f
+V003__workflow_schedule.sql  bb6ada4c7ffa9216847fff7761e44dcb6bc9e8c6bdcbc05bac42307d3f2ff8ba

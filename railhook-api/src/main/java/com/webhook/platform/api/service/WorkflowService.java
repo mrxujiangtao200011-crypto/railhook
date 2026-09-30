@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.Workflow;
@@ -15,7 +16,9 @@ import com.webhook.platform.api.dto.WorkflowResponse;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.service.workflow.WorkflowEngine;
+import com.webhook.platform.api.service.workflow.WorkflowSchedule;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.Map;
@@ -104,6 +107,7 @@ public class WorkflowService {
                 .triggerType(request.getTriggerType() != null ? request.getTriggerType() : Workflow.TriggerType.WEBHOOK_EVENT)
                 .triggerConfig(serializeJson(request.getTriggerConfig()))
                 .build();
+        applySchedule(workflow);
 
         workflow = workflowRepository.save(workflow);
         log.debug("Created workflow '{}' for project {}", workflow.getName(), projectId);
@@ -177,6 +181,7 @@ public class WorkflowService {
         if (request.getTriggerConfig() != null) {
             workflow.setTriggerConfig(serializeJson(request.getTriggerConfig()));
         }
+        applySchedule(workflow);
 
         workflow = workflowRepository.save(workflow);
         log.debug("Updated workflow '{}' (v{})", workflow.getName(), workflow.getVersion());
@@ -194,9 +199,28 @@ public class WorkflowService {
     public WorkflowResponse toggleEnabled(UUID projectId, UUID id, boolean enabled) {
         Workflow workflow = requireWorkflow(projectId, id);
         workflow.setEnabled(enabled);
+        applySchedule(workflow);
         workflow = workflowRepository.save(workflow);
         log.debug("Workflow '{}' {}", workflow.getName(), enabled ? "enabled" : "disabled");
         return mapToResponse(workflow);
+    }
+
+    public List<Instant> previewSchedule(String cron, String timezone) {
+        return WorkflowSchedule.parse(cron, timezone).nextRuns(Instant.now(), 3);
+    }
+
+    private void applySchedule(Workflow workflow) {
+        if (workflow.getTriggerType() != Workflow.TriggerType.SCHEDULE) {
+            workflow.setNextRunAt(null);
+            return;
+        }
+        WorkflowSchedule schedule;
+        try {
+            schedule = WorkflowSchedule.of(objectMapper.readTree(workflow.getTriggerConfig()));
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Invalid trigger config: " + e.getOriginalMessage());
+        }
+        workflow.setNextRunAt(workflow.getEnabled() ? schedule.nextAfter(Instant.now()) : null);
     }
 
     public WorkflowExecutionResponse manualTrigger(UUID projectId, UUID workflowId, Object testPayload) {
@@ -270,6 +294,7 @@ public class WorkflowService {
                 .triggerType(w.getTriggerType())
                 .triggerConfig(parseJson(w.getTriggerConfig()))
                 .version(w.getVersion())
+                .nextRunAt(w.getNextRunAt())
                 .createdAt(w.getCreatedAt())
                 .updatedAt(w.getUpdatedAt())
                 .totalExecutions(counts.total())
@@ -283,6 +308,7 @@ public class WorkflowService {
                 .id(e.getId())
                 .workflowId(e.getWorkflowId())
                 .triggerEventId(e.getTriggerEventId())
+                .scheduledFor(e.getScheduledFor())
                 .status(e.getStatus())
                 .triggerData(parseJson(e.getTriggerData()))
                 .startedAt(e.getStartedAt())

@@ -3,8 +3,6 @@
 Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe,
 GitHub and others, with retries, signatures and a record of every attempt.
 
-![Deliveries](https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-ui/public/screens/deliveries.webp)
-
 ## Images
 
 Railhook runs as three images from one release. Use the same tag for all three.
@@ -18,7 +16,7 @@ Railhook runs as three images from one release. Use the same tag for all three.
 They also need PostgreSQL 16 and Redis 7. The API has to start first: it runs the migrations the
 worker waits for.
 
-Tags: the release version (`3.3.0`), `latest`, and `sha-<commit>`. Every image is built for
+Tags: each release version and `latest`. Every image is built for
 `linux/amd64` and `linux/arm64`, with an SBOM and provenance attached. The same images are on
 `ghcr.io/vadymkykalo/railhook-*`.
 

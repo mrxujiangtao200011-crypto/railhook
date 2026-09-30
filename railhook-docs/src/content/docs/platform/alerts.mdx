@@ -39,7 +39,7 @@ When an evaluation finds the condition no longer holds, the open alert resolves 
 |---|---|---|
 | Window | 5 minutes | How far back the condition looks. Short windows are jumpy on low traffic; long ones are slow on high traffic. Match it to how many deliveries the project gets in that time. |
 | Endpoint | None | Required for `CONSECUTIVE_FAILURES`. The other conditions measure the whole project. |
-| Severity | `WARNING` | `INFO`, `WARNING` or `CRITICAL`. A `CRITICAL` rule also opens an incident when it fires. |
+| Severity | `WARNING` | `INFO`, `WARNING` or `CRITICAL`. `INFO` opens no incident and cannot use PagerDuty or Opsgenie. The incident the rule opens gets the same severity, and PagerDuty and Opsgenie get it as the alert's urgency. |
 | Mute and snooze | Off | Mute a rule indefinitely, or snooze it until a set time. Snooze during planned work instead of deleting the rule. Turning a rule off stops it being evaluated at all. |
 
 ## Channels
@@ -51,7 +51,11 @@ One channel per rule. To notify two places, create two rules.
 | `IN_APP` | A notification in the dashboard. The default. | Nothing |
 | `EMAIL` | Up to 10 addresses, separated by commas. Each must belong to a member of the organization who has verified it; any other address is refused when the rule is saved. | Email configured on the deployment: `EMAIL_ENABLED=true` and SMTP settings |
 | `SLACK` | A Slack incoming webhook URL | The URL |
-| `WEBHOOK` | Any URL of yours, as a JSON `POST`. Use it to reach a pager, a ticket system or your own routing. | The URL |
+| `WEBHOOK` | Any URL of yours, as a JSON `POST`. Use it to reach a ticket system or your own routing. | The URL |
+| `PAGERDUTY` | A PagerDuty service, through the Events API v2. Triggers when the rule fires and resolves when the condition clears. | The routing key of an Events API v2 integration on the service |
+| `OPSGENIE` | An Opsgenie team, through the Alerts API. Creates an alert when the rule fires and closes it when the condition clears. | The key of an API integration on the team, and its region: `US` or `EU` |
+
+The PagerDuty routing key and the Opsgenie API key are stored encrypted, are never returned by the API, and are re-encrypted by a key rotation. Leave the key field blank when editing a rule to keep the stored one. Changing the rule's channel drops the stored key.
 
 <Aside type="caution" title="Alert URLs are checked like delivery URLs">
 Slack and webhook URLs go through the same SSRF protection as endpoint URLs. Private and loopback addresses are refused unless the deployment allows them with `WEBHOOK_ALLOW_PRIVATE_IPS` or `WEBHOOK_ALLOWED_HOSTS`.
@@ -59,7 +63,11 @@ Slack and webhook URLs go through the same SSRF protection as endpoint URLs. Pri
 
 ## Incidents
 
-An incident groups what happened into a record with a timeline. A `CRITICAL` rule opens one automatically when it fires; you can also open one yourself on the project's **Incidents** page and add notes to its timeline.
+An incident groups what happened into a record with a timeline. You can open one yourself on the project's **Incidents** page and add notes to its timeline.
+
+A `WARNING` or `CRITICAL` alert rule also opens one when it fires, titled with the rule's name; an `INFO` rule only records the alert. While that incident is not resolved, each further firing of the rule is added to its timeline instead of opening another. When an evaluation finds the condition no longer holds, the incident is resolved and marked **Resolved automatically**, and a PagerDuty or Opsgenie rule closes the page it opened: both use the incident as the dedup key, so the resolve reaches the right alert. The next time the condition holds opens a new incident.
+
+Resolving an incident by hand does not close the PagerDuty or Opsgenie alert; resolve that one there.
 
 | Status | Means |
 |---|---|
@@ -69,6 +77,5 @@ An incident groups what happened into a record with a timeline. A `CRITICAL` rul
 
 ## Not available yet
 
-- **No PagerDuty or Opsgenie channel.** Both accept an HTTP request, so the `WEBHOOK` channel reaches them with a small adapter on your side.
 - **No alert on silence.** A rule fires on what happened, not on a project that stopped sending traffic when it should not have.
 - **No alert rule for an endpoint Railhook disabled.** It raises an alert of its own, which appears in this list without a rule behind it (see [When Railhook turns an endpoint off](/docs/outgoing/endpoints-subscriptions/#when-railhook-turns-an-endpoint-off)). You cannot change its severity or route it to a channel.

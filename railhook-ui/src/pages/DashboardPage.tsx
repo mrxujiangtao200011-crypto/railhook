@@ -33,7 +33,7 @@ import type { StatusKind } from '../components/StatusBadge';
 /** Stable so the deliveries query key does not change on every render. */
 const IN_FLIGHT_FILTER: DeliveryFilters = { status: 'PENDING', page: 0, size: 4, sort: 'createdAt,desc' };
 
-const DASHBOARD_PERIOD = '7d';
+const DASHBOARD_PERIOD = '7d' as const;
 
 function SkeletonDashboard() {
   return (
@@ -108,7 +108,7 @@ export default function DashboardPage() {
   const {
     data: analytics, isLoading: analyticsLoading, isError: analyticsIsError,
     error: analyticsError, isFetching: analyticsFetching, refetch: refetchAnalytics,
-  } = useAnalytics(projectId, DASHBOARD_PERIOD);
+  } = useAnalytics(projectId, { period: DASHBOARD_PERIOD });
 
   const { data: inFlightPage } = useDeliveries(projectId, IN_FLIGHT_FILTER);
   const { data: unresolvedAlerts } = useUnresolvedAlertCount(projectId);

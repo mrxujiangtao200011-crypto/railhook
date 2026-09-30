@@ -5812,8 +5812,9 @@ paths:
       - Encryption Admin
       summary: Rotate encryption keys
       description: "Re-encrypts all secrets (endpoints, incoming sources, incoming\
-        \ destinations) with the currently active encryption key version, across ALL\
-        \ tenants. Requires the platform-admin operator credential (X-Platform-Admin-Token)."
+        \ destinations, alert rule keys) with the currently active encryption key\
+        \ version, across ALL tenants. Requires the platform-admin operator credential\
+        \ (X-Platform-Admin-Token)."
       operationId: rotateEncryptionKeys
       responses:
         "200":
@@ -6162,6 +6163,45 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/WorkflowExecutionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/workflows/schedule-preview:
+    get:
+      tags:
+      - Workflows
+      summary: Preview workflow schedule
+      description: The next three times a 5-field cron expression fires in the given
+        time zone. Answers 400 with the reason when the schedule is not accepted.
+      operationId: previewWorkflowSchedule
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cron
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: timezone
+        in: query
+        required: false
+        schema:
+          type: string
+          default: UTC
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: date-time
       security:
       - bearerAuth: []
       - apiKey: []
@@ -7710,7 +7750,9 @@ paths:
       tags:
       - Dashboard
       summary: Get project analytics
-      description: Returns detailed analytics with time series data
+      description: "Returns detailed analytics with time series data for a preset\
+        \ period or a custom from/to range of at most 90 days. Buckets are hourly\
+        \ up to two days, daily beyond."
       operationId: getProjectAnalytics
       parameters:
       - name: projectId
@@ -7721,11 +7763,24 @@ paths:
           format: uuid
       - name: period
         in: query
-        description: "Time period: 24h, 7d, 30d"
+        description: "Time period: 24h, 7d, 30d. Defaults to 24h"
         required: false
         schema:
           type: string
-          default: 24h
+      - name: from
+        in: query
+        description: "Range start, ISO-8601 instant"
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: "Range end, ISO-8601 instant"
+        required: false
+        schema:
+          type: string
+          format: date-time
       responses:
         "200":
           description: OK
@@ -7733,6 +7788,47 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AnalyticsResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/dashboard/projects/{projectId}/analytics/export:
+    get:
+      tags:
+      - Dashboard
+      summary: Export project analytics as CSV
+      description: "The same period or range as the analytics endpoint: one row per\
+        \ time bucket, then a blank line and one row per endpoint."
+      operationId: exportProjectAnalytics
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: period
+        in: query
+        description: "Time period: 24h, 7d, 30d. Defaults to 24h"
+        required: false
+        schema:
+          type: string
+      - name: from
+        in: query
+        description: "Range start, ISO-8601 instant"
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: "Range end, ISO-8601 instant"
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
       security:
       - bearerAuth: []
       - apiKey: []
@@ -8638,6 +8734,9 @@ components:
         version:
           type: integer
           format: int32
+        nextRunAt:
+          type: string
+          format: date-time
         createdAt:
           type: string
           format: date-time
@@ -9386,6 +9485,13 @@ components:
           - CRITICAL
         rcaNotes:
           type: string
+        alertRuleId:
+          type: string
+          format: uuid
+        alertRuleName:
+          type: string
+        autoResolved:
+          type: boolean
         resolvedAt:
           type: string
           format: date-time
@@ -9585,6 +9691,8 @@ components:
           - EMAIL
           - WEBHOOK
           - SLACK
+          - PAGERDUTY
+          - OPSGENIE
         thresholdValue:
           type: number
           format: double
@@ -9607,6 +9715,13 @@ components:
           type: string
         emailRecipients:
           type: string
+        integrationKey:
+          type: string
+        opsgenieRegion:
+          type: string
+          enum:
+          - US
+          - EU
       required:
       - alertType
       - name
@@ -9644,6 +9759,8 @@ components:
           - EMAIL
           - WEBHOOK
           - SLACK
+          - PAGERDUTY
+          - OPSGENIE
         thresholdValue:
           type: number
           format: double
@@ -9664,6 +9781,13 @@ components:
           type: string
         emailRecipients:
           type: string
+        integrationKeyConfigured:
+          type: boolean
+        opsgenieRegion:
+          type: string
+          enum:
+          - US
+          - EU
         createdAt:
           type: string
           format: date-time
@@ -9994,6 +10118,9 @@ components:
         triggerEventId:
           type: string
           format: uuid
+        scheduledFor:
+          type: string
+          format: date-time
         status:
           type: string
           enum:
@@ -11304,6 +11431,9 @@ components:
         destinationsRotated:
           type: integer
           format: int32
+        alertRulesRotated:
+          type: integer
+          format: int32
         errors:
           type: integer
           format: int32
@@ -11398,8 +11528,6 @@ components:
           format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
-        unpaged:
-          type: boolean
         paged:
           type: boolean
         pageNumber:
@@ -11408,6 +11536,8 @@ components:
         pageSize:
           type: integer
           format: int32
+        unpaged:
+          type: boolean
     SortObject:
       type: object
       properties:

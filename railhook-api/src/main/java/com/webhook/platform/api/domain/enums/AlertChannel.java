@@ -4,5 +4,7 @@ public enum AlertChannel {
     IN_APP,
     EMAIL,
     WEBHOOK,
-    SLACK
+    SLACK,
+    PAGERDUTY,
+    OPSGENIE
 }

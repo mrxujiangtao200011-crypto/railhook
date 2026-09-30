@@ -1,8 +1,10 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingSource;
+import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
@@ -51,6 +53,7 @@ class EncryptionKeyRotationServiceTest {
     @Mock private EndpointRepository endpointRepository;
     @Mock private IncomingSourceRepository incomingSourceRepository;
     @Mock private IncomingDestinationRepository incomingDestinationRepository;
+    @Mock private AlertRuleRepository alertRuleRepository;
 
     private EncryptionKeyRegistry registry;
     private EncryptionKeyRotationService service;
@@ -71,10 +74,11 @@ class EncryptionKeyRotationServiceTest {
         LockProvider lockProvider = mock(LockProvider.class);
         lenient().when(lockProvider.lock(any(LockConfiguration.class))).thenReturn(Optional.of(simpleLock));
         LockingTaskExecutor lockExecutor = new DefaultLockingTaskExecutor(lockProvider);
+        lenient().when(alertRuleRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
 
         service = new EncryptionKeyRotationService(
                 endpointRepository, incomingSourceRepository, incomingDestinationRepository,
-                registry, txTemplate, lockExecutor, meterRegistry
+                alertRuleRepository, registry, txTemplate, lockExecutor, meterRegistry
         );
     }
 
@@ -107,6 +111,29 @@ class EncryptionKeyRotationServiceTest {
 
     private Page<IncomingDestination> destPage(List<IncomingDestination> items) {
         return new PageImpl<>(items);
+    }
+
+    // Left on the old key, a PagerDuty or Opsgenie rule stops paging once that key is retired.
+    @Test
+    void reEncryptsAnAlertRulesOnCallKey() {
+        SecretEncryption.EncryptedData key = SecretEncryption.encrypt("routing-key", KEY_V1, SALT, 1);
+        AlertRule rule = AlertRule.builder()
+                .id(UUID.randomUUID())
+                .integrationKeyEncrypted(key.getCiphertext())
+                .integrationKeyIv(key.getIv())
+                .encryptionKeyVersion(1)
+                .build();
+        when(endpointRepository.findAll(any(Pageable.class))).thenReturn(endpointPage(Collections.emptyList()));
+        when(incomingSourceRepository.findAll(any(Pageable.class))).thenReturn(sourcePage(Collections.emptyList()));
+        when(incomingDestinationRepository.findAll(any(Pageable.class))).thenReturn(destPage(Collections.emptyList()));
+        when(alertRuleRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(rule)));
+
+        EncryptionKeyRotationService.RotationResult result = service.rotateAll();
+
+        assertThat(result.alertRulesRotated()).isEqualTo(1);
+        assertThat(rule.getEncryptionKeyVersion()).isEqualTo(2);
+        assertThat(SecretEncryption.decrypt(rule.getIntegrationKeyEncrypted(), rule.getIntegrationKeyIv(), KEY_V2, SALT))
+                .isEqualTo("routing-key");
     }
 
     @Nested
@@ -365,6 +392,7 @@ class EncryptionKeyRotationServiceTest {
 
             EncryptionKeyRotationService lockedService = new EncryptionKeyRotationService(
                     endpointRepository, incomingSourceRepository, incomingDestinationRepository,
+                    alertRuleRepository,
                     registry, txTemplate, noopLockExecutor, meterRegistry
             );
 

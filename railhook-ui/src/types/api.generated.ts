@@ -2553,7 +2553,7 @@ export interface paths {
         put?: never;
         /**
          * Rotate encryption keys
-         * @description Re-encrypts all secrets (endpoints, incoming sources, incoming destinations) with the currently active encryption key version, across ALL tenants. Requires the platform-admin operator credential (X-Platform-Admin-Token).
+         * @description Re-encrypts all secrets (endpoints, incoming sources, incoming destinations, alert rule keys) with the currently active encryption key version, across ALL tenants. Requires the platform-admin operator credential (X-Platform-Admin-Token).
          */
         post: operations["rotateEncryptionKeys"];
         delete?: never;
@@ -2738,6 +2738,26 @@ export interface paths {
          * @description One run, node by node: what each step was given, what it returned, and where the run stopped if it did.
          */
         get: operations["getExecution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/workflows/schedule-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview workflow schedule
+         * @description The next three times a 5-field cron expression fires in the given time zone. Answers 400 with the reason when the schedule is not accepted.
+         */
+        get: operations["previewWorkflowSchedule"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3591,9 +3611,29 @@ export interface paths {
         };
         /**
          * Get project analytics
-         * @description Returns detailed analytics with time series data
+         * @description Returns detailed analytics with time series data for a preset period or a custom from/to range of at most 90 days. Buckets are hourly up to two days, daily beyond.
          */
         get: operations["getProjectAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/projects/{projectId}/analytics/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export project analytics as CSV
+         * @description The same period or range as the analytics endpoint: one row per time bucket, then a blank line and one row per endpoint.
+         */
+        get: operations["exportProjectAnalytics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4146,6 +4186,8 @@ export interface components {
             /** Format: int32 */
             version?: number;
             /** Format: date-time */
+            nextRunAt?: string;
+            /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
@@ -4581,6 +4623,10 @@ export interface components {
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
             rcaNotes?: string;
+            /** Format: uuid */
+            alertRuleId?: string;
+            alertRuleName?: string;
+            autoResolved?: boolean;
             /** Format: date-time */
             resolvedAt?: string;
             /** Format: date-time */
@@ -4685,7 +4731,7 @@ export interface components {
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
             /** @enum {string} */
-            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK";
+            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK" | "PAGERDUTY" | "OPSGENIE";
             /** Format: double */
             thresholdValue: number;
             /** Format: int32 */
@@ -4698,6 +4744,9 @@ export interface components {
             snoozedUntil?: string;
             webhookUrl?: string;
             emailRecipients?: string;
+            integrationKey?: string;
+            /** @enum {string} */
+            opsgenieRegion?: "US" | "EU";
         };
         AlertRuleResponse: {
             /** Format: uuid */
@@ -4711,7 +4760,7 @@ export interface components {
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
             /** @enum {string} */
-            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK";
+            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK" | "PAGERDUTY" | "OPSGENIE";
             /** Format: double */
             thresholdValue?: number;
             /** Format: int32 */
@@ -4724,6 +4773,9 @@ export interface components {
             snoozedUntil?: string;
             webhookUrl?: string;
             emailRecipients?: string;
+            integrationKeyConfigured?: boolean;
+            /** @enum {string} */
+            opsgenieRegion?: "US" | "EU";
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -4907,6 +4959,8 @@ export interface components {
             workflowId?: string;
             /** Format: uuid */
             triggerEventId?: string;
+            /** Format: date-time */
+            scheduledFor?: string;
             /** @enum {string} */
             status?: "RUNNING" | "WAITING" | "COMPLETED" | "FAILED" | "CANCELLED";
             triggerData?: unknown;
@@ -5648,6 +5702,8 @@ export interface components {
             /** Format: int32 */
             destinationsRotated?: number;
             /** Format: int32 */
+            alertRulesRotated?: number;
+            /** Format: int32 */
             errors?: number;
         };
         ChangeMemberRoleRequest: {
@@ -5699,12 +5755,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
-            unpaged?: boolean;
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
+            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -12660,6 +12716,31 @@ export interface operations {
             };
         };
     };
+    previewWorkflowSchedule: {
+        parameters: {
+            query: {
+                cron: string;
+                timezone?: string;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string[];
+                };
+            };
+        };
+    };
     getProjectUsage: {
         parameters: {
             query?: {
@@ -13775,8 +13856,12 @@ export interface operations {
     getProjectAnalytics: {
         parameters: {
             query?: {
-                /** @description Time period: 24h, 7d, 30d */
+                /** @description Time period: 24h, 7d, 30d. Defaults to 24h */
                 period?: string;
+                /** @description Range start, ISO-8601 instant */
+                from?: string;
+                /** @description Range end, ISO-8601 instant */
+                to?: string;
             };
             header?: never;
             path: {
@@ -13794,6 +13879,33 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["AnalyticsResponse"];
                 };
+            };
+        };
+    };
+    exportProjectAnalytics: {
+        parameters: {
+            query?: {
+                /** @description Time period: 24h, 7d, 30d. Defaults to 24h */
+                period?: string;
+                /** @description Range start, ISO-8601 instant */
+                from?: string;
+                /** @description Range end, ISO-8601 instant */
+                to?: string;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

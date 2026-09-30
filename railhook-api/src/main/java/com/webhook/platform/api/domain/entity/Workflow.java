@@ -61,6 +61,9 @@ public class Workflow {
     @Builder.Default
     private Integer version = 1;
 
+    @Column(name = "next_run_at")
+    private Instant nextRunAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

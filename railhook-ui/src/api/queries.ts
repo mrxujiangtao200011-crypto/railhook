@@ -9,6 +9,7 @@ import { authApi } from './auth.api';
 import { platformAdminApi, type OrganizationFilters } from './platformAdmin.api';
 import { organizationsApi } from './organizations.api';
 import { dashboardApi } from './dashboard.api';
+import { rangeQuery, type AnalyticsRange } from '../lib/analyticsRange';
 import { dlqApi, type DlqFilters } from './dlq.api';
 import { incomingDlqApi, type IncomingDlqFilters } from './incomingDlq.api';
 import { auditLogApi, type AuditLogFilters } from './auditLog.api';
@@ -161,6 +162,10 @@ export const queryKeys = {
         versionDiff: (projectId: string, id: string, left: number, right: number) =>
             ['transformations', projectId, id, 'versions', 'diff', left, right] as const,
     },
+    workflows: {
+        schedulePreview: (projectId: string, cron: string, timezone: string) =>
+            ['workflows', projectId, 'schedule-preview', cron, timezone] as const,
+    },
     rules: {
         list: (projectId: string) => ['rules', projectId] as const,
         detail: (projectId: string, id: string) => ['rules', projectId, id] as const,
@@ -220,10 +225,10 @@ export function useDashboardStats(projectId: string | undefined) {
     });
 }
 
-export function useAnalytics(projectId: string | undefined, period: string) {
+export function useAnalytics(projectId: string | undefined, range: AnalyticsRange) {
     return useQuery({
-        queryKey: queryKeys.dashboard.analytics(projectId!, period),
-        queryFn: () => dashboardApi.getAnalytics(projectId!, period),
+        queryKey: queryKeys.dashboard.analytics(projectId!, rangeQuery(range)),
+        queryFn: () => dashboardApi.getAnalytics(projectId!, range),
         enabled: !!projectId,
     });
 }
