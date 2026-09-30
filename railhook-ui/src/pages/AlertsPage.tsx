@@ -443,7 +443,7 @@ export default function AlertsPage() {
                             <TableCell>
                               <StatusBadge kind={kind} label={t(`alerts.severities.${event.severity}`)} />
                             </TableCell>
-                            <TableCell className="max-w-0">
+                            <TableCell className="sm:max-w-0">
                               <p className="truncate text-sm font-medium">{event.title}</p>
                               {event.message && !isExpanded && (
                                 <p className="mt-0.5 truncate text-xs text-muted-foreground">{event.message}</p>

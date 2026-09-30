@@ -216,8 +216,10 @@ export default function ApiKeysPage() {
                       {apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : t('apiKeys.never')}
                     </TableCell>
                     <TableCell className={cn('px-3 font-mono text-[12px] text-muted-foreground', expired && 'text-halt', (retiring || expiringSoon) && 'text-retry')}>
-                      {retiring && <span className="block font-sans text-[12px]">{t('apiKeys.stopsWorking')}</span>}
-                      {apiKey.expiresAt ? formatDateTimeShort(apiKey.expiresAt) : t('apiKeys.createDialog.noExpiration')}
+                      <span>
+                        {retiring && <span className="block font-sans text-[12px]">{t('apiKeys.stopsWorking')}</span>}
+                        {apiKey.expiresAt ? formatDateTimeShort(apiKey.expiresAt) : t('apiKeys.createDialog.noExpiration')}
+                      </span>
                     </TableCell>
                     <TableCell className="px-3 font-mono text-[12px] text-muted-foreground max-lg:hidden">{formatDateTimeShort(apiKey.createdAt)}</TableCell>
                     {canManageApiKeys && (

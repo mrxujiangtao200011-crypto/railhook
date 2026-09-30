@@ -301,7 +301,7 @@
   }
   .rh-table-stack > table > tbody > tr:has(> td[data-cell="select"]) { padding-right: 3.25rem; }
   .rh-table-stack > table > tbody > tr > td:not(.hidden) {
-    display: flex; min-width: 0; align-items: center; justify-content: space-between;
+    display: flex; min-width: 0; max-width: none; width: auto; align-items: center; justify-content: space-between;
     gap: 0.75rem; min-height: 2.5rem; padding: 0; text-align: right; overflow-wrap: anywhere;
   }
   .rh-table-stack > table > tbody > tr > td[data-label]::before {
@@ -329,7 +329,8 @@
   }
   .rh-table-stack > table > tbody > tr > td[data-cell="actions"] { justify-content: flex-end; }
   .rh-table-stack > table > tbody > tr > td[data-cell="wide"] { display: block; text-align: left; }
-  .rh-table-stack > table > tbody > tr > td a { display: inline-flex; min-height: 2.5rem; align-items: center; }
+  .rh-table-stack > table > tbody > tr > td a:not(.truncate) { display: inline-flex; min-height: 2.5rem; align-items: center; }
+  .rh-table-stack > table > tbody > tr > td a.truncate { display: block; padding-block: 0.625rem; }
 }
 
 html, body { overflow-x: clip; }

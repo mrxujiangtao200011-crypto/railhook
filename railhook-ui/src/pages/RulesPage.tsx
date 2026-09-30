@@ -274,8 +274,10 @@ export default function RulesPage() {
                   return [
                     <TableRow key={rule.id} className={cn(!rule.enabled && 'text-muted-foreground', expanded && 'bg-secondary/40')}>
                       <TableCell className="px-3 font-mono text-[12px] text-muted-foreground">
-                        {index + 1}
-                        {rule.priority !== 0 && <span className="ml-1 text-[11px]">P{rule.priority}</span>}
+                        <span>
+                          {index + 1}
+                          {rule.priority !== 0 && <span className="ml-1 text-[11px]">P{rule.priority}</span>}
+                        </span>
                       </TableCell>
                       <TableCell className="max-w-[16rem] px-3">
                         <span className="block truncate" title={rule.name}>{rule.name}</span>
@@ -305,8 +307,10 @@ export default function RulesPage() {
                         )}
                       </TableCell>
                       <TableCell className={cn('px-3 text-right tabular-nums', never && 'text-retry')}>
-                        {rule.totalMatches.toLocaleString()}
-                        <span className="text-muted-foreground"> / {rule.totalExecutions.toLocaleString()}</span>
+                        <span>
+                          {rule.totalMatches.toLocaleString()}
+                          <span className="text-muted-foreground"> / {rule.totalExecutions.toLocaleString()}</span>
+                        </span>
                       </TableCell>
                       <TableCell className="px-3">
                         <span className="flex items-center gap-2">

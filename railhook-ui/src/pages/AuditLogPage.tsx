@@ -199,9 +199,11 @@ export default function AuditLogPage() {
                   </TableCell>
                   <TableCell className="font-mono text-[12px]">{actionLabel(entry.action)}</TableCell>
                   <TableCell className="font-mono text-[12px]">
-                    {entry.resourceType}
-                    <span className="ml-1.5 text-muted-foreground" title={entry.resourceId || undefined}>
-                      {shortId(entry.resourceId)}
+                    <span>
+                      {entry.resourceType}
+                      <span className="ml-1.5 text-muted-foreground" title={entry.resourceId || undefined}>
+                        {shortId(entry.resourceId)}
+                      </span>
                     </span>
                   </TableCell>
                   <TableCell className="max-w-[16rem] truncate text-muted-foreground" title={entry.userEmail || entry.userId || undefined}>

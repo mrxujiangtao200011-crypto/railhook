@@ -331,7 +331,7 @@ export default function AnalyticsPage() {
                   const rateKind = kindOfSuccessRate(ep.successRate, ep.enabled);
                   return (
                     <TableRow key={ep.endpointId} className={cn(ep.status === 'FAILING' && 'bg-halt-soft/40')}>
-                      <TableCell className="max-w-0 px-2">
+                      <TableCell className="px-2 sm:max-w-0">
                         <Link
                           to={`/admin/projects/${projectId}/deliveries?endpointId=${ep.endpointId}`}
                           className="block truncate font-mono text-[12px] hover:underline max-sm:whitespace-normal max-sm:break-all"
