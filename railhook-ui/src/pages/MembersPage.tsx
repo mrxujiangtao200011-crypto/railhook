@@ -8,7 +8,7 @@ import PageSkeleton, { SkeletonTable } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge, { type StatusKind } from '../components/StatusBadge';
-import PermissionGate, { GRANTABLE_ROLES, ROLES, ROLE_ICON, RoleCard } from '../components/PermissionGate';
+import PermissionGate, { GRANTABLE_ROLES, ROLES, ROLE_ICON } from '../components/PermissionGate';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AddMemberModal from '../components/AddMemberModal';
@@ -22,12 +22,12 @@ import { useAuth } from '../auth/auth.store';
 import { usePermissions } from '../auth/usePermissions';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Select } from '../components/ui/select';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
+import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 /** A suspension is halt, not idle: access was deliberately stopped. */
 function kindOfMemberStatus(status: string): StatusKind {
@@ -151,7 +151,7 @@ export default function MembersPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <SettingsLayout>
       <PageHeader
         eyebrow={user?.organization?.name}
         title={t('members.title')}
@@ -159,13 +159,19 @@ export default function MembersPage() {
         actions={addButton}
       />
 
-      <section aria-labelledby="roles-heading" className="mb-6">
-        <h3 id="roles-heading" className="mono-label mb-2.5">{t('members.rolesHeading')}</h3>
-        <div className="grid gap-3 sm:grid-cols-3">
+      <section aria-labelledby="roles-heading" className="mb-8">
+        <h3 id="roles-heading" className="sr-only">{t('members.rolesHeading')}</h3>
+        <dl className="grid border-t border-rail sm:grid-cols-3 sm:gap-x-8">
           {ROLES.map((role) => (
-            <RoleCard key={role} role={role} count={members.filter((m) => m.role === role).length} />
+            <div key={role} className="border-b border-rail py-3 sm:border-b-0">
+              <dt className="flex items-baseline justify-between gap-3 text-[13px]">
+                <span>{t(`roles.${role}.name`)}</span>
+                <span className="tabular-nums text-muted-foreground">{members.filter((m) => m.role === role).length}</span>
+              </dt>
+              <dd className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{t(`roles.${role}.summary`)}</dd>
+            </div>
           ))}
-        </div>
+        </dl>
       </section>
 
       {isError ? (
@@ -200,12 +206,11 @@ export default function MembersPage() {
           </div>
 
           {filteredMembers.length === 0 ? (
-            <p className="border border-dashed border-rail px-6 py-12 text-center text-sm text-muted-foreground">
+            <p className="border-t border-rail py-10 text-sm text-muted-foreground">
               {t('members.noResults')}
             </p>
           ) : (
-          <Card className="animate-fade-in overflow-hidden">
-          <Table>
+          <Table className="animate-fade-in text-[13px]">
             <TableHeader>
               <TableRow>
                 <TableHead>{t('members.email')}</TableHead>
@@ -226,7 +231,7 @@ export default function MembersPage() {
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-foreground" aria-hidden>
-                          <span className="font-mono text-[11px] font-medium text-background">
+                          <span className="font-mono text-[12px] font-medium text-background">
                             {member.email.charAt(0).toUpperCase()}
                           </span>
                         </span>
@@ -347,7 +352,6 @@ export default function MembersPage() {
               })}
             </TableBody>
           </Table>
-        </Card>
           )}
         </>
       )}
@@ -425,6 +429,6 @@ export default function MembersPage() {
         loading={removeMember.isPending}
         confirmLabel={t('members.remove')}
       />
-    </div>
+    </SettingsLayout>
   );
 }

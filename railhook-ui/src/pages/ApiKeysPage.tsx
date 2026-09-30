@@ -20,7 +20,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
-import { Card, CardContent } from '../components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { TablePagination } from '../components/ui/table-pagination';
 import {
   Dialog,
@@ -31,13 +31,15 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { usePermissions } from '../auth/usePermissions';
+import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 const SCOPES: ApiKeyScope[] = ['READ_WRITE', 'READ_ONLY'];
 const PAGE_SIZE = 20;
+const EXPIRING_SOON_MS = 7 * 24 * 60 * 60 * 1000;
 
 function KeyFingerprint({ prefix }: { prefix: string }) {
   return (
-    <span className="font-mono text-[13px] text-muted-foreground">
+    <span className="block font-mono text-[12px] text-muted-foreground">
       {prefix}
       <span aria-hidden>{'•'.repeat(12)}</span>
     </span>
@@ -138,18 +140,18 @@ export default function ApiKeysPage() {
 
   if (project.isError || keysPage.isError || !project.data) {
     return (
-      <div className="p-4 lg:p-6">
+      <SettingsLayout>
         <ErrorState
           error={project.error ?? keysPage.error}
           fallbackKey="apiKeys.toast.loadFailed"
           onRetry={() => { project.refetch(); keysPage.refetch(); }}
         />
-      </div>
+      </SettingsLayout>
     );
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <SettingsLayout>
       <PageHeader
         eyebrow={project.data.name}
         title={t('apiKeys.title')}
@@ -175,79 +177,82 @@ export default function ApiKeysPage() {
           ) : undefined}
         />
       ) : (
-        <div className="animate-fade-in space-y-3">
-          {apiKeys.map((apiKey) => {
-            const expired = !!apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date();
-            const retiring = !!apiKey.rotatedAt && !expired;
-            return (
-              <Card key={apiKey.id}>
-                <CardContent className="flex flex-wrap items-start justify-between gap-4 p-4 lg:p-5">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium">{apiKey.name}</p>
+        <div className="animate-fade-in">
+          <Table className="text-[13px]">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="px-3">{t('apiKeys.columns.key')}</TableHead>
+                <TableHead className="w-32 px-3">{t('apiKeys.columns.scope')}</TableHead>
+                <TableHead className="w-36 px-3">{t('apiKeys.columns.status')}</TableHead>
+                <TableHead className="w-36 px-3">{t('apiKeys.lastUsed')}</TableHead>
+                <TableHead className="w-40 px-3">{t('apiKeys.expires')}</TableHead>
+                <TableHead className="w-32 px-3 max-lg:hidden">{t('apiKeys.created')}</TableHead>
+                {canManageApiKeys && <TableHead className="w-24 px-2"><span className="sr-only">{t('common.actions')}</span></TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {apiKeys.map((apiKey) => {
+                const expired = !!apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date();
+                const retiring = !!apiKey.rotatedAt && !expired;
+                const expiringSoon = !expired && !retiring && !!apiKey.expiresAt
+                  && new Date(apiKey.expiresAt).getTime() - Date.now() < EXPIRING_SOON_MS;
+                return (
+                  <TableRow key={apiKey.id} className={cn(expired && 'bg-halt-soft/40', (retiring || expiringSoon) && 'bg-retry-soft/40')}>
+                    <TableCell className="max-w-[18rem] px-3">
+                      <span className="block truncate" title={apiKey.name}>{apiKey.name}</span>
+                      <KeyFingerprint prefix={apiKey.keyPrefix} />
+                      {retiring && <span className="block text-[12px] text-retry">{t('apiKeys.retiringHint')}</span>}
+                    </TableCell>
+                    <TableCell className="px-3 text-muted-foreground">
+                      {t(apiKey.scope === 'READ_ONLY' ? 'apiKeys.scopeReadOnly' : 'apiKeys.scopeReadWrite')}
+                    </TableCell>
+                    <TableCell className="px-3">
                       <StatusBadge
                         kind={expired ? 'halt' : retiring ? 'retry' : 'ok'}
                         label={t(expired ? 'apiKeys.expired' : retiring ? 'apiKeys.retiring' : 'apiKeys.activeKey')}
                       />
-                      <span className="border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                        {t(apiKey.scope === 'READ_ONLY' ? 'apiKeys.scopeReadOnly' : 'apiKeys.scopeReadWrite')}
-                      </span>
-                    </div>
-                    <div className="mt-1.5">
-                      <KeyFingerprint prefix={apiKey.keyPrefix} />
-                    </div>
-                    <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[11px]">
-                      <div className="flex gap-1.5">
-                        <dt className="mono-label">{t('apiKeys.created')}</dt>
-                        <dd className="text-muted-foreground">{formatDateTimeShort(apiKey.createdAt)}</dd>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <dt className="mono-label">{t('apiKeys.lastUsed')}</dt>
-                        <dd className="text-muted-foreground">
-                          {apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : t('apiKeys.never')}
-                        </dd>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <dt className="mono-label">{t(retiring ? 'apiKeys.stopsWorking' : 'apiKeys.expires')}</dt>
-                        <dd className={cn('text-muted-foreground', expired && 'text-halt', retiring && 'text-retry')}>
-                          {apiKey.expiresAt ? formatDateTimeShort(apiKey.expiresAt) : t('apiKeys.createDialog.noExpiration')}
-                        </dd>
-                      </div>
-                    </dl>
-                    {retiring && (
-                      <p className="mt-2 text-xs text-retry">{t('apiKeys.retiringHint')}</p>
+                    </TableCell>
+                    <TableCell className="px-3 text-muted-foreground">
+                      {apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : t('apiKeys.never')}
+                    </TableCell>
+                    <TableCell className={cn('px-3 font-mono text-[12px] text-muted-foreground', expired && 'text-halt', (retiring || expiringSoon) && 'text-retry')}>
+                      {retiring && <span className="block font-sans text-[12px]">{t('apiKeys.stopsWorking')}</span>}
+                      {apiKey.expiresAt ? formatDateTimeShort(apiKey.expiresAt) : t('apiKeys.createDialog.noExpiration')}
+                    </TableCell>
+                    <TableCell className="px-3 font-mono text-[12px] text-muted-foreground max-lg:hidden">{formatDateTimeShort(apiKey.createdAt)}</TableCell>
+                    {canManageApiKeys && (
+                      <TableCell className="px-2 text-right">
+                        <div className="flex justify-end gap-1">
+                          {!apiKey.rotatedAt && !expired && (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => { setRotateGraceHours('24'); setRotating(apiKey); }}
+                              title={t('apiKeys.rotate')}
+                              aria-label={t('apiKeys.rotateNamed', { name: apiKey.name })}
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setRevoking(apiKey)}
+                            title={t('apiKeys.revoke')}
+                            aria-label={t('apiKeys.revokeNamed', { name: apiKey.name })}
+                            className="text-muted-foreground hover:text-halt"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     )}
-                  </div>
-                  {canManageApiKeys && (
-                    <div className="flex flex-shrink-0 items-center gap-1">
-                    {!apiKey.rotatedAt && !expired && (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => { setRotateGraceHours('24'); setRotating(apiKey); }}
-                      title={t('apiKeys.rotate')}
-                      aria-label={t('apiKeys.rotateNamed', { name: apiKey.name })}
-                      className="flex-shrink-0 text-muted-foreground hover:text-foreground"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setRevoking(apiKey)}
-                      title={t('apiKeys.revoke')}
-                      aria-label={t('apiKeys.revokeNamed', { name: apiKey.name })}
-                      className="flex-shrink-0 text-muted-foreground hover:text-halt"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
 
           {keysPage.data && (
             <TablePagination
@@ -262,7 +267,7 @@ export default function ApiKeysPage() {
         </div>
       )}
 
-      {projectId && <ConnectedMcpApps projectId={projectId} />}
+      {projectId && <div className="mt-12"><ConnectedMcpApps projectId={projectId} /></div>}
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
@@ -418,7 +423,7 @@ export default function ApiKeysPage() {
 
             <div className="space-y-1.5">
               <p className="mono-label">{t('apiKeys.keyDialog.howToUse')}</p>
-              <pre className="overflow-x-auto border border-rail bg-secondary/60 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
+              <pre className="overflow-x-auto border border-rail bg-secondary/60 p-3 font-mono text-[12px] leading-relaxed text-muted-foreground">
 {sendEventCurl({ payload: '{"type":"user.created","data":{"userId":"123"}}', apiKey: '$RAILHOOK_API_KEY' })}
               </pre>
             </div>
@@ -434,6 +439,6 @@ export default function ApiKeysPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </SettingsLayout>
   );
 }

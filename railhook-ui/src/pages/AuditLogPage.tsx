@@ -4,22 +4,23 @@ import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/queries';
 import { formatDateTimeCompact } from '../lib/date';
 import { SkeletonTable } from '../components/PageSkeleton';
-import JsonBlock from '../components/JsonBlock';
 import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { auditLogApi, type AuditLogEntry, type AuditLogFilters } from '../api/auditLog.api';
 import { Button } from '../components/ui/button';
-import { Card } from '../components/ui/card';
 import { Select } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { showSuccess, showApiError } from '../lib/toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../components/ui/sheet';
+import { CodeView } from '../components/port/p2/parts';
+import { cn } from '../lib/utils';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
 import { TablePagination } from '../components/ui/table-pagination';
 import { FilterBar } from './tableParts';
+import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 const ALL_ACTIONS = [
   'CREATE', 'UPDATE', 'DELETE', 'ROTATE_SECRET', 'REVOKE',
@@ -102,7 +103,7 @@ export default function AuditLogPage() {
   const actionLabel = (action: string) => t(`auditLog.actions.${action}`, { defaultValue: action });
 
   return (
-    <div className="p-4 lg:p-6">
+    <SettingsLayout>
       <PageHeader
         eyebrow={data ? t('auditLog.eventCount', { count: data.totalElements }) : undefined}
         title={t('auditLog.title')}
@@ -166,7 +167,7 @@ export default function AuditLogPage() {
       {isError ? (
         <ErrorState error={error} fallbackKey="auditLog.loadFailed" onRetry={() => refetch()} retrying={isRefetching} />
       ) : isLoading ? (
-        <Card className="overflow-hidden"><SkeletonTable rows={8} /></Card>
+        <SkeletonTable rows={8} />
       ) : !data || data.content.length === 0 ? (
         <EmptyState
           icon={FileText}
@@ -175,8 +176,7 @@ export default function AuditLogPage() {
           action={hasFilters ? <Button variant="outline" onClick={clearFilters}>{t('auditLog.filters.clear')}</Button> : undefined}
         />
       ) : (
-        <Card className="overflow-hidden">
-          <Table>
+          <Table className="text-[13px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[150px]">{t('auditLog.columns.time')}</TableHead>
@@ -190,18 +190,22 @@ export default function AuditLogPage() {
             </TableHeader>
             <TableBody>
               {data.content.map((entry: AuditLogEntry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                <TableRow
+                  key={entry.id}
+                  onClick={() => setSelected(entry)}
+                  className={cn('cursor-pointer', entry.status !== 'SUCCESS' && 'bg-halt-soft/40', selected?.id === entry.id && 'bg-secondary')}
+                >
+                  <TableCell className="whitespace-nowrap font-mono text-[12px] text-muted-foreground">
                     {formatDateTimeCompact(entry.createdAt)}
                   </TableCell>
-                  <TableCell className="font-mono text-[13px]">{actionLabel(entry.action)}</TableCell>
-                  <TableCell className="font-mono text-[13px]">
+                  <TableCell className="font-mono text-[12px]">{actionLabel(entry.action)}</TableCell>
+                  <TableCell className="font-mono text-[12px]">
                     {entry.resourceType}
                     <span className="ml-1.5 text-muted-foreground" title={entry.resourceId || undefined}>
                       {shortId(entry.resourceId)}
                     </span>
                   </TableCell>
-                  <TableCell className="truncate font-mono text-[13px] text-muted-foreground" title={entry.userId || undefined}>
+                  <TableCell className="max-w-[16rem] truncate text-muted-foreground" title={entry.userEmail || entry.userId || undefined}>
                     {entry.userEmail || (entry.userId ? shortId(entry.userId) : '—')}
                   </TableCell>
                   <TableCell>
@@ -214,7 +218,7 @@ export default function AuditLogPage() {
                     {entry.durationMs != null ? `${entry.durationMs}ms` : '—'}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setSelected(entry)}>
+                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelected(entry); }}>
                       {t('auditLog.detail.open')}
                     </Button>
                   </TableCell>
@@ -222,7 +226,6 @@ export default function AuditLogPage() {
               ))}
             </TableBody>
           </Table>
-        </Card>
       )}
 
       {!isError && !isLoading && data && data.content.length > 0 && (
@@ -236,13 +239,14 @@ export default function AuditLogPage() {
         />
       )}
 
-      <Dialog open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{t('auditLog.detail.title')}</DialogTitle>
-          </DialogHeader>
+      <Sheet open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>{t('auditLog.detail.title')}</SheetTitle>
+            <SheetDescription className="sr-only">{selected ? actionLabel(selected.action) : ''}</SheetDescription>
+          </SheetHeader>
           {selected && (
-            <div className="space-y-0.5">
+            <div className="mt-4 space-y-0.5">
               <DetailRow label={t('auditLog.columns.time')} value={formatDateTimeCompact(selected.createdAt)} mono />
               <DetailRow label={t('auditLog.columns.action')} value={actionLabel(selected.action)} mono />
               <DetailRow label={t('auditLog.columns.status')}>
@@ -256,32 +260,30 @@ export default function AuditLogPage() {
               <DetailRow label={t('auditLog.columns.user')} value={selected.userEmail || '—'} mono />
               <DetailRow label={t('auditLog.columns.duration')} value={selected.durationMs != null ? `${selected.durationMs}ms` : '—'} mono />
               <DetailRow label={t('auditLog.columns.ip')} value={selected.clientIp || '—'} mono />
-              {selected.details && (
-                <div className="pt-3">
-                  <JsonBlock label={t('auditLog.detail.changes')} value={selected.details} maxHeight="max-h-48" />
+              {selected.errorMessage && (
+                <div className="border-l-2 border-halt py-1 pl-3">
+                  <p className="text-[12px] text-muted-foreground">{t('auditLog.columns.error')}</p>
+                  <p className="break-all text-[13px] text-halt">{selected.errorMessage}</p>
                 </div>
               )}
-              {selected.errorMessage && (
-                <div className="pt-3">
-                  <p className="mono-label mb-1.5">{t('auditLog.columns.error')}</p>
-                  <p className="break-all border border-halt/30 bg-halt-soft p-3 text-[13px] text-halt">
-                    {selected.errorMessage}
-                  </p>
+              {selected.details && (
+                <div className="pt-4">
+                  <CodeView value={selected.details} title={t('auditLog.detail.changes')} maxHeight="max-h-80" />
                 </div>
               )}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        </SheetContent>
+      </Sheet>
+    </SettingsLayout>
   );
 }
 
 function DetailRow({ label, value, mono, children }: { label: string; value?: string; mono?: boolean; children?: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 border-b border-rail py-2 last:border-b-0">
-      <span className="mono-label w-32 flex-shrink-0">{label}</span>
-      {children || <span className={`min-w-0 break-all text-[13px] ${mono ? 'font-mono' : ''}`}>{value}</span>}
+      <span className="w-32 flex-shrink-0 text-[12px] text-muted-foreground">{label}</span>
+      {children || <span className={`min-w-0 break-all ${mono ? 'font-mono text-[12px]' : 'text-[13px]'}`}>{value}</span>}
     </div>
   );
 }

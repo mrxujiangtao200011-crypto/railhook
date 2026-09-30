@@ -21,6 +21,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
+import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 const COMMON_TIMEZONES = [
   'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -39,7 +40,7 @@ export function FormSection({
 }) {
   return (
     <section className="border-t border-rail pt-8 first:border-t-0 first:pt-0">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:gap-10">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] xl:gap-10">
         <div>
           <h3 className="text-[15px] font-medium">{title}</h3>
           {description && <p className="mt-1 text-sm leading-snug text-muted-foreground">{description}</p>}
@@ -175,7 +176,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <SettingsLayout>
       <div className="max-w-4xl">
         <PageHeader
           eyebrow={user?.organization?.name}
@@ -404,7 +405,7 @@ export default function SettingsPage() {
           <EraseAccount />
         </div>
       </div>
-    </div>
+    </SettingsLayout>
   );
 }
 
