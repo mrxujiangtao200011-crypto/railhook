@@ -31,7 +31,6 @@ import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
     | `APP_ENV` | `production`, тож платформа відмовиться запускатися з небезпечною конфігурацією |
     | `APP_BASE_URL`, `CORS_ALLOWED_ORIGINS` | `https://<your domain>` |
     | Ingress-адреси джерел і адреси тунелів CLI | Беруться з `APP_BASE_URL`, тож провайдери отримують `https://<your domain>/ingress/…` |
-    | `DB_SSL_MODE` | `require` |
     | `LOG_LEVEL` | `WARN` |
     | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, щоб у журнал аудиту й ліміти запитів для кожної IP-адреси потрапляли справжні IP-адреси клієнтів. Якщо Railhook стоїть за CDN, наприклад Cloudflare, додайте також опубліковані діапазони адрес цього CDN, інакше всіх відвідувачів, що пройшли через один edge-вузол, буде пораховано як цей вузол |
 

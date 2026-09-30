@@ -9,7 +9,7 @@ description: Change the database schema in this repo — add or alter a table or
 
 Only in `railhook-api/src/main/resources/db/migration`, named `V0NN__snake_case_description.sql`. The API module is the sole owner: `spring.flyway.enabled: true` is set there and the worker has **no Flyway dependency at all**. The worker connects to the same schema and expects it to already be migrated.
 
-Append the next free number (currently through `V068`); never edit a migration that has been applied anywhere — Flyway records a checksum per version and refuses to start when it changes. To correct an applied migration, add a new one that fixes it forward.
+Append the next free number after `V001__schema.sql`; never edit a migration that has been applied anywhere — Flyway records a checksum per version and refuses to start when it changes. To correct an applied migration, add a new one that fixes it forward.
 
 `MigrationChecksumTest` (a `@Tag("ratchet")` guard) enforces that: it holds a committed hash of every migration and fails when one changes. Adding a migration therefore also means regenerating the manifest and committing it alongside:
 

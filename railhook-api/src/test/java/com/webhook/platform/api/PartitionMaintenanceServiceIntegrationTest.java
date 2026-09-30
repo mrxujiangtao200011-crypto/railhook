@@ -33,11 +33,9 @@ class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest
 
     @Test
     @Order(1)
-    void migrationCreatesMonthlyPartitionsPlusLegacyAndDefault() {
+    void migrationCreatesMonthlyPartitionsAndDefault() {
         List<String> partitions = childPartitionNames("delivery_attempts");
 
-        assertTrue(partitions.contains("delivery_attempts_legacy"),
-                "pre-cutover history should be attached as delivery_attempts_legacy");
         assertTrue(partitions.contains("delivery_attempts_default"),
                 "a DEFAULT partition must exist so out-of-range inserts don't fail outright");
         assertTrue(partitions.stream().anyMatch(p -> p.matches("delivery_attempts_y\\d{4}_m\\d{2}")),
@@ -46,10 +44,9 @@ class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest
 
     @Test
     @Order(2)
-    void migrationCreatesWeeklyPartitionsPlusLegacyAndDefault() {
+    void migrationCreatesWeeklyPartitionsAndDefault() {
         List<String> partitions = childPartitionNames("tunnel_request_log");
 
-        assertTrue(partitions.contains("tunnel_request_log_legacy"));
         assertTrue(partitions.contains("tunnel_request_log_default"));
         assertTrue(partitions.stream().anyMatch(p -> p.matches("tunnel_request_log_y\\d{4}_w\\d{2}")));
     }
@@ -59,22 +56,17 @@ class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest
     void rowsRouteToTheirCorrectPartitionByCreatedAt() {
         UUID deliveryId = createDelivery();
 
-        // Lands in the legacy partition.
-        insertDeliveryAttempt(deliveryId, 1, Instant.now().minus(400, ChronoUnit.DAYS));
-        insertDeliveryAttempt(deliveryId, 2, Instant.now());
+        insertDeliveryAttempt(deliveryId, 1, Instant.now());
         // Beyond the migration's lookahead: the DEFAULT partition.
-        insertDeliveryAttempt(deliveryId, 3, Instant.now().plus(1000, ChronoUnit.DAYS));
+        insertDeliveryAttempt(deliveryId, 2, Instant.now().plus(1000, ChronoUnit.DAYS));
 
-        Long legacyCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM delivery_attempts_legacy WHERE delivery_id = ?", Long.class, deliveryId);
         Long defaultCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM delivery_attempts_default WHERE delivery_id = ?", Long.class, deliveryId);
         Long totalCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM delivery_attempts WHERE delivery_id = ?", Long.class, deliveryId);
 
-        assertEquals(1L, legacyCount, "the far-past row should have landed in the legacy partition");
         assertEquals(1L, defaultCount, "the far-future row should have landed in the DEFAULT partition");
-        assertEquals(3L, totalCount, "querying the parent table must transparently see all partitions");
+        assertEquals(2L, totalCount, "querying the parent table must transparently see all partitions");
     }
 
     @Test
@@ -93,16 +85,18 @@ class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest
     @Test
     @Order(5)
     void dropExpiredPartitionsRemovesOnlyPartitionsFullyPastRetention() {
+        jdbcTemplate.execute("CREATE TABLE delivery_attempts_y2020_m01 PARTITION OF delivery_attempts "
+                + "FOR VALUES FROM ('2020-01-01 00:00:00') TO ('2020-02-01 00:00:00')");
         UUID deliveryId = createDelivery();
-        insertDeliveryAttempt(deliveryId, 1, Instant.now().minus(400, ChronoUnit.DAYS));
+        insertDeliveryAttempt(deliveryId, 1, Instant.parse("2020-01-15T00:00:00Z"));
         insertDeliveryAttempt(deliveryId, 2, Instant.now());
 
-        // retentionDays = 0: the legacy partition is fully expired, the current month's is not.
+        // retentionDays = 0: January 2020 is fully expired, the current month is not.
         int dropped = partitionMaintenanceService.dropExpiredPartitions("delivery_attempts", 0);
-        assertTrue(dropped >= 1, "expected at least the legacy partition to be dropped");
+        assertTrue(dropped >= 1, "expected the January 2020 partition to be dropped");
 
         List<String> remaining = childPartitionNames("delivery_attempts");
-        assertFalse(remaining.contains("delivery_attempts_legacy"), "legacy partition should have been dropped");
+        assertFalse(remaining.contains("delivery_attempts_y2020_m01"), "the expired partition should have been dropped");
         assertTrue(remaining.stream().anyMatch(p -> p.matches("delivery_attempts_y\\d{4}_m\\d{2}")),
                 "the current/future dated partitions must not be touched");
 

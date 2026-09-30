@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-// V052 once dropped this FK silently; guards a migration forgetting it again.
+// Partitioning delivery_attempts once dropped this FK silently.
 public class DeliveryAttemptCascadeRepositoryTest extends AbstractIntegrationTest {
 
     @PersistenceContext

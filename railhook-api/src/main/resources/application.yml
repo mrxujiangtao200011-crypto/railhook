@@ -184,11 +184,8 @@ data-retention:
   table-metrics-interval-ms: ${DATA_RETENTION_TABLE_METRICS_INTERVAL_MS:900000}
   tunnel-request-log-retention-days: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:7}
 
-# Partition maintenance for the declaratively-partitioned high-volume tables
-# (delivery_attempts, tunnel_request_log — see V052/V053 migrations and
-# PartitionMaintenanceService). Creates future partitions ahead of need and drops
-# partitions once fully past the corresponding data-retention.*-retention-days above,
-# replacing DELETE-based retention with O(1) DROP TABLE for those two tables.
+# delivery_attempts and tunnel_request_log are partitioned by time: future partitions are created
+# ahead of need and whole partitions are dropped once past their retention above.
 partition-maintenance:
   enabled: ${PARTITION_MAINTENANCE_ENABLED:true}
   delivery-attempts-lookahead-months: ${PARTITION_MAINTENANCE_DELIVERY_ATTEMPTS_LOOKAHEAD_MONTHS:3}

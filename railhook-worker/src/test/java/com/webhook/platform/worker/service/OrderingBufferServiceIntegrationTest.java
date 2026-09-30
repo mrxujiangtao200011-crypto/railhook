@@ -71,6 +71,8 @@ class OrderingBufferServiceIntegrationTest {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        // The scheduled resync calls the same mock from another thread and races the stubbing.
+        registry.add("ordering.buffer-gauge-resync-ms", () -> "3600000");
     }
 
     @TestConfiguration
