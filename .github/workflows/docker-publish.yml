@@ -72,11 +72,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # A mirror for discoverability; GHCR stays what docker-compose.yml and the deploy pull.
+      - name: Log in to Docker Hub
+        if: vars.DOCKERHUB_NAMESPACE != ''
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Extract metadata (tags/labels)
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}-${{ matrix.service }}
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}-${{ matrix.service }}
+            ${{ vars.DOCKERHUB_NAMESPACE != '' && format('docker.io/{0}/railhook-{1}', vars.DOCKERHUB_NAMESPACE, matrix.service) || '' }}
           tags: |
             type=raw,value=${{ needs.resolve-version.outputs.version }}
             type=raw,value=latest
