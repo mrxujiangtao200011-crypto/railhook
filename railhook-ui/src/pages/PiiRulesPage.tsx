@@ -7,8 +7,8 @@ import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import PiiPreview from '../components/PiiPreview';
 import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
-import { EnabledBadge } from '../components/StatusBadge';
-import { RuleStats, RuleRow, MatchExpression, RuleActionChip } from '../components/RuleLayout';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { cn } from '../lib/utils';
 import type { PiiMaskingRuleResponse, MaskStyle } from '../api/piiRules.api';
 import { usePiiRules, useSeedPiiRules, useCreatePiiRule, useUpdatePiiRule, useDeletePiiRule } from '../api/queries';
 import { Button, buttonVariants } from '../components/ui/button';
@@ -16,7 +16,6 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
-import { Badge } from '../components/ui/badge';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -118,7 +117,7 @@ export default function PiiRulesPage() {
   const builtinCount = rules.filter((r) => r.ruleType === 'BUILTIN').length;
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
       <PageHeader
         eyebrow={t('piiRules.count', { count: rules.length })}
         title={t('piiRules.title')}
@@ -202,39 +201,39 @@ export default function PiiRulesPage() {
           }
         />
       ) : (
-        <div className="space-y-4">
-          <RuleStats
-            items={[
-              { label: t('piiRules.stats.total'), value: rules.length },
-              { label: t('piiRules.stats.active'), value: enabledCount },
-              { label: t('piiRules.stats.builtin'), value: builtinCount },
-              { label: t('piiRules.stats.custom'), value: rules.length - builtinCount },
-            ]}
-          />
-
-          <ul className="space-y-2.5">
-            {rules.map((rule) => (
-              <li key={rule.id}>
-                <RuleRow
-                  muted={!rule.enabled}
-                  name={<span className="font-mono">{rule.patternName}</span>}
-                  meta={
-                    <Badge variant={rule.ruleType === 'BUILTIN' ? 'secondary' : 'outline'} className="text-[10px]">
-                      {rule.ruleType === 'BUILTIN' ? t('piiRules.builtin') : t('piiRules.custom')}
-                    </Badge>
-                  }
-                  match={
-                    <MatchExpression title={rule.jsonPath || undefined}>
-                      {rule.jsonPath || t('piiRules.anyField')}
-                    </MatchExpression>
-                  }
-                  then={
-                    <span className="flex flex-wrap items-center gap-1.5">
+        <div className="grid items-start gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+          <div className="min-w-0">
+            <p className="mb-3 text-[13px] text-muted-foreground">
+              {t('piiRules.summary', { active: enabledCount, total: rules.length, builtin: builtinCount, custom: rules.length - builtinCount })}
+            </p>
+            <Table className="text-[13px]">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="px-3">{t('piiRules.columns.pattern')}</TableHead>
+                  <TableHead className="px-3">{t('piiRules.columns.field')}</TableHead>
+                  <TableHead className="w-36 px-3">{t('piiRules.maskStyle')}</TableHead>
+                  <TableHead className="w-24 px-3">{t('piiRules.columns.state')}</TableHead>
+                  <TableHead className="w-12 px-2"><span className="sr-only">{t('common.actions')}</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rules.map((rule) => (
+                  <TableRow key={rule.id} className={cn(!rule.enabled && 'text-muted-foreground')}>
+                    <TableCell className="px-3">
+                      <span className="font-mono text-[12px]">{rule.patternName}</span>
+                      <span className="ml-2 text-[12px] text-muted-foreground">
+                        {rule.ruleType === 'BUILTIN' ? t('piiRules.builtin') : t('piiRules.custom')}
+                      </span>
+                    </TableCell>
+                    <TableCell className="max-w-[14rem] px-3">
+                      <span className="block truncate font-mono text-[12px]" title={rule.jsonPath || undefined}>{rule.jsonPath || t('piiRules.anyField')}</span>
+                    </TableCell>
+                    <TableCell className="px-3">
                       {canManagePiiRules ? (
                         <Select
                           value={rule.maskStyle}
                           onChange={(e) => patchRule(rule, { maskStyle: e.target.value as MaskStyle })}
-                          className="h-7 w-32 text-xs"
+                          className="h-8 w-32 text-xs max-sm:h-11"
                           aria-label={t('piiRules.maskStyle')}
                         >
                           {MASK_STYLE_VALUES.map((value) => (
@@ -242,20 +241,21 @@ export default function PiiRulesPage() {
                           ))}
                         </Select>
                       ) : (
-                        <RuleActionChip icon={EyeOff} label={t(`piiRules.maskStyles.${rule.maskStyle}`)} />
+                        <span className="inline-flex items-center gap-1.5"><EyeOff className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />{t(`piiRules.maskStyles.${rule.maskStyle}`)}</span>
                       )}
-                    </span>
-                  }
-                  status={<EnabledBadge enabled={rule.enabled} />}
-                  controls={
-                    <>
-                      {canManagePiiRules && (
+                    </TableCell>
+                    <TableCell className="px-3">
+                      {canManagePiiRules ? (
                         <Switch
                           checked={rule.enabled}
                           onCheckedChange={() => patchRule(rule, { enabled: !rule.enabled })}
                           aria-label={t(rule.enabled ? 'common.disable' : 'common.enable')}
                         />
+                      ) : (
+                        <span>{rule.enabled ? t('common.on') : t('common.off')}</span>
                       )}
+                    </TableCell>
+                    <TableCell className="px-2 text-right">
                       {canManagePiiRules && rule.ruleType !== 'BUILTIN' && (
                         <Button
                           variant="ghost"
@@ -268,14 +268,16 @@ export default function PiiRulesPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                    </>
-                  }
-                />
-              </li>
-            ))}
-          </ul>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
-          <PiiPreview projectId={projectId!} />
+          <div className="min-w-0">
+            <PiiPreview projectId={projectId!} />
+          </div>
         </div>
       )}
 

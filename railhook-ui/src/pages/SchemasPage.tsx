@@ -31,7 +31,7 @@ export default function SchemasPage() {
   // Otherwise a failed request draws "0 event types": a down backend posing as an empty project.
   if (isError) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
         <PageHeader title={t('schemas.title')} description={t('schemas.subtitle')} />
         <ErrorState
           error={error}
@@ -44,17 +44,17 @@ export default function SchemasPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
       <PageHeader
         eyebrow={t('schemas.typeCount', { count: eventTypes.length })}
         title={t('schemas.title')}
         description={t('schemas.subtitle')}
       />
 
-      <div className="space-y-5">
+      <div className="space-y-8">
         <SchemaValidationPanel projectId={projectId} />
 
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+        <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
           <SchemaListPanel projectId={projectId} selected={selected} onSelect={setSelected} />
 
           <div className="min-w-0 space-y-4">
@@ -71,7 +71,6 @@ export default function SchemasPage() {
                   icon={FileJson2}
                   title={t('schemas.selectEventType')}
                   description={t('schemas.selectEventTypeHint')}
-                  className="flex min-h-[240px] flex-col items-center justify-center border border-dashed border-rail px-6"
                 />
               </>
             )}

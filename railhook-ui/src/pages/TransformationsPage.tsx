@@ -16,7 +16,7 @@ import {
   useDeleteTransformation,
 } from '../api/queries';
 import { Button, buttonVariants } from '../components/ui/button';
-import { Card } from '../components/ui/card';
+import { cn } from '../lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -184,7 +184,7 @@ export default function TransformationsPage() {
   // A failed fetch is not a missing project, so it must not read "project not found".
   if (projectFailed || listFailed || !project) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
         <ErrorState
           error={projectError ?? listError}
           onRetry={() => { refetchProject(); refetchList(); }}
@@ -205,7 +205,7 @@ export default function TransformationsPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
       <PageHeader
         eyebrow={t('transformations.count', { count: transformations.length })}
         title={t('transformations.title')}
@@ -240,12 +240,10 @@ export default function TransformationsPage() {
           description={t('transformations.noMatchingDesc')}
         />
       ) : (
-        <Card className="overflow-hidden">
-          <Table>
+          <Table className="text-[13px]">
             <TableHeader>
               <TableRow>
                 <TableHead>{t('transformations.name')}</TableHead>
-                <TableHead>{t('transformations.description')}</TableHead>
                 <TableHead>{t('transformations.kind')}</TableHead>
                 <TableHead>{t('transformations.version')}</TableHead>
                 <TableHead>{t('transformations.status')}</TableHead>
@@ -256,21 +254,19 @@ export default function TransformationsPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell><span className="text-[13px] font-medium">{item.name}</span></TableCell>
-                  <TableCell>
-                    <span className="block max-w-[250px] truncate text-[13px] text-muted-foreground">
-                      {item.description || '—'}
-                    </span>
+                <TableRow key={item.id} className={cn(!item.enabled && (item.subscriptionCount > 0 || item.destinationCount > 0) && 'bg-retry-soft/40')}>
+                  <TableCell className="max-w-[20rem]">
+                    <span className="block truncate" title={item.name}>{item.name}</span>
+                    {item.description && <span className="block truncate text-[12px] text-muted-foreground">{item.description}</span>}
                   </TableCell>
                   <TableCell>
                     {item.kind === 'JAVASCRIPT' ? (
-                      <span className="inline-flex items-center gap-1 border border-rail bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium">
+                      <span className="inline-flex items-center gap-1.5 text-[12px]">
                         <Code2 className="h-3 w-3" aria-hidden="true" />
                         {t('transformations.kindJavascript')}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 border border-rail px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
                         <Wand2 className="h-3 w-3" aria-hidden="true" />
                         {t('transformations.kindTemplate')}
                       </span>
@@ -347,7 +343,6 @@ export default function TransformationsPage() {
               ))}
             </TableBody>
           </Table>
-        </Card>
       )}
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -429,7 +424,7 @@ export default function TransformationsPage() {
               <div className="space-y-2">
                 <Label>{t('transformations.livePreview')}</Label>
                 <OutputBlock label={t('transformations.sampleInputEvent')}>
-                  <pre className="max-h-[130px] overflow-auto p-2.5 font-mono text-[11px] text-muted-foreground">
+                  <pre className="max-h-[130px] overflow-auto p-2.5 font-mono text-[12px] text-muted-foreground">
                     {JSON.stringify(SAMPLE_INPUT, null, 2)}
                   </pre>
                 </OutputBlock>
@@ -438,7 +433,7 @@ export default function TransformationsPage() {
                 </div>
                 <OutputBlock label={t('transformations.outputPreview')}>
                   {livePreview ? (
-                    <pre className="max-h-[170px] overflow-auto p-2.5 font-mono text-[11px]">{livePreview}</pre>
+                    <pre className="max-h-[170px] overflow-auto p-2.5 font-mono text-[12px]">{livePreview}</pre>
                   ) : (
                     <p className="p-4 text-center text-[11px] text-muted-foreground">
                       {templateHasContent && !templateIsJson
