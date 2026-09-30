@@ -2553,7 +2553,7 @@ export interface paths {
         put?: never;
         /**
          * Rotate encryption keys
-         * @description Re-encrypts all secrets (endpoints, incoming sources, incoming destinations) with the currently active encryption key version, across ALL tenants. Requires the platform-admin operator credential (X-Platform-Admin-Token).
+         * @description Re-encrypts all secrets (endpoints, incoming sources, incoming destinations, alert rule keys) with the currently active encryption key version, across ALL tenants. Requires the platform-admin operator credential (X-Platform-Admin-Token).
          */
         post: operations["rotateEncryptionKeys"];
         delete?: never;
@@ -4581,6 +4581,10 @@ export interface components {
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
             rcaNotes?: string;
+            /** Format: uuid */
+            alertRuleId?: string;
+            alertRuleName?: string;
+            autoResolved?: boolean;
             /** Format: date-time */
             resolvedAt?: string;
             /** Format: date-time */
@@ -4685,7 +4689,7 @@ export interface components {
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
             /** @enum {string} */
-            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK";
+            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK" | "PAGERDUTY" | "OPSGENIE";
             /** Format: double */
             thresholdValue: number;
             /** Format: int32 */
@@ -4698,6 +4702,9 @@ export interface components {
             snoozedUntil?: string;
             webhookUrl?: string;
             emailRecipients?: string;
+            integrationKey?: string;
+            /** @enum {string} */
+            opsgenieRegion?: "US" | "EU";
         };
         AlertRuleResponse: {
             /** Format: uuid */
@@ -4711,7 +4718,7 @@ export interface components {
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
             /** @enum {string} */
-            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK";
+            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK" | "PAGERDUTY" | "OPSGENIE";
             /** Format: double */
             thresholdValue?: number;
             /** Format: int32 */
@@ -4724,6 +4731,9 @@ export interface components {
             snoozedUntil?: string;
             webhookUrl?: string;
             emailRecipients?: string;
+            integrationKeyConfigured?: boolean;
+            /** @enum {string} */
+            opsgenieRegion?: "US" | "EU";
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -5648,6 +5658,8 @@ export interface components {
             /** Format: int32 */
             destinationsRotated?: number;
             /** Format: int32 */
+            alertRulesRotated?: number;
+            /** Format: int32 */
             errors?: number;
         };
         ChangeMemberRoleRequest: {
@@ -5699,12 +5711,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
-            unpaged?: boolean;
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
+            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;

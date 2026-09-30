@@ -12,7 +12,9 @@
       "EMAIL": "Email",
       "IN_APP": "In-App",
       "SLACK": "Slack",
-      "WEBHOOK": "Webhook"
+      "WEBHOOK": "Webhook",
+      "PAGERDUTY": "PagerDuty",
+      "OPSGENIE": "Opsgenie"
     },
     "columns": {
       "details": "Details",
@@ -47,7 +49,16 @@
       "threshold": "Threshold",
       "type": "Alert Type",
       "webhookUrl": "Webhook URL",
-      "window": "Window (min)"
+      "window": "Window (min)",
+      "pagerDutyRoutingKey": "PagerDuty routing key",
+      "pagerDutyHint": "Add an Events API v2 integration to a PagerDuty service and paste its routing key: the rule pages when it fires and resolves the page when the condition clears.",
+      "opsgenieApiKey": "Opsgenie API key",
+      "opsgenieHint": "Add an API integration to an Opsgenie team and paste its key: the rule creates an alert when it fires and closes it when the condition clears.",
+      "opsgenieRegion": "Opsgenie region",
+      "opsgenieRegions": {
+        "US": "US (api.opsgenie.com)",
+        "EU": "EU (api.eu.opsgenie.com)"
+      }
     },
     "history": {
       "desc": "Every alert this project has raised, newest first",
@@ -1535,7 +1546,7 @@
       "OPEN": "Open",
       "RESOLVED": "Resolved"
     },
-    "subtitle": "Group related failures, track what was done, and write down why.",
+    "subtitle": "A firing alert rule opens an incident here and resolves it when the condition clears. Track what was done and write down why.",
     "tiles": {
       "allClear": "All clear",
       "critical": "Critical",
@@ -1555,7 +1566,9 @@
       "rcaSaved": "RCA notes saved",
       "statusUpdated": "Status updated",
       "updateFailed": "Failed to update incident"
-    }
+    },
+    "openedByRule": "Opened by alert rule {{name}}",
+    "autoResolved": "Resolved automatically"
   },
   "incomingDestinations": {
     "create": "Add Destination",

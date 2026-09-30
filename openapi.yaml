@@ -5812,8 +5812,9 @@ paths:
       - Encryption Admin
       summary: Rotate encryption keys
       description: "Re-encrypts all secrets (endpoints, incoming sources, incoming\
-        \ destinations) with the currently active encryption key version, across ALL\
-        \ tenants. Requires the platform-admin operator credential (X-Platform-Admin-Token)."
+        \ destinations, alert rule keys) with the currently active encryption key\
+        \ version, across ALL tenants. Requires the platform-admin operator credential\
+        \ (X-Platform-Admin-Token)."
       operationId: rotateEncryptionKeys
       responses:
         "200":
@@ -9386,6 +9387,13 @@ components:
           - CRITICAL
         rcaNotes:
           type: string
+        alertRuleId:
+          type: string
+          format: uuid
+        alertRuleName:
+          type: string
+        autoResolved:
+          type: boolean
         resolvedAt:
           type: string
           format: date-time
@@ -9585,6 +9593,8 @@ components:
           - EMAIL
           - WEBHOOK
           - SLACK
+          - PAGERDUTY
+          - OPSGENIE
         thresholdValue:
           type: number
           format: double
@@ -9607,6 +9617,13 @@ components:
           type: string
         emailRecipients:
           type: string
+        integrationKey:
+          type: string
+        opsgenieRegion:
+          type: string
+          enum:
+          - US
+          - EU
       required:
       - alertType
       - name
@@ -9644,6 +9661,8 @@ components:
           - EMAIL
           - WEBHOOK
           - SLACK
+          - PAGERDUTY
+          - OPSGENIE
         thresholdValue:
           type: number
           format: double
@@ -9664,6 +9683,13 @@ components:
           type: string
         emailRecipients:
           type: string
+        integrationKeyConfigured:
+          type: boolean
+        opsgenieRegion:
+          type: string
+          enum:
+          - US
+          - EU
         createdAt:
           type: string
           format: date-time
@@ -11304,6 +11330,9 @@ components:
         destinationsRotated:
           type: integer
           format: int32
+        alertRulesRotated:
+          type: integer
+          format: int32
         errors:
           type: integer
           format: int32
@@ -11398,8 +11427,6 @@ components:
           format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
-        unpaged:
-          type: boolean
         paged:
           type: boolean
         pageNumber:
@@ -11408,6 +11435,8 @@ components:
         pageSize:
           type: integer
           format: int32
+        unpaged:
+          type: boolean
     SortObject:
       type: object
       properties:
