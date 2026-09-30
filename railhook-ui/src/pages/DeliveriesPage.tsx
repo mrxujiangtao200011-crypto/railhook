@@ -35,6 +35,7 @@ import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, Se
 import { useDebounced } from '../hooks/useDebounced';
 import Callout from '../components/Callout';
 import { cn } from '../lib/utils';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 const STATUS_VALUES = ['', 'SUCCESS', 'FAILED', 'DLQ', 'CANCELLED', 'PENDING', 'PROCESSING'] as const;
 const DATE_RANGE_VALUES = ['24h', '7d', '30d'] as const;
@@ -101,6 +102,8 @@ export default function DeliveriesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkReplayDialog, setShowBulkReplayDialog] = useState(false);
   const { canReplayDeliveries } = usePermissions();
+  const wide = useMediaQuery('(min-width: 1280px)');
+  const paneOpen = wide && !!selectedDeliveryId;
 
   const debouncedSearch = useDebounced(searchQuery);
 
@@ -198,7 +201,7 @@ export default function DeliveriesPage() {
 
   if (loading) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="p-4 lg:p-8">
         <SkeletonRows count={5} />
       </div>
     );
@@ -206,7 +209,7 @@ export default function DeliveriesPage() {
 
   if (isError) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="p-4 lg:p-8">
         <ErrorState error={projectError ?? deliveriesError} fallbackKey="deliveries.toast.loadFailed" onRetry={retry} />
       </div>
     );
@@ -224,7 +227,7 @@ export default function DeliveriesPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
       <PageHeader
         eyebrow={t('nav.outgoing')}
         description={<Trans i18nKey="deliveries.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
@@ -232,7 +235,7 @@ export default function DeliveriesPage() {
       />
 
       {eventIdFilter && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 border border-rail bg-secondary/50 px-3 py-2">
+        <div className="mb-4 flex flex-wrap items-center gap-2 border-l-2 border-foreground/40 py-1 pl-3">
           <Send className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
           <span className="text-sm text-muted-foreground">{t('deliveries.filteringByEvent')}</span>
           <code className="font-mono text-[13px]">{eventIdFilter.substring(0, 8)}</code>
@@ -296,7 +299,8 @@ export default function DeliveriesPage() {
           />
         )
       ) : (
-        <div className="animate-fade-in">
+        <div className={cn('animate-fade-in', paneOpen && 'grid grid-cols-[minmax(0,1fr)_28rem] gap-8')}>
+          <div className="min-w-0">
           <PermissionGate allowed={canReplayDeliveries}>
             <SelectionBar count={selectedCount} onClear={() => setSelectedIds(new Set())}>
               <VerificationGate>
@@ -308,8 +312,8 @@ export default function DeliveriesPage() {
             </SelectionBar>
           </PermissionGate>
 
-          <div className="overflow-hidden border border-rail bg-card">
-            <Table>
+          <div className="min-w-0">
+            <Table className="text-[13px]">
               <TableHeader>
                 <TableRow>
                   {canReplayDeliveries && (
@@ -324,10 +328,10 @@ export default function DeliveriesPage() {
                   )}
                   <SortableTableHead field="status" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.status')}</SortableTableHead>
                   <TableHead>{t('deliveries.columns.event')}</TableHead>
-                  <TableHead>{t('deliveries.columns.endpoint')}</TableHead>
+                  <TableHead className={cn(paneOpen && 'hidden')}>{t('deliveries.columns.endpoint')}</TableHead>
                   <SortableTableHead field="attemptCount" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.attempts')}</SortableTableHead>
                   <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={cn(SORTABLE_HEAD_CLASS, 'hidden lg:table-cell')}>{t('deliveries.columns.created')}</SortableTableHead>
-                  <TableHead className="hidden xl:table-cell">{t('deliveries.columns.deliveryId')}</TableHead>
+                  <TableHead className={cn('hidden', !paneOpen && '2xl:table-cell')}>{t('deliveries.columns.deliveryId')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -337,9 +341,14 @@ export default function DeliveriesPage() {
                   return (
                     <TableRow
                       key={delivery.id}
-                      className="group/row cursor-pointer"
+                      className={cn(
+                        'group/row cursor-pointer',
+                        selectedDeliveryId === delivery.id && 'bg-secondary',
+                        kindOfDeliveryStatus(delivery.status) === 'halt' && selectedDeliveryId !== delivery.id && 'bg-halt-soft/40',
+                      )}
+                      aria-selected={selectedDeliveryId === delivery.id}
                       data-state={selectedIds.has(delivery.id) ? 'selected' : undefined}
-                      onClick={() => setSelectedDeliveryId(delivery.id)}
+                      onClick={() => setSelectedDeliveryId(selectedDeliveryId === delivery.id && paneOpen ? null : delivery.id)}
                     >
                       {canReplayDeliveries && (
                         <TableCell>
@@ -370,7 +379,7 @@ export default function DeliveriesPage() {
                           <Link
                             to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="block max-w-[220px] truncate rounded font-mono text-[13px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="block max-w-[220px] truncate font-mono text-[12px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             title={delivery.eventType}
                           >
                             {delivery.eventType}
@@ -382,11 +391,11 @@ export default function DeliveriesPage() {
                           />
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={cn(paneOpen && 'hidden')}>
                         <Link
                           to={`/admin/projects/${projectId}/endpoints`}
                           onClick={(e) => e.stopPropagation()}
-                          className="block max-w-[220px] truncate rounded font-mono text-[13px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="block max-w-[260px] truncate font-mono text-[12px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           title={getEndpointName(delivery.endpointId)}
                         >
                           {getEndpointName(delivery.endpointId)}
@@ -402,7 +411,7 @@ export default function DeliveriesPage() {
                         />
                       </TableCell>
                       <TableCell className="hidden lg:table-cell"><TimeCell value={delivery.createdAt} /></TableCell>
-                      <TableCell className="hidden xl:table-cell"><CopyId value={delivery.id} /></TableCell>
+                      <TableCell className={cn('hidden', !paneOpen && '2xl:table-cell')}><CopyId value={delivery.id} /></TableCell>
                     </TableRow>
                   );
                 })}
@@ -418,15 +427,30 @@ export default function DeliveriesPage() {
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
           />
+          </div>
+          {paneOpen && (
+            <div className="sticky top-4 max-h-[calc(100vh-6rem)] self-start overflow-y-auto border-l border-rail pl-6">
+              <DeliveryDetailsSheet
+                key={selectedDeliveryId}
+                variant="pane"
+                deliveryId={selectedDeliveryId}
+                open
+                onClose={() => setSelectedDeliveryId(null)}
+                onRefresh={refetchDeliveries}
+              />
+            </div>
+          )}
         </div>
       )}
 
-      <DeliveryDetailsSheet
-        deliveryId={selectedDeliveryId}
-        open={!!selectedDeliveryId}
-        onClose={() => setSelectedDeliveryId(null)}
-        onRefresh={refetchDeliveries}
-      />
+      {!wide && (
+        <DeliveryDetailsSheet
+          deliveryId={selectedDeliveryId}
+          open={!!selectedDeliveryId}
+          onClose={() => setSelectedDeliveryId(null)}
+          onRefresh={refetchDeliveries}
+        />
+      )}
 
       <AlertDialog open={showBulkReplayDialog} onOpenChange={setShowBulkReplayDialog}>
         <AlertDialogContent>
