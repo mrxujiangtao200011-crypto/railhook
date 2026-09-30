@@ -48,7 +48,10 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                                 SELECT a.id FROM incoming_forward_attempts a
                                 WHERE a.destination_id = e.destination_id
                                   AND a.status IN ('PENDING', 'PROCESSING') AND a.next_retry_at <= :now
-                                ORDER BY a.next_retry_at LIMIT :perDestination
+                                ORDER BY a.next_retry_at
+                                LIMIT GREATEST(0, :perDestination - (SELECT count(*) FROM incoming_forward_attempts f
+                                    WHERE f.destination_id = e.destination_id AND f.status = 'PROCESSING'
+                                      AND f.next_retry_at > :now))
                                 FOR UPDATE SKIP LOCKED) p
                             LIMIT :limit
                         )

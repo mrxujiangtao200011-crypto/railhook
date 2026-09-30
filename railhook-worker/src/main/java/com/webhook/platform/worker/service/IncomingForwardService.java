@@ -49,7 +49,7 @@ public class IncomingForwardService {
             Clock clock,
             @Value("${webhook.claim.timeout-seconds:300}") long claimTimeoutSeconds,
             @Value("${webhook.claim.max-targets:500}") int maxDestinations,
-            @Value("${webhook.claim.per-target:5}") int perDestination) {
+            @Value("${webhook.max-concurrent-per-endpoint:5}") int perDestination) {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.attemptRepository = attemptRepository;

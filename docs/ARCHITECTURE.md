@@ -211,9 +211,9 @@ sequenceDiagram
 ```
 
 The worker polls every 200 ms when idle and again at once after a full batch. A retry is the same
-row with a later `next_retry_at`; the claim query takes it when it is due. Each poll takes at most
-`WEBHOOK_CLAIM_PER_TARGET` rows per endpoint, round-robin across endpoints, so one endpoint's
-backlog cannot fill a batch.
+row with a later `next_retry_at`; the claim query takes it when it is due. Each poll takes from an
+endpoint only as many rows as it has free concurrency (`WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT` minus
+what is in flight), round-robin across endpoints, so one endpoint's backlog cannot fill a batch.
 
 ## Incoming ingress flow
 
