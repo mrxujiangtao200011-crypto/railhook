@@ -100,11 +100,7 @@
     "tiles": {
       "allClear": "All clear",
       "armed": "Armed rules",
-      "armedHint": "of {{total}} rules",
-      "silenced": "Silenced",
-      "silencedHint": "Muted, snoozed or turned off",
-      "unresolved": "Unresolved",
-      "unresolvedHint": "Alerts waiting on a decision"
+      "unresolved": "Unresolved"
     },
     "title": "Alerts",
     "toast": {
@@ -229,9 +225,6 @@
     "successRate": "Success Rate",
     "throughput": "Throughput",
     "tiles": {
-      "failedBadge": "Retrying",
-      "failedHint": "{{percent}}% of all deliveries",
-      "latencyHint": "p95 {{p95}} · p99 {{p99}}",
       "successRateHint": "{{delivered}} of {{total}} delivered"
     },
     "to": "To"
@@ -304,7 +297,6 @@
     "scopeReadOnly": "Read Only",
     "scopeReadWrite": "Read & Write",
     "stopsWorking": "Stops working",
-    "subtitle": "Manage API keys for <strong>{{project}}</strong>",
     "subtitlePlain": "Keys that authenticate calls to the API for this project.",
     "title": "API Keys",
     "toast": {
@@ -891,7 +883,6 @@
   "dashboard": {
     "attention": {
       "alerts": "Unresolved alerts",
-      "clearBadge": "All clear",
       "desc": "Work Railhook has stopped doing on its own",
       "dlq": "Abandoned in the DLQ",
       "failed": "Failed, retrying",
@@ -930,7 +921,6 @@
     "endpointHealth": {
       "empty": "No endpoints configured",
       "emptyDesc": "Add endpoints to start receiving webhooks",
-      "subtitle": "Top endpoints by volume",
       "title": "Endpoint Health"
     },
     "headline": "Delivery health",
@@ -968,25 +958,14 @@
       "delivery_other": "{{count}} deliveries",
       "empty": "No recent events",
       "emptyDesc": "Events will appear here when sent",
-      "subtitle": "Latest webhook events",
       "title": "Recent Events"
-    },
-    "share": {
-      "abandoned": "Abandoned",
-      "delivered": "Delivered",
-      "failed": "Failed",
-      "inFlight": "In flight"
     },
     "stats": {
       "abandoned": "Abandoned",
-      "abandonedHint": "Retry ladder exhausted",
       "delivered": "Delivered",
-      "deliveredHint": "{{percent}}% of everything sent",
       "deliveries": "Deliveries",
       "dlq": "Failed Messages",
-      "dlqBadge": "In the DLQ",
       "inFlight": "In flight",
-      "inFlightHint": "Still owed an attempt",
       "window": "Last 7 days",
       "latencyP95": "Latency p95"
     },
@@ -1174,8 +1153,6 @@
     "ladderExhausted_many": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_one": "Retry ladder exhausted after {{count}} attempt",
     "ladderExhausted_other": "Retry ladder exhausted after {{count}} attempts",
-    "last24h": "Last 24 Hours",
-    "last7d": "Last 7 Days",
     "noItems": "No items in DLQ",
     "noItemsDesc": "No delivery has used up its retries.",
     "purgeAll": "Purge All",
@@ -1199,7 +1176,6 @@
       "purged": "{{count}} items purged from DLQ",
       "replayed": "Delivery queued for replay"
     },
-    "totalItems": "Total Items",
     "unknownError": "Unknown error",
     "statsLine": "{{total}} waiting · {{day}} in the last 24 hours · {{week}} in the last 7 days"
   },
@@ -1433,19 +1409,15 @@
     "deliveriesCount": "Deliveries",
     "eventIdCopied": "Event ID copied",
     "eventType": "Event Type",
-    "existingLinks": "Existing debug links (PII-safe):",
     "expires": "Expires {{time}}",
-    "linkCopied": "Link copied",
     "noDebugLinks": "No debug links created yet",
     "noSchema": "No schema registered for event type \"{{type}}\"",
-    "payloadCopied": "Payload copied",
     "payloadSize": "Payload Size",
     "project": "Project",
     "rawPayload": "Raw Payload",
     "replayFailed": "Replay {{count}} Failed",
     "replayed": "Replayed",
     "replayedFailed": "Replayed {{count}} failed deliveries",
-    "sanitized": "PII-Sanitized Payload",
     "sanitizedHint": "The payload with your PII masking rules applied.",
     "sanitizedUseDebug": "Use \"Share Debug\" to share it as a link.",
     "schemaInfo": "Schema Information",
@@ -1453,9 +1425,7 @@
     "tabs": {
       "debug": "Debug Links",
       "deliveries": "Deliveries",
-      "raw": "Raw Payload",
-      "sanitized": "Sanitized",
-      "schema": "Schema"
+      "raw": "Raw Payload"
     },
     "viewSchemaRegistry": "View in Schema Registry",
     "views": "{{count}} views"
@@ -1518,15 +1488,12 @@
     "details": {
       "deliveries": "Deliveries",
       "noDeliveries": "No deliveries for this event",
-      "noDeliveriesHint": "Events are only delivered to endpoints that have a matching subscription.",
       "noDeliveriesNoSub": "No active subscription matches <strong>{{eventType}}</strong>. Create one to deliver this type.",
       "noPayload": "No payload",
       "notFound": "Event not found",
       "openFull": "Open Full Details",
       "raw": "Raw",
       "replay": "Replay",
-      "sanitized": "Sanitized",
-      "sanitizedUnavailable": "Sanitized view unavailable. Configure PII rules first.",
       "title": "Event Details"
     },
     "eventId": "Event ID",
@@ -1565,8 +1532,7 @@
     "toast": {
       "loadFailed": "Failed to load events",
       "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created."
-    },
-    "viewDeliveries": "View deliveries for this event"
+    }
   },
   "footer": {
     "apiReference": "API reference",
@@ -1626,13 +1592,11 @@
       "title": "Add Timeline Note",
       "titlePlaceholder": "Contacted vendor support"
     },
-    "openCount": "{{count}} open incidents",
     "openOnly": "Open Only",
     "rcaNotes": "Root Cause Analysis",
     "rcaPlaceholder": "Document the root cause, impact, and remediation steps...",
     "reopen": "Reopen",
     "resolve": "Resolve",
-    "resolvedAt": "Resolved",
     "resolvedAtLabel": "Resolved {{time}}",
     "showAll": "Show All",
     "statuses": {
@@ -1644,11 +1608,8 @@
     "tiles": {
       "allClear": "All clear",
       "critical": "Critical",
-      "criticalHint": "Unresolved and marked critical",
       "investigating": "Investigating",
-      "investigatingHint": "Someone is on it",
-      "open": "Open",
-      "openHint": "Nobody has claimed these yet"
+      "open": "Open"
     },
     "timeline": "Timeline",
     "title": "Incidents",
@@ -1753,7 +1714,6 @@
       "destination": "Destination",
       "eventId": "Event ID",
       "failedAt": "Failed At",
-      "lastError": "Last Error",
       "source": "Source",
       "lastResponse": "Last response"
     },
@@ -1762,8 +1722,6 @@
     "ladderExhausted_many": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_one": "Retry ladder exhausted after {{count}} attempt",
     "ladderExhausted_other": "Retry ladder exhausted after {{count}} attempts",
-    "last24h": "Last 24 Hours",
-    "last7d": "Last 7 Days",
     "noItems": "No abandoned forwards",
     "noItemsDesc": "Every incoming webhook is reaching its destinations",
     "pageTitle": "Failed Forwards",
@@ -1790,7 +1748,6 @@
       "retried": "Forward queued for retry",
       "retryFailed": "Failed to retry forward"
     },
-    "totalItems": "Total Items",
     "unknownError": "Unknown error",
     "statsLine": "{{total}} waiting · {{day}} in the last 24 hours · {{week}} in the last 7 days"
   },
@@ -2547,7 +2504,6 @@
     "newRuleEyebrow": "New rule",
     "noRules": "No masking rules configured",
     "noRulesHint": "Seed defaults to add email, phone, and card masking",
-    "pattern": "Pattern",
     "patternName": "Pattern name",
     "patternNamePlaceholder": "email, phone, card",
     "preview": {
@@ -2567,12 +2523,6 @@
       "unchangedHint": "No enabled rule matched this payload."
     },
     "seedDefaults": "Seed defaults",
-    "stats": {
-      "active": "Active",
-      "builtin": "Built-in",
-      "custom": "Custom",
-      "total": "Total"
-    },
     "subtitle": "Configure which fields are masked before sharing event payloads",
     "title": "PII Masking Rules",
     "toast": {
@@ -2657,16 +2607,11 @@
       "generatedAt": "As of {{time}}",
       "kpi": {
         "activeTunnels": "Active tunnels",
-        "deliveriesFailed": "Deliveries failed, 24h",
-        "deliveriesFailedHint": "Still retrying or given up",
-        "deliveriesSucceeded": "Deliveries succeeded, 24h",
         "events30d": "{{total}} in 30 days",
-        "eventsToday": "Events today",
         "nearQuota": "Near event limit",
         "nearQuotaHint": "At 80% or more of this month's plan limit",
         "organizations": "Organizations",
         "signupsPeriods": "{{week}} in 7 days · {{month}} in 30 days",
-        "signupsToday": "Sign-ups today",
         "suspended": "{{count}} suspended",
         "users": "Accounts"
       },
@@ -2684,9 +2629,7 @@
       "daily": {
         "period": "Last 30 days",
         "signups": "Sign-ups per day",
-        "signupsSeries": "Sign-ups",
         "events": "Events per day",
-        "eventsSeries": "Events",
         "today": "today"
       },
       "attention": {
@@ -2806,7 +2749,6 @@
     "deleteNamed": "Delete {{name}}",
     "health": {
       "endpoints": "{{count}} endpoints",
-      "lastEvent": "Last event {{time}}",
       "noDeliveries": "No deliveries yet",
       "noEndpoints": "No endpoints",
       "noEvents": "No events yet",
@@ -3030,9 +2972,6 @@
     "search": "Search rules…",
     "showDetails": "Show rule details",
     "stats": {
-      "active": "Active",
-      "executions": "Evaluations",
-      "matchRate": "Match Rate",
       "matches": "Matches",
       "total": "Total Rules"
     },
@@ -3690,7 +3629,6 @@
     "viewTitle": "Version {{version}}"
   },
   "tunnels": {
-    "active": "Active",
     "client": "Client",
     "close": "Close tunnel",
     "closeDialog": {
@@ -3707,11 +3645,6 @@
     "noTunnelsDesc": "Start a tunnel from the CLI with `railhook listen 3000` to forward requests to your local machine. Install the CLI with `curl -fsSL https://railhook.io/install-cli.sh | bash` and sign in with `railhook login` first.",
     "openCount": "Open · {{count}}",
     "refresh": "Refresh",
-    "stats": {
-      "active": "Active tunnels",
-      "mine": "My tunnels",
-      "pending": "Pending requests"
-    },
     "subtitle": "CLI sessions forwarding webhooks to a local machine.",
     "title": "Tunnels",
     "toast": {
@@ -3773,12 +3706,8 @@
       "endpoints": "Active Endpoints"
     },
     "tiles": {
-      "alertRulesHint": "Watching this project",
-      "endpointsHint": "Registered and enabled",
       "events": "Events",
-      "eventsHint": "Announced by your systems",
-      "incoming": "Incoming events",
-      "incomingHint": "Received from your sources"
+      "incoming": "Incoming events"
     },
     "title": "Usage & Metrics",
     "traffic": {
