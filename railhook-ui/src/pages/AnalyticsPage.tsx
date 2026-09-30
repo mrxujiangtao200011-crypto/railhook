@@ -1,17 +1,20 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { Download, Loader2, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAnalytics, queryKeys } from '../api/queries';
-import type { AnalyticsData } from '../api/dashboard.api';
-import { formatDateTimeShort, formatTime } from '../lib/date';
+import { dashboardApi, type AnalyticsData } from '../api/dashboard.api';
+import { formatDateTimeShort, formatTime, toLocalDatetime } from '../lib/date';
+import { PRESETS, customRange, rangeQuery, type AnalyticsRange } from '../lib/analyticsRange';
+import { showApiError } from '../lib/toast';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
 import { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
+import { Input } from '../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { cn } from '../lib/utils';
 import {
@@ -19,9 +22,6 @@ import {
   formatCompact, formatMs, formatRate, kindOfEndpointStatus, kindOfSuccessRate, outcomeLegend,
   share, type RankDatum,
 } from '../components/charts';
-
-const PERIODS = ['24h', '7d', '30d'] as const;
-type Period = (typeof PERIODS)[number];
 
 const EMPTY_OVERVIEW: AnalyticsData['overview'] = {
   totalEvents: 0, totalDeliveries: 0, successfulDeliveries: 0, failedDeliveries: 0,
@@ -36,15 +36,43 @@ const EMPTY_PERCENTILES: AnalyticsData['latencyPercentiles'] = {
 export default function AnalyticsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
-  const [period, setPeriod] = useState<Period>('24h');
+  const [range, setRange] = useState<AnalyticsRange>({ period: '24h' });
+  const [editingCustom, setEditingCustom] = useState(false);
+  const [draftFrom, setDraftFrom] = useState(() => toLocalDatetime(new Date(Date.now() - 86_400_000).toISOString()));
+  const [draftTo, setDraftTo] = useState(() => toLocalDatetime(new Date().toISOString()));
+  const [exporting, setExporting] = useState(false);
   const qc = useQueryClient();
 
   const {
     data: analytics, isLoading, isError, error, isFetching, refetch,
-  } = useAnalytics(projectId, period);
+  } = useAnalytics(projectId, range);
+
+  const period = 'period' in range
+    ? range.period
+    : `${formatDateTimeShort(range.from)} – ${formatDateTimeShort(range.to)}`;
+  const draftRange = customRange(draftFrom, draftTo);
+  const customActive = editingCustom || !('period' in range);
 
   const refresh = () => {
-    if (projectId) qc.invalidateQueries({ queryKey: queryKeys.dashboard.analytics(projectId, period) });
+    if (projectId) qc.invalidateQueries({ queryKey: queryKeys.dashboard.analytics(projectId, rangeQuery(range)) });
+  };
+
+  const exportCsv = async () => {
+    if (!projectId) return;
+    setExporting(true);
+    try {
+      const { blob, filename } = await dashboardApi.exportAnalyticsCsv(projectId, range);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? 'analytics.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showApiError(err, 'analytics.export.failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Defaults everywhere: a window with no traffic comes back sparse.
@@ -88,6 +116,84 @@ export default function AnalyticsPage() {
     failed: t('analytics.outcome.failed'),
   };
 
+  const picker = (
+    <div className="mb-4 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <div
+          role="group"
+          aria-label={t('analytics.periodLabel')}
+          className="inline-flex border border-rail bg-card p-0.5"
+        >
+          {PRESETS.map((p) => {
+            const active = !customActive && 'period' in range && range.period === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => { setEditingCustom(false); setRange({ period: p }); }}
+                aria-pressed={active}
+                className={cn(
+                  'px-3 py-1.5 font-mono text-xs transition-colors',
+                  active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {t(`analytics.periods.${p}`)}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setEditingCustom(true)}
+            aria-pressed={customActive}
+            className={cn(
+              'px-3 py-1.5 font-mono text-xs transition-colors',
+              customActive
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {t('analytics.custom')}
+          </button>
+        </div>
+        {editingCustom && (
+          <>
+            <Input
+              type="datetime-local"
+              aria-label={t('analytics.from')}
+              value={draftFrom}
+              onChange={(e) => setDraftFrom(e.target.value)}
+              className="w-auto"
+            />
+            <Input
+              type="datetime-local"
+              aria-label={t('analytics.to')}
+              value={draftTo}
+              onChange={(e) => setDraftTo(e.target.value)}
+              className="w-auto"
+            />
+            <Button size="sm" disabled={!draftRange} onClick={() => draftRange && setRange(draftRange)}>
+              {t('analytics.apply')}
+            </Button>
+          </>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">{t('analytics.export.hint')}</p>
+    </div>
+  );
+
+  const actions = (
+    <div className="flex gap-2">
+      <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
+        {exporting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Download className="h-4 w-4" aria-hidden />}
+        {t('analytics.export.csv')}
+      </Button>
+      <Button variant="outline" size="sm" onClick={refresh} disabled={isFetching}>
+        <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} aria-hidden />
+        {t('analytics.refresh')}
+      </Button>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <PageSkeleton maxWidth="max-w-none">
@@ -101,6 +207,7 @@ export default function AnalyticsPage() {
     return (
       <div className="p-4 lg:p-6">
         <PageHeader eyebrow={period} description={t('analytics.subtitle')} />
+        {picker}
         <ErrorState error={error} fallbackKey="analytics.loadFailed" onRetry={() => refetch()} />
       </div>
     );
@@ -113,38 +220,10 @@ export default function AnalyticsPage() {
       <PageHeader
         eyebrow={period}
         description={t('analytics.subtitle')}
-        actions={
-          <Button variant="outline" size="sm" onClick={refresh} disabled={isFetching}>
-            <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} aria-hidden />
-            {t('analytics.refresh')}
-          </Button>
-        }
+        actions={actions}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div
-          role="group"
-          aria-label={t('analytics.periodLabel')}
-          className="inline-flex border border-rail bg-card p-0.5"
-        >
-          {PERIODS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPeriod(p)}
-              aria-pressed={period === p}
-              className={cn(
-                'px-3 py-1.5 font-mono text-xs transition-colors',
-                period === p
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {t(`analytics.periods.${p}`)}
-            </button>
-          ))}
-        </div>
-      </div>
+      {picker}
 
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

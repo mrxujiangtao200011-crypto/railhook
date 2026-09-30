@@ -3591,9 +3591,29 @@ export interface paths {
         };
         /**
          * Get project analytics
-         * @description Returns detailed analytics with time series data
+         * @description Returns detailed analytics with time series data for a preset period or a custom from/to range of at most 90 days. Buckets are hourly up to two days, daily beyond.
          */
         get: operations["getProjectAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/projects/{projectId}/analytics/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export project analytics as CSV
+         * @description The same period or range as the analytics endpoint: one row per time bucket, then a blank line and one row per endpoint.
+         */
+        get: operations["exportProjectAnalytics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -13775,8 +13795,12 @@ export interface operations {
     getProjectAnalytics: {
         parameters: {
             query?: {
-                /** @description Time period: 24h, 7d, 30d */
+                /** @description Time period: 24h, 7d, 30d. Defaults to 24h */
                 period?: string;
+                /** @description Range start, ISO-8601 instant */
+                from?: string;
+                /** @description Range end, ISO-8601 instant */
+                to?: string;
             };
             header?: never;
             path: {
@@ -13794,6 +13818,33 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["AnalyticsResponse"];
                 };
+            };
+        };
+    };
+    exportProjectAnalytics: {
+        parameters: {
+            query?: {
+                /** @description Time period: 24h, 7d, 30d. Defaults to 24h */
+                period?: string;
+                /** @description Range start, ISO-8601 instant */
+                from?: string;
+                /** @description Range end, ISO-8601 instant */
+                to?: string;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

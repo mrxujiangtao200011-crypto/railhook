@@ -7710,7 +7710,9 @@ paths:
       tags:
       - Dashboard
       summary: Get project analytics
-      description: Returns detailed analytics with time series data
+      description: "Returns detailed analytics with time series data for a preset\
+        \ period or a custom from/to range of at most 90 days. Buckets are hourly\
+        \ up to two days, daily beyond."
       operationId: getProjectAnalytics
       parameters:
       - name: projectId
@@ -7721,11 +7723,24 @@ paths:
           format: uuid
       - name: period
         in: query
-        description: "Time period: 24h, 7d, 30d"
+        description: "Time period: 24h, 7d, 30d. Defaults to 24h"
         required: false
         schema:
           type: string
-          default: 24h
+      - name: from
+        in: query
+        description: "Range start, ISO-8601 instant"
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: "Range end, ISO-8601 instant"
+        required: false
+        schema:
+          type: string
+          format: date-time
       responses:
         "200":
           description: OK
@@ -7733,6 +7748,47 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AnalyticsResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/dashboard/projects/{projectId}/analytics/export:
+    get:
+      tags:
+      - Dashboard
+      summary: Export project analytics as CSV
+      description: "The same period or range as the analytics endpoint: one row per\
+        \ time bucket, then a blank line and one row per endpoint."
+      operationId: exportProjectAnalytics
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: period
+        in: query
+        description: "Time period: 24h, 7d, 30d. Defaults to 24h"
+        required: false
+        schema:
+          type: string
+      - name: from
+        in: query
+        description: "Range start, ISO-8601 instant"
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: "Range end, ISO-8601 instant"
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
       security:
       - bearerAuth: []
       - apiKey: []

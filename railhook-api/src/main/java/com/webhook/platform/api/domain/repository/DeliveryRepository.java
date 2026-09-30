@@ -37,7 +37,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
 
     @Query(value = """
         SELECT 
-            TO_CHAR(DATE_TRUNC('hour', d.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
+            TO_CHAR(DATE_TRUNC('hour', d.created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
             COUNT(*) as total,
             COUNT(*) FILTER (WHERE d.status = 'SUCCESS') as success,
             COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DLQ')) as failed
@@ -45,7 +45,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
         JOIN events e ON d.event_id = e.id
         WHERE d.organization_id = :organizationId
           AND e.project_id = :projectId AND d.created_at BETWEEN :from AND :to
-        GROUP BY DATE_TRUNC('hour', d.created_at)
+        GROUP BY DATE_TRUNC('hour', d.created_at AT TIME ZONE 'UTC')
         ORDER BY ts
         """, nativeQuery = true)
     List<Object[]> findDeliveryTimeSeriesByHour(
@@ -56,7 +56,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
 
     @Query(value = """
         SELECT 
-            TO_CHAR(DATE_TRUNC('day', d.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
+            TO_CHAR(DATE_TRUNC('day', d.created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
             COUNT(*) as total,
             COUNT(*) FILTER (WHERE d.status = 'SUCCESS') as success,
             COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DLQ')) as failed
@@ -64,7 +64,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
         JOIN events e ON d.event_id = e.id
         WHERE d.organization_id = :organizationId
           AND e.project_id = :projectId AND d.created_at BETWEEN :from AND :to
-        GROUP BY DATE_TRUNC('day', d.created_at)
+        GROUP BY DATE_TRUNC('day', d.created_at AT TIME ZONE 'UTC')
         ORDER BY ts
         """, nativeQuery = true)
     List<Object[]> findDeliveryTimeSeriesByDay(
