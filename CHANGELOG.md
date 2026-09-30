@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-09-30
+
 ### Added
 
 - `GET /api/v1/incoming-providers` lists the providers an incoming source can verify, with the header each signs in. The sources pages read their provider list from it.
