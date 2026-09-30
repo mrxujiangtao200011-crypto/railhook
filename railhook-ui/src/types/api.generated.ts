@@ -2746,6 +2746,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/workflows/schedule-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview workflow schedule
+         * @description The next three times a 5-field cron expression fires in the given time zone. Answers 400 with the reason when the schedule is not accepted.
+         */
+        get: operations["previewWorkflowSchedule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/usage": {
         parameters: {
             query?: never;
@@ -4146,6 +4166,8 @@ export interface components {
             /** Format: int32 */
             version?: number;
             /** Format: date-time */
+            nextRunAt?: string;
+            /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
@@ -4907,6 +4929,8 @@ export interface components {
             workflowId?: string;
             /** Format: uuid */
             triggerEventId?: string;
+            /** Format: date-time */
+            scheduledFor?: string;
             /** @enum {string} */
             status?: "RUNNING" | "WAITING" | "COMPLETED" | "FAILED" | "CANCELLED";
             triggerData?: unknown;
@@ -12656,6 +12680,31 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["WorkflowExecutionResponse"];
+                };
+            };
+        };
+    };
+    previewWorkflowSchedule: {
+        parameters: {
+            query: {
+                cron: string;
+                timezone?: string;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string[];
                 };
             };
         };

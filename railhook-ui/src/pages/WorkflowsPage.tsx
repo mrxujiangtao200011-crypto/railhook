@@ -173,6 +173,7 @@ export default function WorkflowsPage() {
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span className="font-mono">{t(`workflows.triggerTypes.${wf.triggerType}`)}</span>
+                  {wf.nextRunAt && <span>{t('workflows.nextRun', { date: formatDateTime(wf.nextRunAt) })}</span>}
                   <span className="font-mono">{t('workflows.builder.nodesCount', { count: wf.definition?.nodes?.length || 0 })}</span>
                   <span>{t('workflows.updated', { date: formatDateTime(wf.updatedAt) })}</span>
                 </div>
