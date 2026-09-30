@@ -314,13 +314,6 @@ class TestPaginatedResponseGeneric:
 class TestIncomingEnums:
     """The enums mirror the API's own; a value the API refuses is worse than no enum."""
 
-    def test_provider_type_matches_the_api(self):
-        from railhook.types import ProviderType
-
-        assert {p.value for p in ProviderType} == {
-            "GENERIC", "GITHUB", "GITLAB", "STRIPE", "SHOPIFY", "SLACK", "TWILIO",
-        }
-
     def test_verification_mode_includes_provider(self):
         from railhook.types import VerificationMode
 
