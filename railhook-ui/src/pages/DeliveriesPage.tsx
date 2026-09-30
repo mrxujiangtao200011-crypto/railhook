@@ -395,7 +395,7 @@ export default function DeliveriesPage() {
                         <Link
                           to={`/admin/projects/${projectId}/endpoints`}
                           onClick={(e) => e.stopPropagation()}
-                          className="block max-w-[260px] truncate font-mono text-[12px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="block max-w-[260px] truncate max-sm:leading-10 font-mono text-[12px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           title={getEndpointName(delivery.endpointId)}
                         >
                           {getEndpointName(delivery.endpointId)}
