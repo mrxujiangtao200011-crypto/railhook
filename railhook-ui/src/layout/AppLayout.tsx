@@ -17,8 +17,7 @@ import ChangeEmailForm from '../components/ChangeEmailForm';
 import DemoBanner from '../components/DemoBanner';
 import ProtectedRoute from '../auth/ProtectedRoute';
 import Sidebar from './Sidebar';
-import SectionTabs from './SectionTabs';
-import { requiredRoleFor, sectionFor } from './nav.config';
+import { requiredRoleFor, sectionFor, segmentOf } from './nav.config';
 import { useProjects } from '../api/queries';
 import { projectToOpen, rememberProject } from '../lib/lastProject';
 
@@ -50,6 +49,7 @@ export default function AppLayout() {
   }, [routeProjectId]);
   const needsVerification = user?.user?.status === 'PENDING_VERIFICATION';
   const section = sectionFor(location.pathname);
+  const currentTab = section?.tabs.find((tab) => tab.owns.includes(segmentOf(location.pathname)));
 
   useEffect(() => {
     authApi.getCurrentUser().then((freshUser) => {
@@ -148,7 +148,7 @@ export default function AppLayout() {
         {sidebarOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <div className="fixed inset-0 bg-foreground/30" onClick={() => setSidebarOpen(false)} />
-            <aside className="animate-slide-in-left fixed inset-y-0 left-0 w-64 border-r border-rail shadow-elevated">
+            <aside className="animate-slide-in-left fixed inset-y-0 left-0 w-72 max-w-[85vw] shadow-elevated">
               <Sidebar
                 projectId={projectId}
                 role={role}
@@ -171,7 +171,15 @@ export default function AppLayout() {
             </Button>
 
             {section && (
-              <h1 className="truncate text-[15px] font-medium">{t(section.nameKey)}</h1>
+              <p className="min-w-0 truncate text-[13px]">
+                {currentTab && currentTab.nameKey !== section.nameKey ? (
+                  <>
+                    <span className="text-muted-foreground max-sm:hidden">{t(section.nameKey)}</span>
+                    <span className="px-1.5 text-muted-foreground max-sm:hidden">/</span>
+                    <span className="font-medium">{t(currentTab.nameKey)}</span>
+                  </>
+                ) : <span className="font-medium">{t(section.nameKey)}</span>}
+              </p>
             )}
 
             <div className="flex-1" />
@@ -201,7 +209,7 @@ export default function AppLayout() {
             </div>
           </header>
 
-          <SectionTabs projectId={projectId} role={role} />
+
 
           {isDemo && <DemoBanner onStartFree={handleStartFree} onExit={handleLogout} />}
 

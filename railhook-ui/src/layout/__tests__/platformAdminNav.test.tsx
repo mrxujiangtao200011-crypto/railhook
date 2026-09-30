@@ -39,9 +39,11 @@ describe('the platform admin entry', () => {
     expect(screen.queryByRole('link', { name: 'Platform admin' })).not.toBeInTheDocument();
   });
 
-  it('is marked current anywhere inside the panel', () => {
+  it('turns the sidebar into the panel’s own navigation, with a way back', () => {
     renderSidebar(true, '/admin/platform/organizations/org-9');
-    expect(screen.getByRole('link', { name: 'Platform admin' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Organizations' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Back to workspace' })).toHaveAttribute('href', '/admin/dashboard');
   });
 });
 

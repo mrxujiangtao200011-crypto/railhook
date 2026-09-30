@@ -91,7 +91,7 @@ export default function OrganizationSwitcher({ collapsed }: { collapsed?: boolea
                 className={cn(
                   'flex w-full items-center gap-2.5 px-2 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60',
                   current
-                    ? 'bg-accent font-medium text-accent-foreground'
+                    ? 'bg-secondary text-foreground'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 )}
               >

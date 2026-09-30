@@ -2329,7 +2329,9 @@
     "tunnels": "Тунелі",
     "usage": "Використання",
     "workflows": "Воркфлоу",
-    "consumers": "Споживачі"
+    "consumers": "Споживачі",
+    "adminZone": "Адмін",
+    "backToWorkspace": "Назад до робочого простору"
   },
   "notFound": {
     "backToDashboard": "Повернутися до панелі",

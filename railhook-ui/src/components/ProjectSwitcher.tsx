@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useProjects } from '../api/queries';
+import { useAuth } from '../auth/auth.store';
 import { cn } from '../lib/utils';
 
 interface ProjectSwitcherProps {
@@ -17,6 +18,7 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
   const navigate = useNavigate();
   const location = useLocation();
   const { data: projects = [] } = useProjects();
+  const organizationName = useAuth().user?.organization?.name;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -95,7 +97,7 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
                 onClick={() => handleSwitch(project.id)}
                 className={cn(
                   'flex w-full items-center gap-2.5 px-2 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  current ? 'bg-accent font-medium text-accent-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  current ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 )}
               >
                 <span
@@ -154,19 +156,13 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
         aria-expanded={open}
         aria-label={t('nav.currentProject', { name: label })}
         className={cn(
-          'flex w-full items-center gap-2.5 border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          open ? 'border-primary/50 bg-secondary/60' : 'border-rail hover:bg-secondary/60'
+          'flex w-full items-center gap-2.5 px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-lg:min-h-11',
+          open ? 'bg-secondary' : 'hover:bg-secondary'
         )}
       >
-        <span
-          aria-hidden
-          className="flex h-7 w-7 flex-shrink-0 items-center justify-center bg-primary font-mono text-[13px] font-medium text-primary-foreground"
-        >
-          {initial}
-        </span>
         <span className="min-w-0 flex-1">
-          <span className="mono-label block leading-none">{t('nav.project')}</span>
-          <span className="mt-0.5 block truncate text-[13px] font-medium leading-tight">{label}</span>
+          <span className="block truncate text-[12px] leading-tight text-muted-foreground">{organizationName ?? t('nav.project')}</span>
+          <span className="mt-0.5 block truncate text-[13px] leading-tight text-foreground">{label}</span>
         </span>
         <ChevronsUpDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
       </button>

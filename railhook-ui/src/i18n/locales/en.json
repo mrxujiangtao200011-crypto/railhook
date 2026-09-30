@@ -2329,7 +2329,9 @@
     "tunnels": "Tunnels",
     "usage": "Usage",
     "workflows": "Workflows",
-    "consumers": "Consumers"
+    "consumers": "Consumers",
+    "adminZone": "Admin",
+    "backToWorkspace": "Back to workspace"
   },
   "notFound": {
     "backToDashboard": "Back to Dashboard",
