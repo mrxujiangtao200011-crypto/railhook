@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
-import { Card } from '../ui/card';
 import { ErrorState } from '../EmptyState';
 import ChartLegend, { type LegendItem } from './ChartLegend';
 
@@ -31,8 +30,8 @@ export default function ChartCard({
   const { t } = useTranslation();
 
   return (
-    <Card className={cn('flex flex-col overflow-hidden', className)}>
-      <div className="flex flex-wrap items-start justify-between gap-3 px-5 pb-3 pt-5">
+    <section className={cn('flex min-w-0 flex-col border-t border-rail', className)}>
+      <div className="flex flex-wrap items-start justify-between gap-3 pb-3 pt-4">
         <div className="min-w-0">
           {eyebrow && <div className="mono-label mb-1">{eyebrow}</div>}
           <h3 className="text-sm font-medium leading-tight">{title}</h3>
@@ -41,9 +40,9 @@ export default function ChartCard({
         {action && <div className="flex flex-shrink-0 items-center gap-2">{action}</div>}
       </div>
 
-      {legend && legend.length > 1 && <ChartLegend items={legend} className="px-5 pb-3" />}
+      {legend && legend.length > 1 && <ChartLegend items={legend} className="pb-3" />}
 
-      <div className={cn('relative px-2 pb-4', bodyClass)}>
+      <div className={cn('relative -mx-2 pb-4', bodyClass)}>
         {error ? (
           <ErrorState
             error={error}
@@ -63,6 +62,6 @@ export default function ChartCard({
           </div>
         )}
       </div>
-    </Card>
+    </section>
   );
 }

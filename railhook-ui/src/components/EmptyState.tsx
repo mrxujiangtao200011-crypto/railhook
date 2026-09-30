@@ -19,17 +19,17 @@ interface EmptyStateProps {
 export default function EmptyState({ icon: Icon, title, description, action, docsLink, className }: EmptyStateProps) {
   const { t, i18n } = useTranslation();
   return (
-    <div className={cn('flex flex-col items-center justify-center border border-dashed border-rail py-16', className)}>
-      <div className="mb-5 flex h-11 w-11 items-center justify-center border border-rail bg-card">
-        <Icon className="h-5 w-5 text-muted-foreground" />
-      </div>
-      <h3 className="mb-1.5 text-[15px] font-medium">{title}</h3>
+    <div className={cn('flex flex-col items-start border-t border-rail py-10', className)}>
+      <h3 className="flex items-center gap-2 text-[15px] font-normal">
+        <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden />
+        {title}
+      </h3>
       {description && (
-        <p className="mb-5 max-w-sm text-center text-sm text-muted-foreground">{description}</p>
+        <p className="mt-1 max-w-xl text-[13px] text-muted-foreground">{description}</p>
       )}
-      {action && <div className="mb-3">{action}</div>}
+      {action && <div className="mt-4">{action}</div>}
       {docsLink && (
-        <a href={docsUrl(i18n.language, docsLink)} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <a href={docsUrl(i18n.language, docsLink)} className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground sm:min-h-0">
           <BookOpen className="h-3.5 w-3.5" />
           {t('common.learnMore')}
         </a>
@@ -67,13 +67,13 @@ export function ErrorState({
     <div
       data-testid={testId}
       role="alert"
-      className={className ?? 'flex flex-col items-center justify-center border border-dashed border-halt/30 py-16'}
+      className={className ?? 'flex flex-col items-start border-t border-rail py-10'}
     >
-      <div className="mb-5 flex h-11 w-11 items-center justify-center border border-halt/30 bg-halt-soft">
-        <AlertTriangle className="h-5 w-5 text-halt" />
-      </div>
-      <h3 className="mb-1.5 text-[15px] font-medium">{title ?? t('common.loadErrorTitle')}</h3>
-      <p className="mb-5 max-w-sm text-center text-sm text-muted-foreground">{resolvedDescription}</p>
+      <h3 className="flex items-center gap-2 text-[15px] font-normal text-halt">
+        <AlertTriangle className="h-4 w-4 flex-shrink-0" aria-hidden />
+        {title ?? t('common.loadErrorTitle')}
+      </h3>
+      <p className="mb-4 mt-1 max-w-xl text-[13px] text-muted-foreground">{resolvedDescription}</p>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry} disabled={retrying}>
           <RefreshCw className={`h-3.5 w-3.5 ${retrying ? 'animate-spin' : ''}`} />

@@ -171,7 +171,7 @@ export default function AppLayout() {
             </Button>
 
             {section && (
-              <p className="min-w-0 truncate text-[13px]">
+              <h1 className="min-w-0 truncate text-[13px] font-normal">
                 {currentTab && currentTab.nameKey !== section.nameKey ? (
                   <>
                     <span className="text-muted-foreground max-sm:hidden">{t(section.nameKey)}</span>
@@ -179,7 +179,7 @@ export default function AppLayout() {
                     <span className="font-medium">{t(currentTab.nameKey)}</span>
                   </>
                 ) : <span className="font-medium">{t(section.nameKey)}</span>}
-              </p>
+              </h1>
             )}
 
             <div className="flex-1" />

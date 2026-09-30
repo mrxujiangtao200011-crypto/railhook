@@ -143,11 +143,9 @@
 
 @layer utilities {
   .mono-label {
-    font-family: theme('fontFamily.mono');
-    font-size: 0.6875rem;
+    font-family: theme('fontFamily.sans');
+    font-size: 0.75rem;
     font-weight: 400;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
     color: hsl(var(--muted-foreground));
   }
 
@@ -309,8 +307,7 @@
   .rh-table-stack > table > tbody > tr > td[data-label]::before {
     content: attr(data-label);
     flex-shrink: 0; max-width: 40%; text-align: left;
-    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 400;
-    letter-spacing: 0.08em; text-transform: uppercase; color: hsl(var(--muted-foreground));
+    font-size: 12px; font-weight: 400; color: hsl(var(--muted-foreground));
   }
   .rh-table-stack > table > tbody > tr > td[data-label] > * { min-width: 0; max-width: 100%; }
   .rh-table-stack > table > tbody > tr > td[data-label]:has(> :nth-child(2)) {
