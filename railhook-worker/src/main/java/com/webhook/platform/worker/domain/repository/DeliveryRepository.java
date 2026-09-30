@@ -16,7 +16,7 @@ import java.util.UUID;
 @Repository
 public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
 
-    /** Capped per endpoint so one backlog cannot fill a batch; a timed-out claim is retaken under a new token. */
+    /** An endpoint gets only its free concurrency, so nothing claimed is deferred for want of a permit. */
     @Query(value = """
             WITH RECURSIVE due_endpoints AS (
                 (SELECT d.endpoint_id, 1 AS n FROM deliveries d
@@ -38,7 +38,10 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
                     SELECT d.id FROM deliveries d
                     WHERE d.endpoint_id = e.endpoint_id AND d.status IN ('PENDING', 'PROCESSING')
                       AND d.next_retry_at <= :now
-                    ORDER BY d.next_retry_at LIMIT :perEndpoint
+                    ORDER BY d.next_retry_at
+                    LIMIT GREATEST(0, :perEndpoint - (SELECT count(*) FROM deliveries f
+                        WHERE f.endpoint_id = e.endpoint_id AND f.status = 'PROCESSING'
+                          AND f.next_retry_at > :now))
                     FOR UPDATE SKIP LOCKED) p
                 LIMIT :limit
             )

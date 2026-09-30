@@ -3,6 +3,11 @@
 Only the releases that need something from you are listed. Everything else upgrades with
 `./railhook upgrade` (Compose) or `helm upgrade`.
 
+## v3.2.0
+
+- `V001__schema.sql` changed (time columns are `timestamptz`), so a database created by 3.1.0 will
+  not start. Recreate it the same way as for 3.1.0 below.
+
 ## v3.1.0
 
 - The migration history starts again at `V001__schema.sql`, so a database created by an earlier

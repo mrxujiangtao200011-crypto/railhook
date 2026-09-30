@@ -603,12 +603,6 @@
           "description": "Seconds after which a claimed row whose worker has not finished is claimed again; keep above 60s plus transformation time."
         },
         {
-          "name": "WEBHOOK_CLAIM_PER_TARGET",
-          "default": "5",
-          "example": null,
-          "description": "Rows one poll takes from each endpoint or destination, so one backlog cannot fill the batch."
-        },
-        {
           "name": "WEBHOOK_CLAIM_MAX_TARGETS",
           "default": "500",
           "example": null,

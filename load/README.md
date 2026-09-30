@@ -63,14 +63,24 @@ Look for:
 - Memory: `*_jvm_used_mb` with a rising floor after GC.
 - Redis: `redis_dbsize` that keeps growing after traffic drops. All expected keys have TTLs.
 
-## Target numbers
+## Measured numbers
 
-No numbers have been measured on real hardware yet. Run the scenarios on a machine not shared
-with other work and fill this in.
+Measured on 2026-09-30 against 3.2.0 with `make up`: api, worker, Postgres 16, Redis, UI and the
+receiver on one laptop (Intel i5-11320H, 8 threads, 15 GB RAM, Docker 20.10), k6 0.54 on the same
+machine. Default pool sizes. The per-project guards were raised so they would not be the limit:
+`EVENT_INGESTION_RATE_LIMIT_PER_SECOND=2000`, `WEBHOOK_PROJECT_RATE_LIMIT_PER_SECOND=2000`,
+`WEBHOOK_MAX_CONCURRENT_PER_TENANT=200`, `ENTITLEMENT_DEFAULT_RATE_LIMIT=2000`.
+`WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT` stayed at 5. Delivery times are `succeeded_at - created_at`
+from the database.
 
-| Metric | Observed | Conditions |
-|---|---|---|
-| Events ingested/sec | | RPS, VUs, hardware |
-| Deliveries/sec | | endpoint count, ordering on/off |
-| p99 end-to-end latency | | healthy endpoint, no backlog |
-| Delivery backlog onset | | RPS at which due deliveries stop draining |
+| Scenario | Result |
+|---|---|
+| `ingest.js`, 100 events/s for 2 min, one endpoint | 12,000 accepted, 0 errors, API p99 27 ms. Delivered as fast as ingested: p50 23 ms, p99 2.9 s, backlog empty 1 s after the run |
+| `ingest.js`, 300 events/s for 1 min, one endpoint | 18,000 accepted, 0 errors, API p99 30 ms. One endpoint drains at 211 deliveries/s (5 concurrent requests), so a backlog builds above that |
+| `fanout.js`, 200 events × 50 endpoints | 10,000 deliveries in 12.6 s, about 790/s, all on the first attempt |
+| `ordering.js`, 20 ordered deliveries, the first forced into a retry | 0 out of order; the other 19 waited for the retry (about 87 s, the first rung) |
+| `failure-recovery.js`, endpoint healthy, slow, down 2 min, back | 2,701 events, 2,701 delivered exactly once, 0 duplicates, backlog empty 5 min after recovery |
+
+The single-endpoint ceiling is the per-endpoint concurrency limit, not the queue: raising
+`WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT` raises it, at the cost of more parallel requests to one
+receiver.

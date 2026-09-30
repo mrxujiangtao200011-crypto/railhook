@@ -139,6 +139,23 @@ class DeliveryRepositoryTest {
         assertTrue(claimed.stream().anyMatch(d -> d.getId().equals(quiet.getId())));
     }
 
+    // Claiming past an endpoint's concurrency deferred the extra rows for up to a minute.
+    @Test
+    void claimDue_takesOnlyTheEndpointsFreeConcurrency() {
+        createSharedEndpoint();
+        Instant now = Instant.now();
+        for (int i = 0; i < 3; i++) {
+            createAndPersistDelivery(DeliveryStatus.PROCESSING, now.plusSeconds(300));
+        }
+        for (int i = 0; i < 10; i++) {
+            createAndPersistDelivery(DeliveryStatus.PENDING, now.minusSeconds(1 + i));
+        }
+        entityManager.flush();
+        entityManager.clear();
+
+        assertEquals(2, deliveryRepository.claimDue(now, now.plusSeconds(300), FROM_START, 10, 5, 10).size());
+    }
+
     @Test
     void claimDue_resumesAfterTheCursor() {
         createSharedEndpoint();

@@ -9,4 +9,4 @@
 # is a `flyway repair` in production rather than anything in this branch. Write a
 # new migration instead. See the class javadoc for the one case where changing a
 # line is legitimate.
-V001__schema.sql  74f64e61840c2bdfc0a69ef071db916a38119708448179d2720368250ec7f40e
+V001__schema.sql  caaf92d74b04818e0359c660080d8a3eeb1f897a620a8821e315c3c5f3efc0b2

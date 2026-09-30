@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A claim takes from an endpoint or destination only its free concurrency (`WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT` minus what is in flight), and the worker polls again at once after a partial batch. Before, one endpoint was held to about 25 deliveries per second and extra claims were deferred for up to a minute. `WEBHOOK_CLAIM_PER_TARGET` is removed.
+- Every time column is `timestamptz`. 72 columns were `timestamp` without a zone, which read correctly only while the database session ran in UTC. Partition bounds and the daily statistics buckets are fixed to UTC explicitly.
+
 ## [3.1.0] - 2026-09-30
 
 ### Changed
