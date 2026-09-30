@@ -47,7 +47,7 @@ Railhook порівняно зі Svix, Hookdeck, Convoy і Hook0 за тим, щ
 ### Чого в Railhook немає
 
 - **Портал для клієнтів ще молодий.** Вигляд налаштовується лише кольором бренду, логотипом, світлою чи темною темою та мовою. Немає власного CSS, власного домену порталу й перегляду схем із каталогу подій.
-- **Доставка лише через HTTP.** Призначень SQS, S3, EventBridge, Pub/Sub, RabbitMQ чи Kafka немає.
+- **Доставка лише через HTTP.** Призначень SQS, S3, EventBridge, Pub/Sub чи RabbitMQ немає.
 - **Немає SSO (SAML чи OIDC) і SCIM.**
 - **Немає OpenTelemetry.** Метрики Prometheus детальні, але трейсів немає.
 - **Три фіксовані ролі й два рівні доступу для API-ключів.** Власних ролей і дозволів на окремі ресурси немає.
@@ -66,7 +66,7 @@ Railhook порівняно зі Svix, Hookdeck, Convoy і Hook0 за тим, щ
 
 ## Hookdeck
 
-- **Outpost** є відкритим продуктом Hookdeck під Apache-2.0 для надсилання подій. Він доставляє у вебхуки, Hookdeck Event Gateway, Amazon EventBridge, AWS SQS, AWS S3, GCP Pub/Sub, RabbitMQ і Kafka, має портал користувача, а також трейси, метрики й логи OpenTelemetry. ([hookdeck/outpost](https://github.com/hookdeck/outpost))
+- **Outpost** є відкритим продуктом Hookdeck під Apache-2.0 для надсилання подій. Він доставляє у вебхуки, Hookdeck Event Gateway, Amazon EventBridge, AWS SQS, AWS S3, GCP Pub/Sub і RabbitMQ, має портал користувача, а також трейси, метрики й логи OpenTelemetry. ([hookdeck/outpost](https://github.com/hookdeck/outpost))
 - **Event Gateway** приймає вебхуки на URL джерела й через з'єднання спрямовує їх до призначень, із фільтрами, трансформаціями, дедуплікацією та повторними спробами. ([Документація Hookdeck](https://hookdeck.com/docs/sources))
 
 **Обирайте Hookdeck**, якщо приймачі ваших клієнтів є чергами чи хмарними шинами подій, а не HTTP-сервісами. Туди Railhook доставляти не вміє.
