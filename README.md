@@ -28,18 +28,25 @@ GitHub and others, with retries, signatures and a record of every attempt. Self-
 
 ## Install
 
-With Docker and Compose (about 4 GiB of RAM):
+Locally, with Docker:
 
 ```bash
-curl -fsSL https://railhook.io/install.sh | bash
-# on a server with a domain, with HTTPS:
+git clone https://github.com/vadymkykalo/railhook && cd railhook
+make up
+```
+
+Then open http://localhost:8080. `make up` writes a `.env` with development secrets, builds the
+images and starts PostgreSQL, Redis, the API, the worker and the dashboard.
+
+On a server with a domain (HTTPS through Let's Encrypt):
+
+```bash
 curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
 ```
 
-The installer checks the machine, generates the secrets into `.env`, pins the latest release,
-starts the stack and adds a `./railhook` helper (`status`, `logs`, `upgrade`, `backup`, `doctor`).
-To do the same by hand with `docker compose`, or to install on Kubernetes with the Helm chart, see
-[Install with Docker](https://railhook.io/docs/self-hosting/install-docker/) and
+It generates the secrets, pulls the latest release and adds `./railhook` for `status`, `logs`,
+`upgrade` and `backup`. About 3 GiB of RAM. Plain Compose and Helm:
+[Install with Docker](https://railhook.io/docs/self-hosting/install-docker/),
 [Kubernetes](https://railhook.io/docs/self-hosting/kubernetes/).
 
 ## Send an event
