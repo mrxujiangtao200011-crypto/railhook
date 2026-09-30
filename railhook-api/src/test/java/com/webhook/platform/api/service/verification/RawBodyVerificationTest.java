@@ -1,5 +1,9 @@
 package com.webhook.platform.api.service.verification;
 
+import com.webhook.platform.api.service.ingress.provider.GitHubProvider;
+import com.webhook.platform.api.service.ingress.provider.StripeProvider;
+import com.webhook.platform.api.service.ingress.provider.SlackProvider;
+import com.webhook.platform.api.service.ingress.provider.ShopifyProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,7 +58,7 @@ class RawBodyVerificationTest {
         HttpServletRequest r = request("application/json; charset=iso-8859-1");
         ((MockHttpServletRequest) r).addHeader("X-Hub-Signature-256", "sha256=" + hmacHex(SECRET, BODY));
 
-        assertThat(new GitHubVerifier().verify(SECRET, BODY, r).verified()).isTrue();
+        assertThat(new GitHubProvider().verify(SECRET, BODY, r).verified()).isTrue();
     }
 
     @Test
@@ -69,7 +73,7 @@ class RawBodyVerificationTest {
             throw new IllegalStateException(e);
         }
 
-        assertThat(new ShopifyVerifier().verify(SECRET, BODY, r).verified()).isTrue();
+        assertThat(new ShopifyProvider().verify(SECRET, BODY, r).verified()).isTrue();
     }
 
     @Test
@@ -79,7 +83,7 @@ class RawBodyVerificationTest {
         MockHttpServletRequest r = request("application/json; charset=iso-8859-1");
         r.addHeader("Stripe-Signature", "t=" + ts + ",v1=" + hmacHex(SECRET, prefixed(ts + ".", BODY)));
 
-        assertThat(new StripeVerifier().verify(SECRET, BODY, r).verified()).isTrue();
+        assertThat(new StripeProvider().verify(SECRET, BODY, r).verified()).isTrue();
     }
 
     @Test
@@ -90,7 +94,7 @@ class RawBodyVerificationTest {
         r.addHeader("X-Slack-Request-Timestamp", String.valueOf(ts));
         r.addHeader("X-Slack-Signature", "v0=" + hmacHex(SECRET, prefixed("v0:" + ts + ":", BODY)));
 
-        assertThat(new SlackVerifier().verify(SECRET, BODY, r).verified()).isTrue();
+        assertThat(new SlackProvider().verify(SECRET, BODY, r).verified()).isTrue();
     }
 
     @Test
@@ -120,6 +124,6 @@ class RawBodyVerificationTest {
         HttpServletRequest r = request("application/json; charset=iso-8859-1");
         ((MockHttpServletRequest) r).addHeader("X-Hub-Signature-256", "sha256=" + hmacHex(SECRET, reEncoded()));
 
-        assertThat(new GitHubVerifier().verify(SECRET, BODY, r).verified()).isFalse();
+        assertThat(new GitHubProvider().verify(SECRET, BODY, r).verified()).isFalse();
     }
 }

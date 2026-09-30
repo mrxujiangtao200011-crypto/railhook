@@ -8,7 +8,6 @@ import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.GdprExportDto;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -145,7 +144,7 @@ class GdprExportServiceTest {
         UUID sourceId = UUID.randomUUID();
         IncomingSource source = IncomingSource.builder()
                 .id(sourceId).projectId(projectId).name("GitHub").slug("github")
-                .providerType(ProviderType.GITHUB).verificationMode(VerificationMode.HMAC_GENERIC)
+                .providerType("GITHUB").verificationMode(VerificationMode.HMAC_GENERIC)
                 .status(IncomingSourceStatus.ACTIVE).ingressPathToken("tok")
                 .createdAt(Instant.now()).build();
         when(incomingSourceRepository.findByProjectId(eq(projectId), any(Pageable.class)))

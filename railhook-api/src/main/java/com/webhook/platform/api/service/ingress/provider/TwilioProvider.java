@@ -1,6 +1,8 @@
-package com.webhook.platform.api.service.verification;
+package com.webhook.platform.api.service.ingress.provider;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -15,14 +17,36 @@ import lombok.RequiredArgsConstructor;
 
 // Non-form requests sign only the URL, so its bodySHA256 must be checked or the body could be
 // swapped. The URL comes from ingress-base-url, not Host headers, which break behind a proxy.
+@Component
 @RequiredArgsConstructor
-public class TwilioVerifier implements WebhookVerificationStrategy {
+public class TwilioProvider implements InboundProvider {
 
     private static final String SIGNATURE_HEADER = "X-Twilio-Signature";
     private static final String BODY_HASH_PARAM = "bodySHA256";
     private static final String FORM_CONTENT_TYPE = "application/x-www-form-urlencoded";
 
+    @Value("${webhook.ingress-base-url:}")
     private final String ingressBaseUrl;
+
+    @Override
+    public String id() {
+        return "TWILIO";
+    }
+
+    @Override
+    public String displayName() {
+        return "Twilio";
+    }
+
+    @Override
+    public String signatureHeader() {
+        return SIGNATURE_HEADER;
+    }
+
+    @Override
+    public String eventId(HttpServletRequest request, String body) {
+        return request.getHeader("I-Twilio-Idempotency-Token");
+    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

@@ -1,6 +1,5 @@
 package com.webhook.platform.api.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingEvent;
@@ -9,7 +8,6 @@ import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
@@ -20,6 +18,7 @@ import com.webhook.platform.common.demo.DemoTenant;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 import com.webhook.platform.api.service.ingress.IngressOutcome;
+import com.webhook.platform.api.service.ingress.provider.InboundProvider;
 import com.webhook.platform.api.exception.OrganizationSuspendedException;
 import com.webhook.platform.api.exception.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.ProviderEventIdExtractor;
@@ -50,6 +49,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -146,16 +146,17 @@ public class IngressService {
             throw new SignatureVerificationFailedException("Signature verification failed: " + reason);
         }
 
-        // A handshake, never stored. Echoed only when verified, so nobody can claim another's URL.
-        if (source.getProviderType() == ProviderType.SLACK && Boolean.TRUE.equals(verification.verified())) {
-            String challenge = slackUrlVerificationChallenge(meta.body());
-            if (challenge != null) {
-                log.info("Answered Slack url_verification: sourceId={}", source.getId());
-                return new IngressOutcome.SlackUrlVerification(challenge);
+        InboundProvider provider = verifierFactory.provider(source.getProviderType()).orElse(null);
+
+        if (provider != null && Boolean.TRUE.equals(verification.verified())) {
+            Optional<String> handshake = provider.handshake(meta.body());
+            if (handshake.isPresent()) {
+                log.info("Answered {} handshake: sourceId={}", provider.id(), source.getId());
+                return new IngressOutcome.Handshake(handshake.get());
             }
         }
 
-        String providerEventId = ProviderEventIdExtractor.extract(request, meta.body());
+        String providerEventId = ProviderEventIdExtractor.extract(provider, request, meta.body());
 
         // Before quota and replay checks, so a same-signature resend is not refused; after
         // verification, so a forged request cannot probe which ids exist.
@@ -191,24 +192,6 @@ public class IngressService {
             releaseReplayMarkerAfterFailedPersist(source, verification, providerEventId);
             throw e;
         }
-    }
-
-    private String slackUrlVerificationChallenge(String body) {
-        if (body == null || body.isBlank()) {
-            return null;
-        }
-        try {
-            JsonNode root = objectMapper.readTree(body);
-            JsonNode type = root.get("type");
-            JsonNode challenge = root.get("challenge");
-            if (type != null && "url_verification".equals(type.asText())
-                    && challenge != null && challenge.isTextual() && !challenge.asText().isEmpty()) {
-                return challenge.asText();
-            }
-        } catch (Exception e) {
-            log.debug("Slack body is not JSON, so not a url_verification: {}", e.getMessage());
-        }
-        return null;
     }
 
     private IncomingSource resolveActiveSource(String token) {
@@ -398,7 +381,7 @@ public class IngressService {
         event = eventRepository.save(event);
 
         meterRegistry.counter("incoming_events_received_total",
-                "provider_type", source.getProviderType().name()).increment();
+                "provider_type", source.getProviderType()).increment();
 
         log.debug("Received incoming webhook: eventId={}, sourceId={}, requestId={}, verified={}",
                 event.getId(), source.getId(), meta.requestId(), verification.verified());

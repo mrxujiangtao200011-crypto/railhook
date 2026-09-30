@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `GET /api/v1/incoming-providers` lists the providers an incoming source can verify, with the header each signs in. The sources pages read their provider list from it.
+
+### Changed
+
+- An inbound provider is one class implementing `InboundProvider`. Adding one no longer touches the API schema, the UI or the SDKs; `CONTRIBUTING.md` has the steps.
+- An incoming webhook is deduplicated by the event id of the provider its source names. A `GENERIC` source is keyed only by `X-Webhook-Id`; before, it also picked up Stripe, GitHub and other provider ids from whatever headers arrived.
+- `providerType` is a string in the OpenAPI spec rather than an enum, and an unknown value is refused with `400`.
+- The ingress handshake answer (Slack's `url_verification`) is documented as a plain JSON object; the `SlackUrlVerificationResponse` schema is gone.
+
+### Removed
+
+- The `ProviderType` type in the Node SDK and the `ProviderType` enum in the Python SDK. Both were already missing providers; `providerType` is a string.
+
 ## [3.2.1] - 2026-09-30
 
 ### Changed

@@ -5,7 +5,7 @@ import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { IncomingSourceResponse } from '../../types/api.types';
 
 vi.mock('../../api/incomingSources.api', () => ({
-  incomingSourcesApi: { get: vi.fn(), list: vi.fn() },
+  incomingSourcesApi: { get: vi.fn(), list: vi.fn(), providers: vi.fn() },
 }));
 vi.mock('../../api/incomingDestinations.api', () => ({
   incomingDestinationsApi: { list: vi.fn() },
@@ -50,6 +50,9 @@ describe('IncomingSourceDetailPage — how a request is signed', () => {
       { content: [], totalElements: 0, totalPages: 0, size: 20, number: 0 } as never,
     );
     vi.mocked(transformationsApi.list).mockResolvedValue([] as never);
+    vi.mocked(incomingSourcesApi.providers).mockResolvedValue([
+      { id: 'STRIPE', displayName: 'Stripe', signatureHeader: 'Stripe-Signature' },
+    ]);
   });
 
   it('names the provider\'s own header and says to send a test from the provider, not an unsigned cURL', async () => {

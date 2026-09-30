@@ -118,6 +118,7 @@ export const queryKeys = {
     auditLog: {
         list: (page: number, size: number, filters?: AuditLogFilters) => ['audit-log', page, size, filters] as const,
     },
+    incomingProviders: ['incoming-providers'] as const,
     incomingSources: {
         list: (projectId: string, page: number, size: number) => ['incoming-sources', projectId, page, size] as const,
         all: (projectId: string) => ['incoming-sources', projectId] as const,
@@ -577,6 +578,14 @@ export function useAuditLog(page: number, size = 20, filters?: AuditLogFilters) 
     return useQuery({
         queryKey: queryKeys.auditLog.list(page, size, filters),
         queryFn: () => auditLogApi.list(page, size, filters),
+    });
+}
+
+export function useIncomingProviders() {
+    return useQuery({
+        queryKey: queryKeys.incomingProviders,
+        queryFn: () => incomingSourcesApi.providers(),
+        staleTime: Infinity,
     });
 }
 

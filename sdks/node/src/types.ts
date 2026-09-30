@@ -180,7 +180,6 @@ export interface WebhookEvent {
   data: Record<string, unknown>;
 }
 
-export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO';
 /** `HMAC_GENERIC` checks your own header and prefix; `PROVIDER` uses the source's `providerType` scheme. */
 export type VerificationMode = 'NONE' | 'HMAC_GENERIC' | 'PROVIDER';
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
@@ -191,7 +190,7 @@ export interface IncomingSource {
   projectId: string;
   name: string;
   slug: string;
-  providerType: ProviderType;
+  providerType: string;
   status: IncomingSourceStatus;
   ingressPathToken: string;
   ingressUrl: string;
@@ -207,7 +206,7 @@ export interface IncomingSource {
 export interface IncomingSourceCreateParams {
   name: string;
   slug?: string;
-  providerType?: ProviderType;
+  providerType?: string;
   verificationMode?: VerificationMode;
   hmacSecret?: string;
   hmacHeaderName?: string;
@@ -218,7 +217,7 @@ export interface IncomingSourceCreateParams {
 export interface IncomingSourceUpdateParams {
   name?: string;
   slug?: string;
-  providerType?: ProviderType;
+  providerType?: string;
   status?: IncomingSourceStatus;
   verificationMode?: VerificationMode;
   hmacSecret?: string;

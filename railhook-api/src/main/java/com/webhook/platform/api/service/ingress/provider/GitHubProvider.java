@@ -1,15 +1,38 @@
-package com.webhook.platform.api.service.verification;
+package com.webhook.platform.api.service.ingress.provider;
 
+import com.webhook.platform.api.service.verification.GenericHmacVerifier;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 /** {@code X-Hub-Signature-256: sha256=<hex hmac-sha256>} over the raw body. */
-public class GitHubVerifier implements WebhookVerificationStrategy {
+@Component
+public class GitHubProvider implements InboundProvider {
 
     private static final String HEADER = "X-Hub-Signature-256";
     private static final String PREFIX = "sha256=";
+
+    @Override
+    public String id() {
+        return "GITHUB";
+    }
+
+    @Override
+    public String displayName() {
+        return "GitHub";
+    }
+
+    @Override
+    public String signatureHeader() {
+        return HEADER;
+    }
+
+    @Override
+    public String eventId(HttpServletRequest request, String body) {
+        return request.getHeader("X-GitHub-Delivery");
+    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

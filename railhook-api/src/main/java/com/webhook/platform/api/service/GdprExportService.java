@@ -158,7 +158,7 @@ public class GdprExportService {
                         .id(s.getId())
                         .name(s.getName())
                         .slug(s.getSlug())
-                        .providerType(s.getProviderType().name())
+                        .providerType(s.getProviderType())
                         .verificationMode(s.getVerificationMode().name())
                         .status(s.getStatus().name())
                         .createdAt(s.getCreatedAt())

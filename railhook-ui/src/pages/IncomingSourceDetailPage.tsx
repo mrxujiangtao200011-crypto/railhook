@@ -14,13 +14,13 @@ import StatusBadge from '../components/StatusBadge';
 import AttemptRail from '../components/AttemptRail';
 import RetryJitterNote from '../components/RetryJitterNote';
 import { ladderTicks } from './ConnectionSetupPage';
-import { PROVIDER_SIGNATURE_HEADERS } from '../lib/publicSnippets';
+import { providerLabel } from '../lib/providerLabel';
 import type {
   IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType, IncomingSourceResponse,
 } from '../types/api.types';
 import { transformApi } from '../api/transform.api';
 import {
-  useTransformations, useIncomingSource, useIncomingDestinations,
+  useTransformations, useIncomingProviders, useIncomingSource, useIncomingDestinations,
   useCreateIncomingDestination, useUpdateIncomingDestination, useDeleteIncomingDestination,
 } from '../api/queries';
 import { Button } from '../components/ui/button';
@@ -45,12 +45,9 @@ import ConfirmDialog from '../components/ConfirmDialog';
 const AUTH_TYPES: IncomingAuthType[] = ['NONE', 'BEARER', 'BASIC', 'CUSTOM_HEADER'];
 
 /** Provider-verified sources are checked against the provider's own header, not X-Signature. */
-function signatureHeaderOf(source: IncomingSourceResponse): string | undefined {
+function signatureHeaderOf(source: IncomingSourceResponse, providerHeader: string | null | undefined): string | undefined {
   if (source.verificationMode === 'NONE') return undefined;
-  if (source.verificationMode === 'PROVIDER') {
-    const header = PROVIDER_SIGNATURE_HEADERS[source.providerType];
-    if (header) return header;
-  }
+  if (source.verificationMode === 'PROVIDER' && providerHeader) return providerHeader;
   return source.hmacHeaderName || 'X-Signature';
 }
 
@@ -82,6 +79,8 @@ export default function IncomingSourceDetailPage() {
     data: source, isLoading: sourceLoading, isError: sourceFailed, error: sourceError,
     refetch: refetchSource,
   } = useIncomingSource(projectId, sourceId);
+  const { data: providers } = useIncomingProviders();
+  const providerHeader = providers?.find((p) => p.id === source?.providerType)?.signatureHeader;
   const {
     data: destPageInfo, isLoading: destsLoading, isError: destsFailed, error: destsError,
     refetch: refetchDests,
@@ -286,7 +285,7 @@ export default function IncomingSourceDetailPage() {
   return (
     <div className="p-4 lg:p-6">
       <PageHeader
-        eyebrow={`${t(`incomingSources.providerNames.${source.providerType}`)} · ${source.slug}`}
+        eyebrow={`${providerLabel(source.providerType, providers, t)} · ${source.slug}`}
         title={source.name}
         description={t('incomingSources.detailDescription', 'Webhooks arriving at this URL are verified, then forwarded to every destination below.')}
         actions={newDestinationButton}
@@ -312,23 +311,23 @@ export default function IncomingSourceDetailPage() {
               </Button>
             </div>
             <div>
-              {source.verificationMode === 'PROVIDER' && PROVIDER_SIGNATURE_HEADERS[source.providerType] ? (
+              {source.verificationMode === 'PROVIDER' && providerHeader ? (
                 // An unsigned cURL to a provider-verified source only ever produces a 401.
                 <p className="border border-rail bg-secondary/40 p-3 text-xs text-muted-foreground">
                   {t('incomingSources.howToSend.signedByProvider', {
-                    provider: t(`incomingSources.providerNames.${source.providerType}`),
-                    header: signatureHeaderOf(source),
+                    provider: providerLabel(source.providerType, providers, t),
+                    header: providerHeader,
                   })}
                 </p>
               ) : (
                 <>
                   <div className="mono-label mb-1.5">{t('incomingSources.howToSend.curlExample')}</div>
                   <pre className="overflow-x-auto whitespace-pre-wrap break-all border border-rail bg-secondary/40 p-3 font-mono text-[11px] text-muted-foreground">
-                    {ingressCurl(source, signatureHeaderOf(source))}
+                    {ingressCurl(source, signatureHeaderOf(source, providerHeader))}
                   </pre>
-                  {signatureHeaderOf(source) && (
+                  {signatureHeaderOf(source, providerHeader) && (
                     <p className="mt-1.5 text-[11px] text-muted-foreground">
-                      {t('incomingSources.howToSend.signedCurl', { header: signatureHeaderOf(source) })}
+                      {t('incomingSources.howToSend.signedCurl', { header: signatureHeaderOf(source, providerHeader) })}
                     </p>
                   )}
                 </>
@@ -369,10 +368,10 @@ export default function IncomingSourceDetailPage() {
                   />
                 </dd>
               </div>
-              {signatureHeaderOf(source) && (
+              {signatureHeaderOf(source, providerHeader) && (
                 <div className="flex items-center justify-between gap-4">
                   <dt className="text-muted-foreground">{t('incomingSources.createDialog.hmacHeaderName')}</dt>
-                  <dd className="font-mono text-xs">{signatureHeaderOf(source)}</dd>
+                  <dd className="font-mono text-xs">{signatureHeaderOf(source, providerHeader)}</dd>
                 </div>
               )}
               <div className="flex items-center justify-between gap-4">

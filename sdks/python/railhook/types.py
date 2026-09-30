@@ -372,16 +372,6 @@ class WebhookEvent:
     data: Dict[str, Any]
 
 
-class ProviderType(str, Enum):
-    GENERIC = "GENERIC"
-    GITHUB = "GITHUB"
-    GITLAB = "GITLAB"
-    STRIPE = "STRIPE"
-    SHOPIFY = "SHOPIFY"
-    SLACK = "SLACK"
-    TWILIO = "TWILIO"
-
-
 class VerificationMode(str, Enum):
     NONE = "NONE"
     #: Your own header and prefix, HMAC-SHA256 over the body (or ``t=…,v1=…``).

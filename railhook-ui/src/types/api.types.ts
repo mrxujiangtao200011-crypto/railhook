@@ -300,8 +300,12 @@ export interface McpGrantResponse {
   lastUsedAt: string | null;
 }
 
-export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO'
-  | 'SQUARE' | 'ADYEN' | 'SENDGRID' | 'HUBSPOT';
+export interface IncomingProviderResponse {
+  id: string;
+  displayName: string;
+  signatureHeader: string | null;
+}
+
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
 export type VerificationMode = 'NONE' | 'HMAC_GENERIC' | 'PROVIDER';
 export type IncomingAuthType = 'NONE' | 'BEARER' | 'BASIC' | 'CUSTOM_HEADER';
@@ -310,7 +314,7 @@ export type ForwardAttemptStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILE
 export interface IncomingSourceRequest {
   name: string;
   slug?: string;
-  providerType?: ProviderType;
+  providerType?: string;
   status?: IncomingSourceStatus;
   verificationMode?: VerificationMode;
   hmacSecret?: string;
@@ -324,7 +328,7 @@ export interface IncomingSourceResponse {
   projectId: string;
   name: string;
   slug: string;
-  providerType: ProviderType;
+  providerType: string;
   status: IncomingSourceStatus;
   ingressPathToken: string;
   ingressUrl: string;
