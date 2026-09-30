@@ -297,7 +297,7 @@ export default function TestConsolePage() {
   // Returning null on a failed fetch left the console blank with no way back.
   if (projectFailed || endpointsFailed || !project) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
         <ErrorState
           error={projectError ?? endpointsError}
           onRetry={() => { refetchProject(); refetchEndpoints(); }}
@@ -522,7 +522,7 @@ export default function TestConsolePage() {
   const input = mode === 'event' ? eventInput : mode === 'ping' ? pingInput : verifyInput;
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
       <PageHeader
         eyebrow={project.name}
         title={t('testConsole.title')}
@@ -652,7 +652,7 @@ function ResultsPanel({
               />
             }
           >
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[11px]">
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[12px]">
               {formatJson(pingResult.responseBody)}
             </pre>
           </OutputBlock>
@@ -698,7 +698,7 @@ function ResultsPanel({
     >
       <div className="flex items-center gap-2 text-xs">
         <span className="mono-label">{t('testConsole.eventId')}</span>
-        <code className="min-w-0 flex-1 truncate font-mono text-[11px]">{lastEvent.id}</code>
+        <code className="min-w-0 flex-1 truncate font-mono text-[12px]">{lastEvent.id}</code>
         <CopyButton
           id="event-id"
           content={lastEvent.id}
@@ -924,7 +924,7 @@ function CodeBlock({
       label={label}
       actions={<CopyButton id={id} content={content} label={label} copiedId={copiedId} copyText={copyText} />}
     >
-      <pre className="max-h-40 overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[11px]">{content}</pre>
+      <pre className="max-h-40 overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[12px]">{content}</pre>
     </OutputBlock>
   );
 }
