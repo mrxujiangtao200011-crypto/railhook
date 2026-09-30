@@ -325,7 +325,10 @@ tagged release also pushes `<namespace>/railhook-api`, `-worker` and `-ui` to Do
 the repository has:
 
 - variable `DOCKERHUB_NAMESPACE`: the Docker Hub user or organization
-- secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`: a Docker Hub access token with write access
+- secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`: a Docker Hub access token with Read, Write,
+  Delete scope; the description update needs Delete, pushing alone does not
+
+Each push also sets the repository's overview from `deploy/dockerhub/README.md`.
 
 Without the variable the step is skipped. To mirror a release that is already out, run
 **Docker Publish** by hand with its tag.

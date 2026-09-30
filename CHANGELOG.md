@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Release images are also published to Docker Hub as `railhook/railhook-api`, `railhook/railhook-worker` and `railhook/railhook-ui`. Set `DOCKER_REGISTRY=railhook/railhook` in `.env` to pull from there instead of GHCR.
+
 ## [3.3.0] - 2026-09-30
 
 ### Added

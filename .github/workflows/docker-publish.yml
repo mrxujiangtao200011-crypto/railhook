@@ -47,10 +47,13 @@ jobs:
         include:
           - service: api
             dockerfile: railhook-api/Dockerfile
+            description: 'Railhook webhook gateway: REST API and database migrations'
           - service: worker
             dockerfile: railhook-worker/Dockerfile
+            description: 'Railhook webhook gateway: delivers, retries and forwards webhooks'
           - service: ui
             dockerfile: railhook-ui/Dockerfile
+            description: 'Railhook webhook gateway: dashboard and docs'
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -105,6 +108,24 @@ jobs:
           provenance: true
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      # A republished older tag predates the overview, so it comes from the ref the workflow runs on.
+      - name: Check out the Docker Hub overview
+        if: vars.DOCKERHUB_NAMESPACE != ''
+        uses: actions/checkout@v7
+        with:
+          path: .dockerhub
+          sparse-checkout: deploy/dockerhub
+
+      - name: Update Docker Hub description
+        if: vars.DOCKERHUB_NAMESPACE != ''
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_NAMESPACE }}/railhook-${{ matrix.service }}
+          short-description: ${{ matrix.description }}
+          readme-filepath: .dockerhub/deploy/dockerhub/README.md
 
       - name: Publish Summary
         run: |
