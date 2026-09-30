@@ -974,9 +974,14 @@ jobs:
       - name: Find the last release tag
         id: last
         run: |
-          tag=$(git tag --sort=-creatordate | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          # Only a release built on the same baseline migration can upgrade in place.
+          baseline=railhook-api/src/main/resources/db/migration/V001__schema.sql
+          tag=""
+          for t in $(git tag --sort=-creatordate | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$'); do
+            if git show "$t:$baseline" 2>/dev/null | cmp -s - "$baseline"; then tag=$t; break; fi
+          done
           if [ -z "$tag" ]; then
-            echo "::notice::no release tag yet, nothing to upgrade from"
+            echo "::notice::no release shares this baseline migration, nothing to upgrade from"
             echo "found=" >> "$GITHUB_OUTPUT"
           else
             echo "upgrading from $tag"
