@@ -3,8 +3,6 @@
 Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe,
 GitHub and others, with retries, signatures and a record of every attempt.
 
-![Deliveries](https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-ui/public/screens/deliveries.webp)
-
 ## Images
 
 Railhook runs as three images from one release. Use the same tag for all three.
