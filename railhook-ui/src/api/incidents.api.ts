@@ -21,6 +21,9 @@ export interface IncidentResponse {
   status: IncidentStatus;
   severity: string;
   rcaNotes: string | null;
+  alertRuleId: string | null;
+  alertRuleName: string | null;
+  autoResolved: boolean;
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;

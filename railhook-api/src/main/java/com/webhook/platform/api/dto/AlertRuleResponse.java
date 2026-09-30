@@ -3,6 +3,7 @@ package com.webhook.platform.api.dto;
 import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
 import com.webhook.platform.api.domain.enums.AlertType;
+import com.webhook.platform.api.domain.enums.OpsgenieRegion;
 import lombok.*;
 
 import java.time.Instant;
@@ -29,6 +30,8 @@ public class AlertRuleResponse {
     private Instant snoozedUntil;
     private String webhookUrl;
     private String emailRecipients;
+    private Boolean integrationKeyConfigured;
+    private OpsgenieRegion opsgenieRegion;
     private Instant createdAt;
     private Instant updatedAt;
 }

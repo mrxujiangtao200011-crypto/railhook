@@ -6,15 +6,10 @@ import com.webhook.platform.api.domain.EmailAddresses;
 import com.webhook.platform.api.domain.entity.AlertEvent;
 import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.entity.Incident;
-import com.webhook.platform.api.domain.entity.IncidentTimeline;
 import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
-import com.webhook.platform.api.domain.enums.IncidentStatus;
-import com.webhook.platform.api.domain.enums.IncidentTimelineType;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
-import com.webhook.platform.api.domain.repository.IncidentRepository;
-import com.webhook.platform.api.domain.repository.IncidentTimelineRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertEventResponse;
@@ -24,6 +19,8 @@ import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.common.security.SecretEncryption;
 import com.webhook.platform.common.security.UrlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +35,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -49,8 +47,8 @@ public class AlertService {
     private final AlertRuleRepository ruleRepository;
     private final AlertEventRepository eventRepository;
     private final ProjectRepository projectRepository;
-    private final IncidentRepository incidentRepository;
-    private final IncidentTimelineRepository timelineRepository;
+    private final IncidentService incidentService;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final AlertNotificationService notificationService;
     private final MembershipRepository membershipRepository;
     @Value("${webhook.url-validation.allow-private-ips:false}")
@@ -66,6 +64,8 @@ public class AlertService {
             log.info("Alert resolved: rule='{}', project={}; the condition no longer holds",
                     rule.getName(), rule.getProjectId());
         }
+        Optional<Incident> incident = incidentService.resolveClearedAlert(rule);
+        incident.ifPresent(i -> afterCommit(() -> notificationService.dispatchResolved(rule, i)));
         return resolved;
     }
 
@@ -129,7 +129,9 @@ public class AlertService {
                 .snoozedUntil(request.getSnoozedUntil())
                 .webhookUrl(request.getWebhookUrl())
                 .emailRecipients(emailRecipients)
+                .opsgenieRegion(request.getOpsgenieRegion())
                 .build();
+        applyIntegrationKey(rule, request.getIntegrationKey());
 
         rule = ruleRepository.save(rule);
         log.debug("Created alert rule '{}' ({}) for project {}", rule.getName(), rule.getAlertType(), projectId);
@@ -150,7 +152,13 @@ public class AlertService {
         if (request.getDescription() != null) rule.setDescription(request.getDescription());
         if (request.getAlertType() != null) rule.setAlertType(request.getAlertType());
         if (request.getSeverity() != null) rule.setSeverity(request.getSeverity());
-        if (request.getChannel() != null) rule.setChannel(request.getChannel());
+        if (request.getChannel() != null && request.getChannel() != rule.getChannel()) {
+            rule.setChannel(request.getChannel());
+            rule.setIntegrationKeyEncrypted(null);
+            rule.setIntegrationKeyIv(null);
+        }
+        if (request.getOpsgenieRegion() != null) rule.setOpsgenieRegion(request.getOpsgenieRegion());
+        applyIntegrationKey(rule, request.getIntegrationKey());
         if (request.getThresholdValue() != null) rule.setThresholdValue(request.getThresholdValue());
         if (request.getWindowMinutes() != null) rule.setWindowMinutes(request.getWindowMinutes());
         if (request.getEndpointId() != null) rule.setEndpointId(request.getEndpointId());
@@ -235,45 +243,44 @@ public class AlertService {
         log.warn("Alert fired: rule='{}', project={}, current={}, threshold={}",
                 rule.getName(), rule.getProjectId(), currentValue, rule.getThresholdValue());
 
+        Incident incident = incidentService.recordAlertFiring(rule, message);
+
         // Only after commit: sent mid-transaction, a later failure rolled the alert back after
         // the message went out, and the next evaluation sent it again.
-        notifyAfterCommit(rule, event);
-
-        if (rule.getSeverity() == AlertSeverity.CRITICAL) {
-            Incident incident = Incident.builder()
-                    .projectId(rule.getProjectId())
-                    .title("[Auto] " + rule.getName() + " — " + message)
-                    .severity(AlertSeverity.CRITICAL)
-                    .status(IncidentStatus.OPEN)
-                    .build();
-            incident = incidentRepository.save(incident);
-
-            IncidentTimeline entry = IncidentTimeline.builder()
-                    .incidentId(incident.getId())
-                    .entryType(IncidentTimelineType.STATUS_CHANGE)
-                    .title("Auto-created from alert rule: " + rule.getName())
-                    .detail(String.format("Current value: %.2f, Threshold: %.2f", currentValue, rule.getThresholdValue()))
-                    .build();
-            timelineRepository.save(entry);
-
-            log.info("Auto-created incident '{}' for CRITICAL alert rule '{}'", incident.getId(), rule.getName());
-        }
-
+        AlertEvent fired = event;
+        afterCommit(() -> notificationService.dispatch(rule, fired, incident));
         return event;
     }
 
-    private void notifyAfterCommit(AlertRule rule, AlertEvent event) {
+    private void afterCommit(Runnable action) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            notificationService.dispatch(rule, event);
+            action.run();
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        notificationService.dispatch(rule, event);
+                        action.run();
                     }
                 });
+    }
+
+    // Blank keeps the stored key, so an edit need not re-enter it.
+    private void applyIntegrationKey(AlertRule rule, String integrationKey) {
+        if (integrationKey != null && !integrationKey.isBlank()) {
+            SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(integrationKey.trim());
+            rule.setIntegrationKeyEncrypted(encrypted.getCiphertext());
+            rule.setIntegrationKeyIv(encrypted.getIv());
+            rule.setEncryptionKeyVersion(encrypted.getKeyVersion());
+        }
+        boolean onCall = rule.getChannel() == AlertChannel.PAGERDUTY || rule.getChannel() == AlertChannel.OPSGENIE;
+        if (onCall && rule.getIntegrationKeyEncrypted() == null) {
+            throw new DomainException(ErrorCode.INVALID_REQUEST,
+                    rule.getChannel() == AlertChannel.PAGERDUTY
+                            ? "A PagerDuty rule needs the routing key of a PagerDuty service"
+                            : "An Opsgenie rule needs an Opsgenie API key");
+        }
     }
 
     private AlertRuleResponse toRuleResponse(AlertRule rule) {
@@ -293,6 +300,8 @@ public class AlertService {
                 .snoozedUntil(rule.getSnoozedUntil())
                 .webhookUrl(rule.getWebhookUrl())
                 .emailRecipients(rule.getEmailRecipients())
+                .integrationKeyConfigured(rule.getIntegrationKeyEncrypted() != null)
+                .opsgenieRegion(rule.getOpsgenieRegion())
                 .createdAt(rule.getCreatedAt())
                 .updatedAt(rule.getUpdatedAt())
                 .build();

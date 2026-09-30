@@ -12,7 +12,9 @@
       "EMAIL": "Email",
       "IN_APP": "У застосунку",
       "SLACK": "Slack",
-      "WEBHOOK": "Вебхук"
+      "WEBHOOK": "Вебхук",
+      "PAGERDUTY": "PagerDuty",
+      "OPSGENIE": "Opsgenie"
     },
     "columns": {
       "details": "Деталі",
@@ -47,7 +49,16 @@
       "threshold": "Поріг",
       "type": "Тип сповіщення",
       "webhookUrl": "Webhook URL",
-      "window": "Вікно (хв)"
+      "window": "Вікно (хв)",
+      "pagerDutyRoutingKey": "Routing key PagerDuty",
+      "pagerDutyHint": "Додайте до сервісу PagerDuty інтеграцію Events API v2 і вставте її routing key: правило викликає чергового, коли спрацьовує, і знімає виклик, коли умова минає.",
+      "opsgenieApiKey": "API-ключ Opsgenie",
+      "opsgenieHint": "Додайте до команди в Opsgenie API-інтеграцію і вставте її ключ: правило створює сповіщення, коли спрацьовує, і закриває його, коли умова минає.",
+      "opsgenieRegion": "Регіон Opsgenie",
+      "opsgenieRegions": {
+        "US": "США (api.opsgenie.com)",
+        "EU": "ЄС (api.eu.opsgenie.com)"
+      }
     },
     "history": {
       "desc": "Усі сповіщення цього проєкту, найновіші вгорі",
@@ -1544,7 +1555,7 @@
       "OPEN": "Відкритий",
       "RESOLVED": "Закритий"
     },
-    "subtitle": "Групуйте пов'язані збої, фіксуйте зроблене й записуйте причину.",
+    "subtitle": "Правило сповіщень, що спрацювало, відкриває тут інцидент і закриває його, коли умова минає. Фіксуйте зроблене й записуйте причину.",
     "tiles": {
       "allClear": "Усе гаразд",
       "critical": "Критичні",
@@ -1564,7 +1575,9 @@
       "rcaSaved": "Нотатки RCA збережено",
       "statusUpdated": "Статус оновлено",
       "updateFailed": "Не вдалося оновити інцидент"
-    }
+    },
+    "openedByRule": "Відкрито правилом сповіщень {{name}}",
+    "autoResolved": "Закрито автоматично"
   },
   "incomingDestinations": {
     "create": "Додати призначення",

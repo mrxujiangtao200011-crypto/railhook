@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Analytics takes a custom `from`/`to` range of up to 90 days besides the 24h, 7d and 30d presets, and `GET /api/v1/dashboard/projects/{projectId}/analytics/export` returns the same numbers as CSV: one row per hour or day, then one row per endpoint. The analytics page has a range picker and an Export CSV button.
+- `PAGERDUTY` and `OPSGENIE` alert channels. A rule triggers a PagerDuty event or creates an Opsgenie alert when it fires, and resolves or closes it when the condition clears. The routing key or API key is stored encrypted, never returned, and included in key rotation (`alertRulesRotated` in the rotation response).
 
 ### Changed
 
 - An unknown analytics `period` is refused with `400` instead of falling back to 24h.
+- Every alert rule opens an incident when it fires, not only `CRITICAL` ones. Further firings are added to the open incident's timeline, and the incident is resolved automatically when the evaluator sees the condition clear. The Incidents page shows the rule that opened an incident and whether it was resolved automatically.
 
 ### Fixed
 

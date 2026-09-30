@@ -3,6 +3,7 @@ package com.webhook.platform.api.dto;
 import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
 import com.webhook.platform.api.domain.enums.AlertType;
+import com.webhook.platform.api.domain.enums.OpsgenieRegion;
 import com.webhook.platform.api.dto.validation.EmailRecipientList;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -51,6 +52,10 @@ public class AlertRuleRequest {
     /** Comma-separated. The service also checks each address is a verified member's. */
     @EmailRecipientList(max = AlertRuleRequest.MAX_EMAIL_RECIPIENTS)
     private String emailRecipients;
+
+    private String integrationKey;
+
+    private OpsgenieRegion opsgenieRegion;
 
     public static final int MAX_EMAIL_RECIPIENTS = 10;
 }

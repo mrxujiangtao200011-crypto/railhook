@@ -6,14 +6,13 @@ import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertType;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
-import com.webhook.platform.api.domain.repository.IncidentRepository;
-import com.webhook.platform.api.domain.repository.IncidentTimelineRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.exception.InvalidUrlException;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -62,8 +61,8 @@ class AlertServiceTest {
     @Mock private AlertRuleRepository ruleRepository;
     @Mock private AlertEventRepository eventRepository;
     @Mock private ProjectRepository projectRepository;
-    @Mock private IncidentRepository incidentRepository;
-    @Mock private IncidentTimelineRepository timelineRepository;
+    @Mock private IncidentService incidentService;
+    @Mock private EncryptionKeyRegistry encryptionKeyRegistry;
     @Mock private AlertNotificationService notificationService;
     @Mock private MembershipRepository membershipRepository;
 
@@ -82,7 +81,7 @@ class AlertServiceTest {
     void setUp() {
         TenantContext.set(organizationId);
         service = new AlertService(ruleRepository, eventRepository, projectRepository,
-                incidentRepository, timelineRepository, notificationService, membershipRepository,
+                incidentService, encryptionKeyRegistry, notificationService, membershipRepository,
                 false, Collections.emptyList());
 
         when(projectRepository.findById(projectId))

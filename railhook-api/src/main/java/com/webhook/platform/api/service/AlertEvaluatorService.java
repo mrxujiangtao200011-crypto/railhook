@@ -1,11 +1,13 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.AlertRule;
+import com.webhook.platform.api.domain.enums.IncidentStatus;
 import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
+import com.webhook.platform.api.domain.repository.IncidentRepository;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class AlertEvaluatorService {
     private final AlertEventRepository eventRepository;
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository attemptRepository;
+    private final IncidentRepository incidentRepository;
     private final AlertService alertService;
 
     private static final Duration RESOLVED_ALERT_RETENTION = Duration.ofDays(90);
@@ -88,15 +91,18 @@ public class AlertEvaluatorService {
             // Checked inside the tenant, because AlertEvent is tenant-scoped too.
             boolean open = eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId());
             Optional<Breach> breach = assess(rule);
-            if (open) {
+            if (breach.isEmpty()) {
                 // Otherwise only a person resolves it, and the rule stays silent through later outages.
-                if (breach.isEmpty()) {
+                if (open || incidentRepository.existsByAlertRuleIdAndStatusNot(rule.getId(), IncidentStatus.RESOLVED)) {
                     alertService.resolveRecovered(rule);
                 }
                 return false;
             }
-            breach.ifPresent(b -> alertService.fireAlert(rule, b.currentValue(), b.message()));
-            return breach.isPresent();
+            if (open) {
+                return false;
+            }
+            alertService.fireAlert(rule, breach.get().currentValue(), breach.get().message());
+            return true;
         }));
     }
 

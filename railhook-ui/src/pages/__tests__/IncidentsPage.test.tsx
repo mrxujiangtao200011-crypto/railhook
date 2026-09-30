@@ -27,6 +27,9 @@ const incident = (over: Partial<IncidentResponse>): IncidentResponse => ({
   status: 'OPEN',
   severity: 'WARNING',
   rcaNotes: null,
+  alertRuleId: null,
+  alertRuleName: null,
+  autoResolved: false,
   resolvedAt: null,
   createdAt: now,
   updatedAt: now,
@@ -96,6 +99,17 @@ describe('IncidentsPage', () => {
 
     await screen.findByText('Checkout webhooks failing');
     expect(tileValue(/critical/i)).toBe('0');
+  });
+
+  it('names the alert rule that opened an incident and says it resolved on its own', async () => {
+    vi.mocked(incidentsApi.list).mockResolvedValue(page([
+      incident({ alertRuleId: 'rule-1', alertRuleName: 'Payments failing', status: 'RESOLVED', autoResolved: true }),
+    ]));
+
+    renderIncidents();
+
+    expect(await screen.findByText('Opened by alert rule Payments failing')).toBeInTheDocument();
+    expect(screen.getByText('Resolved automatically')).toBeInTheDocument();
   });
 
   it('says the list failed to load rather than showing no incidents', async () => {

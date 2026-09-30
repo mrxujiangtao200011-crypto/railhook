@@ -1,8 +1,8 @@
 import { Fragment, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Bell, BellOff, Check, ChevronDown, Clock, Loader2, Mail, MessageSquare, Plus, Search, Trash2,
-  VolumeX, Webhook,
+  Bell, BellOff, Check, ChevronDown, Clock, KeyRound, Loader2, Mail, MessageSquare, Plus, Search, Siren,
+  Trash2, VolumeX, Webhook,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
@@ -10,7 +10,9 @@ import {
   useAlertRules, useCreateAlertRule, useDeleteAlertRule, useUpdateAlertRule,
   useAlertEvents, useResolveAlert, useResolveAllAlerts, useUnresolvedAlertCount,
 } from '../api/queries';
-import type { AlertRuleRequest, AlertType, AlertSeverity, AlertChannel } from '../api/alerts.api';
+import type {
+  AlertRuleRequest, AlertType, AlertSeverity, AlertChannel, OpsgenieRegion,
+} from '../api/alerts.api';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
@@ -40,7 +42,7 @@ import { STATUS_FILL, STATUS_TEXT, StatTile, formatCompact, kindOfSeverity } fro
 
 const ALERT_TYPE_VALUES: AlertType[] = ['FAILURE_RATE', 'DLQ_THRESHOLD', 'CONSECUTIVE_FAILURES', 'LATENCY_THRESHOLD'];
 const SEVERITY_VALUES: AlertSeverity[] = ['INFO', 'WARNING', 'CRITICAL'];
-const CHANNEL_VALUES: AlertChannel[] = ['IN_APP', 'EMAIL', 'WEBHOOK', 'SLACK'];
+const CHANNEL_VALUES: AlertChannel[] = ['IN_APP', 'EMAIL', 'WEBHOOK', 'SLACK', 'PAGERDUTY', 'OPSGENIE'];
 const SNOOZE_HOURS = [1, 4, 8, 24];
 
 const CHANNEL_ICON: Record<AlertChannel, React.ElementType> = {
@@ -48,6 +50,8 @@ const CHANNEL_ICON: Record<AlertChannel, React.ElementType> = {
   EMAIL: Mail,
   WEBHOOK: Webhook,
   SLACK: MessageSquare,
+  PAGERDUTY: Siren,
+  OPSGENIE: Siren,
 };
 
 function isArmed(rule: { enabled: boolean; muted: boolean; snoozedUntil: string | null }): boolean {
@@ -76,6 +80,8 @@ export default function AlertsPage() {
   const [formChannel, setFormChannel] = useState<AlertChannel>('IN_APP');
   const [formWebhookUrl, setFormWebhookUrl] = useState('');
   const [formEmailRecipients, setFormEmailRecipients] = useState('');
+  const [formIntegrationKey, setFormIntegrationKey] = useState('');
+  const [formOpsgenieRegion, setFormOpsgenieRegion] = useState<OpsgenieRegion>('US');
 
   const {
     data: rules = [], isLoading: rulesLoading, isError: rulesIsError, error: rulesError, refetch: refetchRules,
@@ -106,7 +112,11 @@ export default function AlertsPage() {
     setFormChannel('IN_APP');
     setFormWebhookUrl('');
     setFormEmailRecipients('');
+    setFormIntegrationKey('');
+    setFormOpsgenieRegion('US');
   };
+
+  const isOnCall = formChannel === 'PAGERDUTY' || formChannel === 'OPSGENIE';
 
   const handleCreate = async () => {
     const data: AlertRuleRequest = {
@@ -119,6 +129,8 @@ export default function AlertsPage() {
       channel: formChannel,
       webhookUrl: (formChannel === 'WEBHOOK' || formChannel === 'SLACK') ? formWebhookUrl : undefined,
       emailRecipients: formChannel === 'EMAIL' ? formEmailRecipients : undefined,
+      integrationKey: isOnCall ? formIntegrationKey : undefined,
+      opsgenieRegion: formChannel === 'OPSGENIE' ? formOpsgenieRegion : undefined,
     };
     try {
       await createRule.mutateAsync(data);
@@ -470,6 +482,14 @@ export default function AlertsPage() {
                     {(rule.channel === 'WEBHOOK' || rule.channel === 'SLACK') && rule.webhookUrl && (
                       <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground">{rule.webhookUrl}</p>
                     )}
+                    {rule.integrationKeyConfigured && (
+                      <p className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <KeyRound className="h-3 w-3" aria-hidden />
+                        {rule.channel === 'OPSGENIE'
+                          ? `${t('alerts.form.opsgenieApiKey')} · ${rule.opsgenieRegion ?? 'US'}`
+                          : t('alerts.form.pagerDutyRoutingKey')}
+                      </p>
+                    )}
                     {rule.channel === 'EMAIL' && rule.emailRecipients && (
                       <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground">{rule.emailRecipients}</p>
                     )}
@@ -605,10 +625,32 @@ export default function AlertsPage() {
                 <p className="text-xs text-muted-foreground">{t('alerts.form.emailRecipientsHint')}</p>
               </div>
             )}
+            {formChannel === 'PAGERDUTY' && (
+              <div className="space-y-2">
+                <Label htmlFor="alert-pagerduty-key">{t('alerts.form.pagerDutyRoutingKey')}</Label>
+                <Input id="alert-pagerduty-key" type="password" autoComplete="off" value={formIntegrationKey} onChange={(e) => setFormIntegrationKey(e.target.value)} />
+                <p className="text-xs text-muted-foreground">{t('alerts.form.pagerDutyHint')}</p>
+              </div>
+            )}
+            {formChannel === 'OPSGENIE' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="alert-opsgenie-key">{t('alerts.form.opsgenieApiKey')}</Label>
+                  <Input id="alert-opsgenie-key" type="password" autoComplete="off" value={formIntegrationKey} onChange={(e) => setFormIntegrationKey(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">{t('alerts.form.opsgenieHint')}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="alert-opsgenie-region">{t('alerts.form.opsgenieRegion')}</Label>
+                  <Select id="alert-opsgenie-region" value={formOpsgenieRegion} onChange={(e) => setFormOpsgenieRegion(e.target.value as OpsgenieRegion)}>
+                    {(['US', 'EU'] as const).map((v) => <option key={v} value={v}>{t(`alerts.form.opsgenieRegions.${v}`)}</option>)}
+                  </Select>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>{t('common.cancel')}</Button>
-            <Button onClick={handleCreate} disabled={!formName || !formThreshold || createRule.isPending}>
+            <Button onClick={handleCreate} disabled={!formName || !formThreshold || (isOnCall && !formIntegrationKey) || createRule.isPending}>
               {createRule.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {t('alerts.createDialog.submit')}
             </Button>

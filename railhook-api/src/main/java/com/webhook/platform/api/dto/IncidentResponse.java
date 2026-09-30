@@ -21,6 +21,9 @@ public class IncidentResponse {
     private IncidentStatus status;
     private AlertSeverity severity;
     private String rcaNotes;
+    private UUID alertRuleId;
+    private String alertRuleName;
+    private Boolean autoResolved;
     private Instant resolvedAt;
     private Instant createdAt;
     private Instant updatedAt;
@@ -41,7 +44,7 @@ public class IncidentResponse {
         private Instant createdAt;
     }
 
-    public static IncidentResponse of(Incident incident) {
+    public static IncidentResponse of(Incident incident, String alertRuleName) {
         return IncidentResponse.builder()
                 .id(incident.getId())
                 .projectId(incident.getProjectId())
@@ -49,6 +52,9 @@ public class IncidentResponse {
                 .status(incident.getStatus())
                 .severity(incident.getSeverity())
                 .rcaNotes(incident.getRcaNotes())
+                .alertRuleId(incident.getAlertRuleId())
+                .alertRuleName(alertRuleName)
+                .autoResolved(incident.getAutoResolved())
                 .resolvedAt(incident.getResolvedAt())
                 .createdAt(incident.getCreatedAt())
                 .updatedAt(incident.getUpdatedAt())

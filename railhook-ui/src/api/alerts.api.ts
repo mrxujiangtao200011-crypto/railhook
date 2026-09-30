@@ -3,7 +3,8 @@ import type { PageResponse } from '../types/api.types';
 
 export type AlertType = 'FAILURE_RATE' | 'DLQ_THRESHOLD' | 'CONSECUTIVE_FAILURES' | 'LATENCY_THRESHOLD';
 export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
-export type AlertChannel = 'IN_APP' | 'EMAIL' | 'WEBHOOK' | 'SLACK';
+export type AlertChannel = 'IN_APP' | 'EMAIL' | 'WEBHOOK' | 'SLACK' | 'PAGERDUTY' | 'OPSGENIE';
+export type OpsgenieRegion = 'US' | 'EU';
 
 export interface AlertRuleResponse {
   id: string;
@@ -21,6 +22,8 @@ export interface AlertRuleResponse {
   snoozedUntil: string | null;
   webhookUrl: string | null;
   emailRecipients: string | null;
+  integrationKeyConfigured: boolean;
+  opsgenieRegion: OpsgenieRegion | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +42,8 @@ export interface AlertRuleRequest {
   snoozedUntil?: string;
   webhookUrl?: string;
   emailRecipients?: string;
+  integrationKey?: string;
+  opsgenieRegion?: OpsgenieRegion;
 }
 
 export interface AlertEventResponse {
