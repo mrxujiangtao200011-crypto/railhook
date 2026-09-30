@@ -81,6 +81,21 @@ class AlertEvaluatorServiceTest {
     }
 
     @Test
+    @DisplayName("deliveries that ran out of attempts and went to the DLQ count as failed")
+    void failureRateCountsDlq() {
+        AlertRule rule = rule(AlertType.FAILURE_RATE, 50.0);
+        given(rule);
+        when(deliveryRepository.countByProjectIdAndCreatedAtBetween(eq(projectId), any(), any()))
+                .thenReturn(12L);
+        when(deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
+                eq(projectId), eq(DeliveryStatus.DLQ), any(), any())).thenReturn(12L);
+
+        evaluator.evaluate();
+
+        verify(alertService).fireAlert(eq(rule), eq(100.0), anyString());
+    }
+
+    @Test
     @DisplayName("an idle project is not a 100% failure rate")
     void noTrafficDoesNotFire() {
         AlertRule rule = rule(AlertType.FAILURE_RATE, 50.0);

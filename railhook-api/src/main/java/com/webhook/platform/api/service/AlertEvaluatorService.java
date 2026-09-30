@@ -137,7 +137,9 @@ public class AlertEvaluatorService {
             return Optional.empty();
         }
         long failed = deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
-                rule.getProjectId(), DeliveryStatus.FAILED, from, to);
+                rule.getProjectId(), DeliveryStatus.FAILED, from, to)
+                + deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
+                rule.getProjectId(), DeliveryStatus.DLQ, from, to);
         double rate = (failed * 100.0) / total;
         if (rate < threshold) {
             return Optional.empty();

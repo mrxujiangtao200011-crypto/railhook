@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.1] - 2026-10-01
+
+### Fixed
+
+- A `FAILURE_RATE` alert rule counts deliveries that went to the DLQ as failed. It counted only `FAILED`, so an endpoint that refused every request, with each delivery ending in the DLQ, never tripped it.
+
 ## [3.4.0] - 2026-09-30
 
 ### Added
