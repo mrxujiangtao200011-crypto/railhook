@@ -283,6 +283,11 @@
       "revokeFailed": "Не вдалося відкликати API-ключ",
       "revoked": "API-ключ відкликано",
       "rotateFailed": "Не вдалося ротувати ключ. Спробуйте ще раз."
+    },
+    "columns": {
+      "key": "Ключ",
+      "scope": "Доступ",
+      "status": "Стан"
     }
   },
   "auditLog": {
@@ -1307,7 +1312,25 @@
     "verificationRetry": "Перевірка не пройшла — повторити?",
     "verified": "Перевірено",
     "verify": "Перевірити",
-    "verifyEndpoint": "Перевірити ендпоінт"
+    "verifyEndpoint": "Перевірити ендпоінт",
+    "detail": {
+      "failingInARow": "Поспіль невдалих: {{count}}, з {{since}}",
+      "failingInARow_one": "Поспіль невдалих: {{count}}, з {{since}}",
+      "failingInARow_few": "Поспіль невдалих: {{count}}, з {{since}}",
+      "failingInARow_many": "Поспіль невдалих: {{count}}, з {{since}}",
+      "failingInARow_other": "Поспіль невдалих: {{count}}, з {{since}}",
+      "health": "Останні 24 години",
+      "health24h": "Доставлено, 24 год",
+      "delivered": "Доставлено",
+      "ofDeliveries": "{{delivered}} з {{total}}",
+      "p95": "Затримка p95",
+      "lastDelivery": "Остання доставка",
+      "noTraffic": "За останні 24 години доставок на цей ендпоінт не було.",
+      "recent": "Нещодавні доставки",
+      "noRecent": "На цей ендпоінт ще нічого не надсилали.",
+      "subscriptions": "Типи подій, які він отримує",
+      "noSubscriptions": "Не підписаний на жоден тип подій, тож нічого не отримує."
+    }
   },
   "errorBoundary": {
     "description": "Перезавантажте сторінку. Якщо помилка повториться, надішліть подробиці нижче своїй команді.",
@@ -2530,6 +2553,12 @@
       "seedFailed": "Не вдалося додати типові правила",
       "seeded": "Типові правила додано",
       "updateFailed": "Не вдалося оновити правило"
+    },
+    "summary": "Увімкнено {{active}} з {{total}} правил · вбудованих {{builtin}}, власних {{custom}}.",
+    "columns": {
+      "pattern": "Шаблон",
+      "field": "Поле",
+      "state": "Стан"
     }
   },
   "platformAdmin": {

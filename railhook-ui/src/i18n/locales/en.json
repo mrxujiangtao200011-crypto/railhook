@@ -283,6 +283,11 @@
       "revokeFailed": "Failed to revoke API key",
       "revoked": "API key revoked successfully",
       "rotateFailed": "Could not rotate the key. Please try again."
+    },
+    "columns": {
+      "key": "Key",
+      "scope": "Scope",
+      "status": "Status"
     }
   },
   "auditLog": {
@@ -1307,7 +1312,25 @@
     "verificationRetry": "Verification failed — retry?",
     "verified": "Verified",
     "verify": "Verify",
-    "verifyEndpoint": "Verify endpoint"
+    "verifyEndpoint": "Verify endpoint",
+    "detail": {
+      "failingInARow": "{{count}} failed in a row since {{since}}",
+      "failingInARow_one": "{{count}} failure since {{since}}",
+      "failingInARow_few": "{{count}} failed in a row since {{since}}",
+      "failingInARow_many": "{{count}} failed in a row since {{since}}",
+      "failingInARow_other": "{{count}} failed in a row since {{since}}",
+      "health": "Last 24 hours",
+      "health24h": "Delivered, 24h",
+      "delivered": "Delivered",
+      "ofDeliveries": "{{delivered}} of {{total}}",
+      "p95": "Latency p95",
+      "lastDelivery": "Last delivery",
+      "noTraffic": "No deliveries to this endpoint in the last 24 hours.",
+      "recent": "Recent deliveries",
+      "noRecent": "Nothing has been sent to this endpoint yet.",
+      "subscriptions": "Event types it receives",
+      "noSubscriptions": "Not subscribed to any event type, so it receives nothing."
+    }
   },
   "errorBoundary": {
     "description": "Reload the page. If it happens again, send the details below to your team.",
@@ -2530,6 +2553,12 @@
       "seedFailed": "Failed to seed defaults",
       "seeded": "Default rules added",
       "updateFailed": "Failed to update rule"
+    },
+    "summary": "{{active}} of {{total}} rules on · {{builtin}} built in, {{custom}} custom.",
+    "columns": {
+      "pattern": "Pattern",
+      "field": "Field",
+      "state": "State"
     }
   },
   "platformAdmin": {
