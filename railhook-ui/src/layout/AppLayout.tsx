@@ -128,10 +128,10 @@ export default function AppLayout() {
         {t('nav.skipToContent')}
       </a>
 
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex min-h-screen">
         <aside
           className={cn(
-            'hidden border-r border-rail transition-[width] duration-200 lg:flex lg:flex-col',
+            'sticky top-0 hidden h-screen flex-shrink-0 self-start border-r border-rail transition-[width] duration-200 lg:flex lg:flex-col',
             collapsed ? 'lg:w-[60px]' : 'lg:w-[var(--sidebar-width)]'
           )}
         >
@@ -163,7 +163,7 @@ export default function AppLayout() {
           </div>
         )}
 
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 flex h-14 flex-shrink-0 items-center gap-3 border-b border-rail bg-background px-4 lg:px-6">
             <Button variant="ghost" size="icon-sm" onClick={() => setSidebarOpen(true)} className="lg:hidden"
               title={t('nav.openMenu')} aria-label={t('nav.openMenu')}>
@@ -257,7 +257,7 @@ export default function AppLayout() {
           )}
 
           {/* Role gate inside <main>: a refusal is a page, and navigation stays. */}
-          <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
+          <main id="main-content" tabIndex={-1} className="min-w-0 flex-1">
             <div className="animate-fade-in">
               <ProtectedRoute requiredRole={requiredRoleFor(location.pathname)}>
                 {/* Keyed by path so the boundary resets on navigation. */}

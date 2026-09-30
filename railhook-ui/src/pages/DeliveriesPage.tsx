@@ -429,7 +429,7 @@ export default function DeliveriesPage() {
           />
           </div>
           {paneOpen && (
-            <div className="sticky top-4 max-h-[calc(100vh-6rem)] self-start overflow-y-auto border-l border-rail pl-6">
+            <div className="sticky top-[4.5rem] max-h-[calc(100vh-5.5rem)] self-start overflow-y-auto border-l border-rail pl-6">
               <DeliveryDetailsSheet
                 key={selectedDeliveryId}
                 variant="pane"
