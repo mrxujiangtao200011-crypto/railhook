@@ -74,7 +74,8 @@ public class OrderingBufferService {
     }
 
     // Summed rather than tagged per endpoint: endpoint ids are unbounded cardinality.
-    @Scheduled(fixedDelayString = "${ordering.buffer-gauge-resync-ms:30000}")
+    @Scheduled(initialDelayString = "${ordering.buffer-gauge-resync-ms:30000}",
+            fixedDelayString = "${ordering.buffer-gauge-resync-ms:30000}")
     public void resyncBufferSizeGauge() {
         try {
             long total = 0;
