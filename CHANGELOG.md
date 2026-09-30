@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Workflows with the `SCHEDULE` trigger now run. `triggerConfig` takes a 5-field `cron` and an IANA `timezone` (default `UTC`), both checked on save. After downtime a missed schedule runs once, not once per missed tick, and a tick runs once even with several API instances. The workflow response has `nextRunAt`, a run has `scheduledFor`, and `GET /api/v1/projects/{projectId}/workflows/schedule-preview` returns the next three run times. The editor sets the schedule on the trigger node.
+
 ## [3.3.1] - 2026-09-30
 
 ### Added
