@@ -111,7 +111,7 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
 
     @Query(value = """
         SELECT 
-            TO_CHAR(DATE_TRUNC('hour', da.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
+            TO_CHAR(DATE_TRUNC('hour', da.created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
             COUNT(*) as total,
             AVG(da.duration_ms) as avg_latency
         FROM delivery_attempts da
@@ -119,7 +119,7 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         JOIN events e ON d.event_id = e.id
         WHERE da.organization_id = :organizationId
           AND e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
-        GROUP BY DATE_TRUNC('hour', da.created_at)
+        GROUP BY DATE_TRUNC('hour', da.created_at AT TIME ZONE 'UTC')
         ORDER BY ts
         """, nativeQuery = true)
     List<Object[]> findLatencyTimeSeriesByHour(
@@ -130,7 +130,7 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
 
     @Query(value = """
         SELECT 
-            TO_CHAR(DATE_TRUNC('day', da.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
+            TO_CHAR(DATE_TRUNC('day', da.created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
             COUNT(*) as total,
             AVG(da.duration_ms) as avg_latency
         FROM delivery_attempts da
@@ -138,7 +138,7 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         JOIN events e ON d.event_id = e.id
         WHERE da.organization_id = :organizationId
           AND e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
-        GROUP BY DATE_TRUNC('day', da.created_at)
+        GROUP BY DATE_TRUNC('day', da.created_at AT TIME ZONE 'UTC')
         ORDER BY ts
         """, nativeQuery = true)
     List<Object[]> findLatencyTimeSeriesByDay(

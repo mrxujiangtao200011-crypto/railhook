@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +15,10 @@ import org.springframework.stereotype.Service;
 import com.webhook.platform.api.domain.enums.EndpointHealth;
 import com.webhook.platform.common.enums.DeliveryStatus;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,46 +28,72 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AnalyticsService {
 
+    private static final Duration HOURLY_UP_TO = Duration.ofDays(2);
+    // Attempts and events are kept 90 days by default; a longer range would chart deleted data as zero.
+    private static final Duration MAX_SPAN = Duration.ofDays(90);
+    private static final Duration CLOCK_SKEW = Duration.ofMinutes(5);
+    private static final Map<String, Duration> PERIODS = Map.of(
+            "24h", Duration.ofHours(24), "7d", Duration.ofDays(7), "30d", Duration.ofDays(30));
+    private static final DateTimeFormatter FILENAME_INSTANT =
+            DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm'Z'").withZone(ZoneOffset.UTC);
+
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository attemptRepository;
     private final EventRepository eventRepository;
     private final EndpointRepository endpointRepository;
+    private final ProjectRepository projectRepository;
 
-    public AnalyticsResponse getAnalytics(UUID projectId, String period) {
-        Instant now = Instant.now();
-        Instant from;
-        String granularity;
+    public record Window(Instant from, Instant to, String granularity) {
 
-        switch (period.toLowerCase()) {
-            case "24h":
-                from = now.minus(24, ChronoUnit.HOURS);
-                granularity = "HOUR";
-                break;
-            case "7d":
-                from = now.minus(7, ChronoUnit.DAYS);
-                granularity = "DAY";
-                break;
-            case "30d":
-                from = now.minus(30, ChronoUnit.DAYS);
-                granularity = "DAY";
-                break;
-            default:
-                from = now.minus(24, ChronoUnit.HOURS);
-                granularity = "HOUR";
+        public static Window of(String period, Instant from, Instant to, Instant now) {
+            if (from == null && to == null) {
+                Duration span = PERIODS.get(period == null ? "24h" : period.toLowerCase());
+                if (span == null) {
+                    throw new IllegalArgumentException("period must be 24h, 7d or 30d");
+                }
+                return between(now.minus(span), now);
+            }
+            if (period != null) {
+                throw new IllegalArgumentException("Pass either period or from and to, not both");
+            }
+            if (from == null || to == null) {
+                throw new IllegalArgumentException("A custom range needs both from and to");
+            }
+            if (!from.isBefore(to)) {
+                throw new IllegalArgumentException("from must be before to");
+            }
+            if (to.isAfter(now.plus(CLOCK_SKEW))) {
+                throw new IllegalArgumentException("to must not be in the future");
+            }
+            if (Duration.between(from, to).compareTo(MAX_SPAN) > 0) {
+                throw new IllegalArgumentException("A custom range can span at most 90 days");
+            }
+            return between(from, to);
         }
+
+        private static Window between(Instant from, Instant to) {
+            return new Window(from, to,
+                    Duration.between(from, to).compareTo(HOURLY_UP_TO) <= 0 ? "HOUR" : "DAY");
+        }
+    }
+
+    public AnalyticsResponse getAnalytics(UUID projectId, Window window) {
+        Instant from = window.from();
+        Instant to = window.to();
+        String granularity = window.granularity();
 
         TimeRange timeRange = TimeRange.builder()
                 .from(from.toString())
-                .to(now.toString())
+                .to(to.toString())
                 .granularity(granularity)
                 .build();
 
-        OverviewMetrics overview = calculateOverviewMetrics(projectId, from, now);
-        List<TimeSeriesPoint> deliveryTimeSeries = calculateDeliveryTimeSeries(projectId, from, now, granularity);
-        List<TimeSeriesPoint> latencyTimeSeries = calculateLatencyTimeSeries(projectId, from, now, granularity);
-        List<EventTypeBreakdown> eventTypeBreakdown = calculateEventTypeBreakdown(projectId, from, now);
-        List<EndpointPerformance> endpointPerformance = calculateEndpointPerformance(projectId, from, now);
-        LatencyPercentiles latencyPercentiles = calculateLatencyPercentiles(projectId, from, now);
+        OverviewMetrics overview = calculateOverviewMetrics(projectId, from, to);
+        List<TimeSeriesPoint> deliveryTimeSeries = calculateDeliveryTimeSeries(projectId, from, to, granularity);
+        List<TimeSeriesPoint> latencyTimeSeries = calculateLatencyTimeSeries(projectId, from, to, granularity);
+        List<EventTypeBreakdown> eventTypeBreakdown = calculateEventTypeBreakdown(projectId, from, to);
+        List<EndpointPerformance> endpointPerformance = calculateEndpointPerformance(projectId, from, to);
+        LatencyPercentiles latencyPercentiles = calculateLatencyPercentiles(projectId, from, to);
 
         return AnalyticsResponse.builder()
                 .timeRange(timeRange)
@@ -74,6 +104,15 @@ public class AnalyticsService {
                 .endpointPerformance(endpointPerformance)
                 .latencyPercentiles(latencyPercentiles)
                 .build();
+    }
+
+    public String exportFilename(UUID projectId, Window window) {
+        String name = projectRepository.findById(projectId)
+                .map(project -> project.getName().toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", ""))
+                .filter(slug -> !slug.isEmpty())
+                .orElse(projectId.toString());
+        return "analytics-" + name + "-" + FILENAME_INSTANT.format(window.from())
+                + "-" + FILENAME_INSTANT.format(window.to()) + ".csv";
     }
 
     private OverviewMetrics calculateOverviewMetrics(UUID projectId, Instant from, Instant to) {
