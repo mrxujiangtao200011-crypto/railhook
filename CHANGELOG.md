@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `PAGERDUTY` and `OPSGENIE` alert channels. A rule triggers a PagerDuty event or creates an Opsgenie alert when it fires, and resolves or closes it when the condition clears. The routing key or API key is stored encrypted, never returned, and included in key rotation (`alertRulesRotated` in the rotation response).
+
+### Changed
+
+- Every alert rule opens an incident when it fires, not only `CRITICAL` ones. Further firings are added to the open incident's timeline, and the incident is resolved automatically when the evaluator sees the condition clear. The Incidents page shows the rule that opened an incident and whether it was resolved automatically.
+
 ## [3.3.1] - 2026-09-30
 
 ### Added
