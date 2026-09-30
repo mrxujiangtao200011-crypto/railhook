@@ -153,6 +153,19 @@ describe('EventsPage', () => {
     expect(screen.queryByText('invoice.sent')).not.toBeInTheDocument();
   });
 
+  it('opens a row in place to show its payload, with the way to the full event', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(eventsApi.listByProject).mockResolvedValue(populatedPage([{ ...EVENT, payload: '{"orderId":"ord_42"}' }]));
+    renderEvents();
+    await screen.findByText('order.created');
+    expect(screen.queryByText('"ord_42"')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('order.created').closest('tr')!);
+
+    expect(await screen.findByText('"ord_42"')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /open full details/i })).toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/events/event-1`);
+  });
+
   it('keeps checking while a row still owes deliveries, so it turns delivered without a reload', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Radio, Plus, Share2, Loader2 } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ChevronDown, ChevronRight, Loader2, Plus, Radio, Share2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { useEvents, useProject } from '../api/queries';
@@ -15,15 +15,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { SortableTableHead, useSort } from '../components/ui/sortable-table-head';
 import { TablePagination } from '../components/ui/table-pagination';
 import SendTestEventModal from '../components/SendTestEventModal';
-import EventDetailsSheet from '../components/EventDetailsSheet';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { debugLinksApi } from '../api/debugLinks.api';
-import { CopyId, FilterBar, FilterField, SearchField, SORTABLE_HEAD_CLASS, TimeCell } from './tableParts';
+import { CopyId, FilterBar, FilterField, SearchField, SORTABLE_HEAD_CLASS } from './tableParts';
 import type { DeliveryStatusCounts } from '../types/api.types';
 import { useDebounced } from '../hooks/useDebounced';
-
+import { formatDateTime, formatRelativeTime } from '../lib/date';
+import { cn } from '../lib/utils';
+import { JsonView, SegmentBar } from '../components/port/p1/kit';
 
 type EventStatus = 'delivered' | 'owed' | 'abandoned' | 'unsubscribed';
 
@@ -55,7 +56,6 @@ const STATUS_FILTERS: EventStatus[] = ['delivered', 'owed', 'abandoned', 'unsubs
 export default function EventsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
@@ -63,7 +63,7 @@ export default function EventsPage() {
   const [showSendModal, setShowSendModal] = useState(false);
   const { canSendEvents, canCreateDebugLinks } = usePermissions();
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const debouncedSearch = useDebounced(search.trim());
@@ -129,9 +129,8 @@ export default function EventsPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
       <PageHeader
-        eyebrow={t('nav.outgoing')}
         description={<Trans i18nKey="events.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={sendAction}
       />
@@ -166,73 +165,119 @@ export default function EventsPage() {
         />
       ) : (
         <div className="animate-fade-in">
-          <div className="overflow-hidden border border-rail bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('deliveries.columns.status')}</TableHead>
-                  <SortableTableHead field="eventType" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('events.eventType')}</SortableTableHead>
-                  <TableHead>{t('events.deliveriesCount')}</TableHead>
-                  <TableHead>{t('events.eventId')}</TableHead>
-                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('events.created')}</SortableTableHead>
-                  <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleRows.map(({ event, delivered, status }) => (
-                  <TableRow
-                    key={event.id}
-                    className="group/row cursor-pointer"
-                    onClick={() => setSelectedEventId(event.id)}
-                  >
-                    <TableCell>
-                      <StatusBadge kind={STATUS_KIND[status]} label={t(`events.deliveryStatus.${status}`)} />
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        to={`/admin/projects/${projectId}/events/${event.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="rounded font-mono text-[13px] font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {event.eventType}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        to={`/admin/projects/${projectId}/deliveries?eventId=${event.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="rounded font-mono text-[13px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {t('events.deliveredOf', delivered)}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <CopyId value={event.id} to={`/admin/projects/${projectId}/events/${event.id}`} />
-                    </TableCell>
-                    <TableCell><TimeCell value={event.createdAt} /></TableCell>
-                    <TableCell>
-                      {canCreateDebugLinks && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={(e) => { e.stopPropagation(); handleShareDebugLink(event.id); }}
-                          disabled={sharingEventId === event.id}
-                          title={t('debugLinks.share')}
-                          aria-label={t('debugLinks.share')}
-                        >
-                          {sharingEventId === event.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Share2 className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
+          <Table className="text-[13px]">
+            <TableHeader className="border-t border-rail">
+              <TableRow>
+                <TableHead className="hidden w-10 px-2 sm:table-cell"><span className="sr-only">{t('events.details.title')}</span></TableHead>
+                <TableHead className="px-2">{t('deliveries.columns.status')}</TableHead>
+                <SortableTableHead field="eventType" sort={sort} onSort={toggleSort} className={cn(SORTABLE_HEAD_CLASS, 'px-2')}>{t('events.eventType')}</SortableTableHead>
+                <TableHead className="px-2">{t('events.deliveriesCount')}</TableHead>
+                <TableHead className="px-2">{t('events.eventId')}</TableHead>
+                <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={cn(SORTABLE_HEAD_CLASS, 'px-2')}>{t('events.created')}</SortableTableHead>
+                <TableHead className="w-[60px] px-2"><span className="sr-only">{t('common.actions')}</span></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visibleRows.map(({ event, delivered, status }) => {
+                const open = expanded === event.id;
+                const c = event.deliveryCounts;
+                return (
+                  <Fragment key={event.id}>
+                    <TableRow
+                      className={cn(
+                        'group/row cursor-pointer',
+                        open && 'bg-secondary hover:bg-secondary',
+                        status === 'abandoned' && !open && 'bg-halt-soft/40',
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                      onClick={() => setExpanded(open ? null : event.id)}
+                    >
+                      <TableCell className="hidden px-2 py-2 text-muted-foreground sm:table-cell">
+                        {open ? <ChevronDown className="h-3.5 w-3.5" aria-hidden /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden />}
+                      </TableCell>
+                      <TableCell className="px-2 py-2">
+                        <StatusBadge kind={STATUS_KIND[status]} label={t(`events.deliveryStatus.${status}`)} />
+                      </TableCell>
+                      <TableCell className="px-2 py-2">
+                        <Link
+                          to={`/admin/projects/${projectId}/events/${event.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="break-all font-mono text-[12px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {event.eventType}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="px-2 py-2">
+                        <span className="flex items-center gap-3">
+                          {c && delivered.total > 0 && (
+                            <SegmentBar
+                              className="w-16 max-sm:hidden"
+                              parts={[
+                                { value: c.success, className: 'bg-ok' },
+                                { value: c.pending + c.processing, className: 'bg-idle/50' },
+                                { value: c.failed, className: 'bg-retry' },
+                                { value: c.dlq, className: 'bg-halt' },
+                              ]}
+                            />
+                          )}
+                          <Link
+                            to={`/admin/projects/${projectId}/deliveries?eventId=${event.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                              'whitespace-nowrap font-mono text-[12px] underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              status === 'abandoned' ? 'text-halt' : 'text-muted-foreground',
+                            )}
+                          >
+                            {t('events.deliveredOf', delivered)}
+                          </Link>
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-2 py-2">
+                        <CopyId value={event.id} to={`/admin/projects/${projectId}/events/${event.id}`} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap px-2 py-2">
+                        <span className="text-[13px]" title={formatDateTime(event.createdAt)}>{formatRelativeTime(event.createdAt)}</span>
+                      </TableCell>
+                      <TableCell className="px-2 py-2">
+                        {canCreateDebugLinks && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={(e) => { e.stopPropagation(); handleShareDebugLink(event.id); }}
+                            disabled={sharingEventId === event.id}
+                            title={t('debugLinks.share')}
+                            aria-label={t('debugLinks.share')}
+                          >
+                            {sharingEventId === event.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Share2 className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                    {open && (
+                      <TableRow className="bg-secondary/40 hover:bg-secondary/40">
+                        <TableCell colSpan={7} className="px-2 pb-4 pt-1">
+                          <div className="w-full min-w-0 text-left">
+                            <JsonView value={event.payload} title={<span className="font-mono">{event.id}</span>} maxHeight="max-h-72" />
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Button size="sm" asChild>
+                                <Link to={`/admin/projects/${projectId}/events/${event.id}`}>{t('events.details.openFull')}</Link>
+                              </Button>
+                              <Button size="sm" variant="outline" asChild>
+                                <Link to={`/admin/projects/${projectId}/deliveries?eventId=${event.id}`}>{t('events.details.deliveries')}</Link>
+                              </Button>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
 
           {statusFilter && (
             <p className="mt-3 text-xs text-muted-foreground">
@@ -250,16 +295,6 @@ export default function EventsPage() {
           />
         </div>
       )}
-
-      <EventDetailsSheet
-        projectId={projectId!}
-        eventId={selectedEventId}
-        onClose={() => setSelectedEventId(null)}
-        onViewDeliveries={(id) => {
-          setSelectedEventId(null);
-          navigate(`/admin/projects/${projectId}/deliveries?eventId=${id}`);
-        }}
-      />
 
       <SendTestEventModal
         projectId={projectId!}
