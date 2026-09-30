@@ -318,6 +318,21 @@ of that, production should have:
 
 All variables: `.env.dist`.
 
+## Docker Hub mirror
+
+Release images go to GHCR, which is what `docker-compose.yml`, Helm and the deploy pull. A
+tagged release also pushes `<namespace>/railhook-api`, `-worker` and `-ui` to Docker Hub once
+the repository has:
+
+- variable `DOCKERHUB_NAMESPACE`: the Docker Hub user or organization
+- secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`: a Docker Hub access token with Read, Write,
+  Delete scope; the description update needs Delete, pushing alone does not
+
+Each push also sets the repository's overview from `deploy/dockerhub/README.md`.
+
+Without the variable the step is skipped. To mirror a release that is already out, run
+**Docker Publish** by hand with its tag.
+
 ## More
 
 - [Self-hosting](https://railhook.io/docs/self-hosting/overview/)
