@@ -74,8 +74,8 @@ export function PlatformErrorState({
 export function PlatformScope() {
   const { t, i18n } = useTranslation();
   return (
-    <p className="mb-5 flex max-w-3xl items-start gap-2 text-[13px] text-muted-foreground">
-      <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden />
+    <p className="-mt-2 mb-8 flex max-w-3xl items-start gap-2 text-[13px] text-muted-foreground">
+      <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" aria-hidden />
       <span>
         {t('platformAdmin.scope')}{' '}
         <a
@@ -122,7 +122,7 @@ export const PLATFORM_TABLE = '[&_td]:px-3 [&_th]:px-3';
 export function PlatformAdminBadge() {
   const { t } = useTranslation();
   return (
-    <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+    <span className="inline-flex items-center gap-1 border border-rail px-1.5 py-0.5 text-[11px] text-muted-foreground">
       <ShieldCheck className="h-3 w-3" aria-hidden />
       {t('platformAdmin.adminBadge')}
     </span>
@@ -164,22 +164,14 @@ export function SignInMethods({ methods }: { methods: SignInMethod[] }) {
     if (method === 'GOOGLE') return t('platformAdmin.signIn.google');
     return method;
   };
-  return (
-    <span className="inline-flex flex-wrap gap-1">
-      {methods.map((method) => (
-        <span key={method} className="rounded border border-rail px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-          {label(method)}
-        </span>
-      ))}
-    </span>
-  );
+  return <span className="text-[13px] text-muted-foreground">{methods.map(label).join(', ')}</span>;
 }
 
 export function EventsAgainstLimit({ current, limit }: { current: number; limit: number }) {
   const { t } = useTranslation();
   if (limit <= 0) {
     return (
-      <div className="min-w-[7rem] font-mono text-[13px]">
+      <div className="min-w-[7rem] text-[13px] tabular-nums">
         {formatNumber(current)}
         <span className="ml-1.5 font-sans text-xs text-muted-foreground">{t('platformAdmin.unlimited')}</span>
       </div>
@@ -188,13 +180,13 @@ export function EventsAgainstLimit({ current, limit }: { current: number; limit:
   const percent = Math.min(100, Math.round((current / limit) * 100));
   return (
     <div className="min-w-[7rem]">
-      <div className="font-mono text-[13px]">
+      <div className={cn('text-[13px] tabular-nums', percent >= 100 ? 'text-halt' : percent >= 80 && 'text-retry')}>
         {formatNumber(current)}
         <span className="text-muted-foreground"> / {formatNumber(limit)}</span>
       </div>
       <div className="mt-1 h-1 w-full bg-secondary" aria-hidden>
         <div
-          className={cn('h-1', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-primary')}
+          className={cn('h-1', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-foreground/60')}
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -301,5 +293,38 @@ export function SuspensionDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function DailyBars({ label, days }: { label: string; days: { date: string; value: number }[] }) {
+  const { t, i18n } = useTranslation();
+  const [hover, setHover] = useState<number | null>(null);
+  if (days.filter((d) => d.value > 0).length < 5) return null;
+  const max = Math.max(...days.map((d) => d.value), 1);
+  const shown = hover ?? days.length - 1;
+  const day = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString(i18n.language, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return (
+    <figure className="min-w-0">
+      <figcaption className="flex items-baseline justify-between gap-3 text-[13px]">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="truncate tabular-nums">
+          {formatNumber(days[shown].value)} <span className="text-muted-foreground">· {hover === null ? t('platformAdmin.overview.daily.today') : day(days[shown].date)}</span>
+        </span>
+      </figcaption>
+      <div className="mt-3 flex h-14 items-end gap-[2px]" role="img" aria-label={label} onMouseLeave={() => setHover(null)}>
+        {days.map((d, i) => (
+          <div key={d.date} onMouseEnter={() => setHover(i)} className="flex h-full min-w-0 flex-1 items-end">
+            <div
+              className={cn('w-full transition-colors', d.value === 0 ? 'bg-rail' : i === shown ? 'bg-foreground' : 'bg-foreground/25')}
+              style={{ height: d.value === 0 ? 1 : `${Math.max((d.value / max) * 100, 4)}%` }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
+        <span>{t('platformAdmin.overview.daily.period')}</span>
+        <span>{t('platformAdmin.overview.daily.today')}</span>
+      </div>
+    </figure>
   );
 }

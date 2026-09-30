@@ -58,7 +58,7 @@ export const gridProps = {
 
 export const cursorProps = { stroke: CHROME.rail, strokeWidth: 1 } as const;
 
-export const CHART_MARGIN = { top: 8, right: 12, bottom: 0, left: 0 } as const;
+export const CHART_MARGIN = { top: 8, right: 32, bottom: 0, left: 0 } as const;
 
 function localeTag(): string {
   return i18n.language === 'uk' ? 'uk-UA' : 'en-US';

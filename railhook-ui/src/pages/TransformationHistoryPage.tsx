@@ -87,7 +87,7 @@ export default function TransformationHistoryPage() {
 
   if (transformationQuery.isError || versionsQuery.isError || !transformation) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
         <ErrorState
           error={transformationQuery.error ?? versionsQuery.error}
           onRetry={() => { transformationQuery.refetch(); versionsQuery.refetch(); }}
@@ -98,7 +98,7 @@ export default function TransformationHistoryPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
       <Link
         to={backLink}
         className="mb-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -121,7 +121,7 @@ export default function TransformationHistoryPage() {
         />
       ) : (
         <>
-          <Card className="divide-y divide-rail overflow-hidden">
+          <Card className="divide-y divide-rail border-b">
             {versions.map((version) => {
               const selected = compare.includes(version.version);
               return (

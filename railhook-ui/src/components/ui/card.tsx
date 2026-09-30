@@ -10,8 +10,8 @@ const CardDensityContext = React.createContext<CardDensity>("comfortable")
 const cardPadding = cva("", {
   variants: {
     density: {
-      comfortable: "p-6",
-      compact: "p-4",
+      comfortable: "py-5",
+      compact: "py-4",
     },
   },
   defaultVariants: {
@@ -20,11 +20,11 @@ const cardPadding = cva("", {
 })
 
 const cardVariants = cva(
-  "border bg-card text-card-foreground transition-colors duration-200",
+  "border-t border-rail bg-transparent text-card-foreground transition-colors duration-200",
   {
     variants: {
       interactive: {
-        true: "hover:border-foreground",
+        true: "hover:border-foreground hover:bg-secondary/40",
         false: "",
       },
     },
@@ -81,7 +81,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref}
-    className={cn("text-title", className)}
+    className={cn("text-[15px] font-medium leading-snug", className)}
     {...props}
   />
 ))

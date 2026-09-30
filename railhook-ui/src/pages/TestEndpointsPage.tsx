@@ -126,7 +126,7 @@ export default function TestEndpointsPage() {
 
   if (loadError) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
         <PageHeader title={t('testEndpoints.title')} description={t('testEndpoints.subtitle')} />
         <ErrorState
           error={loadError}
@@ -140,7 +140,7 @@ export default function TestEndpointsPage() {
 
   if (endpoints.length === 0) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
         <PageHeader title={t('testEndpoints.title')} description={t('testEndpoints.subtitle')} />
         <EmptyState
           icon={TestTube}
@@ -153,7 +153,7 @@ export default function TestEndpointsPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
       <PageHeader
         eyebrow={t('testEndpoints.count', { count: endpoints.length })}
         title={t('testEndpoints.title')}
@@ -201,8 +201,8 @@ export default function TestEndpointsPage() {
                   </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-[11px]">{endpoint.url}</code>
-                  <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground">
+                  <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-[12px]">{endpoint.url}</code>
+                  <span className="flex-shrink-0 font-mono text-[12px] text-muted-foreground">
                     {t('testEndpoints.requestCount', { count: endpoint.requestCount })}
                   </span>
                 </div>
@@ -256,12 +256,12 @@ export default function TestEndpointsPage() {
                         {expanded
                           ? <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
                           : <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />}
-                        <span className="rounded border border-rail bg-secondary px-1.5 py-0.5 font-mono text-[11px] font-medium">
+                        <span className="rounded border border-rail bg-secondary px-1.5 py-0.5 font-mono text-[12px] font-medium">
                           {req.method}
                         </span>
-                        <span className="font-mono text-[11px] text-muted-foreground">{formatDateTime(req.receivedAt)}</span>
+                        <span className="font-mono text-[12px] text-muted-foreground">{formatDateTime(req.receivedAt)}</span>
                         {req.sourceIp && (
-                          <span className="ml-auto truncate font-mono text-[11px] text-muted-foreground">{req.sourceIp}</span>
+                          <span className="ml-auto truncate font-mono text-[12px] text-muted-foreground">{req.sourceIp}</span>
                         )}
                       </button>
 
@@ -269,7 +269,7 @@ export default function TestEndpointsPage() {
                         <div className="space-y-3 border-t border-rail bg-muted/30 p-3">
                           {req.headers && (
                             <OutputBlock label={t('testEndpoints.headers')}>
-                              <pre className="max-h-40 overflow-auto p-2.5 font-mono text-[11px]">
+                              <pre className="max-h-40 overflow-auto p-2.5 font-mono text-[12px]">
                                 {JSON.stringify(parseHeaders(req.headers), null, 2)}
                               </pre>
                             </OutputBlock>
@@ -282,7 +282,7 @@ export default function TestEndpointsPage() {
                           )}
                           {req.queryString && (
                             <OutputBlock label={t('testEndpoints.queryString')}>
-                              <code className="block break-all p-2.5 font-mono text-[11px]">{`?${req.queryString}`}</code>
+                              <code className="block break-all p-2.5 font-mono text-[12px]">{`?${req.queryString}`}</code>
                             </OutputBlock>
                           )}
                         </div>

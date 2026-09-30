@@ -11,8 +11,8 @@ import { formatRelativeTime } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
-import { EnabledBadge } from '../components/StatusBadge';
-import { RuleStats, RuleRow, MatchExpression, RuleActionChip } from '../components/RuleLayout';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { cn } from '../lib/utils';
 import {
   useProject, useRules, useCreateRule, useUpdateRule, useDeleteRule, useToggleRule,
   useEndpoints, useTransformations,
@@ -206,7 +206,7 @@ export default function RulesPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
       <PageHeader
         eyebrow={t('rules.count', { count: rules.length })}
         title={t('rules.title')}
@@ -229,14 +229,14 @@ export default function RulesPage() {
         />
       ) : (
         <div className="space-y-4">
-          <RuleStats
-            items={[
-              { label: t('rules.stats.total'), value: rules.length },
-              { label: t('rules.stats.active'), value: enabledCount },
-              { label: t('rules.stats.executions'), value: totalExecutions.toLocaleString() },
-              { label: t('rules.stats.matchRate'), value: matchRate },
-            ]}
-          />
+          <p className="text-[13px] text-muted-foreground">
+            {t('rules.summary', {
+              active: enabledCount,
+              total: rules.length,
+              executions: totalExecutions.toLocaleString(),
+              rate: matchRate,
+            })}
+          </p>
 
           <div className="relative max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -245,113 +245,139 @@ export default function RulesPage() {
               placeholder={t('rules.search')}
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              className="pl-9"
+              className="pl-9 max-sm:h-11"
             />
           </div>
 
           {filteredRules.length === 0 ? (
-            <p className="border border-dashed border-rail px-6 py-12 text-center text-sm text-muted-foreground">
+            <p className="border-t border-rail py-10 text-sm text-muted-foreground">
               {t('rules.noResults')}
             </p>
           ) : (
-            <ul className="space-y-2.5">
-              {filteredRules.map((rule) => {
-                const expanded = expandedId === rule.id;
-                return (
-                  <li key={rule.id}>
-                    <RuleRow
-                      muted={!rule.enabled}
-                      name={rule.name}
-                      meta={rule.priority > 0 && (
-                        <Badge variant="outline" className="font-mono text-[10px]">P{rule.priority}</Badge>
-                      )}
-                      match={
-                        <MatchExpression title={rule.eventTypePattern || undefined}>
-                          {rule.eventTypePattern || '**'}
-                        </MatchExpression>
-                      }
-                      then={
-                        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                          {rule.actions.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">{t('rules.noActions')}</span>
-                          ) : rule.actions.map((a, i) => (
-                            <RuleActionChip
-                              key={i}
-                              icon={ACTION_ICON[a.type]}
-                              label={t(`rules.actionTypes.${a.type}`)}
-                              detail={a.endpointUrl || a.transformationName || undefined}
-                            />
-                          ))}
+            <Table className="text-[13px]">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-12 px-3">#</TableHead>
+                  <TableHead className="px-3">{t('rules.columns.rule')}</TableHead>
+                  <TableHead className="px-3">{t('rules.columns.when')}</TableHead>
+                  <TableHead className="px-3">{t('rules.columns.then')}</TableHead>
+                  <TableHead className="w-32 px-3 text-right">{t('rules.stats.matches')}</TableHead>
+                  <TableHead className="w-28 px-3">{t('rules.columns.state')}</TableHead>
+                  <TableHead className="w-12 px-2"><span className="sr-only">{t('rules.showDetails')}</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...filteredRules].sort((x, y) => x.priority - y.priority).flatMap((rule, index) => {
+                  const expanded = expandedId === rule.id;
+                  const conditions = countPredicates(rule.conditions);
+                  const never = rule.enabled && rule.totalExecutions > 0 && rule.totalMatches === 0;
+                  return [
+                    <TableRow key={rule.id} className={cn(!rule.enabled && 'text-muted-foreground', expanded && 'bg-secondary/40')}>
+                      <TableCell className="px-3 font-mono text-[12px] text-muted-foreground">
+                        <span>
+                          {index + 1}
+                          {rule.priority !== 0 && <span className="ml-1 text-[11px]">P{rule.priority}</span>}
                         </span>
-                      }
-                      status={<EnabledBadge enabled={rule.enabled} />}
-                      controls={
-                        <>
+                      </TableCell>
+                      <TableCell className="max-w-[16rem] px-3">
+                        <span className="block truncate" title={rule.name}>{rule.name}</span>
+                        {rule.description && <span className="block truncate text-[12px] text-muted-foreground">{rule.description}</span>}
+                      </TableCell>
+                      <TableCell className="px-3">
+                        <span className="font-mono text-[12px]" title={rule.eventTypePattern || undefined}>{rule.eventTypePattern || '**'}</span>
+                        {conditions > 0 && <span className="block text-[12px] text-muted-foreground">{t('rules.conditionCount', { count: conditions })}</span>}
+                      </TableCell>
+                      <TableCell className="max-w-[18rem] px-3">
+                        {rule.actions.length === 0 ? (
+                          <span className="text-[12px] text-muted-foreground">{t('rules.noActions')}</span>
+                        ) : (
+                          <span className="flex min-w-0 flex-col gap-0.5">
+                            {rule.actions.map((a, i) => {
+                              const Icon = ACTION_ICON[a.type];
+                              const detail = a.endpointUrl || a.transformationName;
+                              return (
+                                <span key={i} className="flex min-w-0 items-center gap-1.5">
+                                  <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
+                                  <span className="flex-shrink-0">{t(`rules.actionTypes.${a.type}`)}</span>
+                                  {detail && <span className="min-w-0 truncate font-mono text-[12px] text-muted-foreground" title={detail}>{detail}</span>}
+                                </span>
+                              );
+                            })}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className={cn('px-3 text-right tabular-nums', never && 'text-retry')}>
+                        <span>
+                          {rule.totalMatches.toLocaleString()}
+                          <span className="text-muted-foreground"> / {rule.totalExecutions.toLocaleString()}</span>
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-3">
+                        <span className="flex items-center gap-2">
                           <Switch
                             checked={rule.enabled}
                             onCheckedChange={() => handleToggle(rule)}
                             disabled={!canManage}
                             aria-label={t(rule.enabled ? 'common.disable' : 'common.enable')}
                           />
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => setExpandedId(expanded ? null : rule.id)}
-                            aria-expanded={expanded}
-                            aria-label={t('rules.showDetails')}
-                          >
-                            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
-                        </>
-                      }
-                      footer={expanded ? (
-                        <div className="space-y-4 border-t border-rail bg-muted/30 px-3.5 py-3">
-                          {rule.description && <p className="text-sm text-muted-foreground">{rule.description}</p>}
-
-                          <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[11px] text-muted-foreground">
-                            <span>{t('rules.conditionCount', { count: countPredicates(rule.conditions) })}</span>
-                            <span>{t('rules.stats.executions')}: {rule.totalExecutions.toLocaleString()}</span>
-                            <span>{t('rules.stats.matches')}: {rule.totalMatches.toLocaleString()}</span>
-                          </div>
-
-                          {rule.conditions && countPredicates(rule.conditions) > 0 && (
-                            <div>
-                              <p className="mono-label mb-2 flex items-center gap-1.5">
-                                <Filter className="h-3 w-3" aria-hidden />
-                                {t('rules.conditionsLabel')}
+                          <span className="text-[12px]">{rule.enabled ? t('common.on') : t('common.off')}</span>
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-2 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setExpandedId(expanded ? null : rule.id)}
+                          aria-expanded={expanded}
+                          aria-label={t('rules.showDetails')}
+                        >
+                          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                      </TableCell>
+                    </TableRow>,
+                    expanded && (
+                      <TableRow key={`${rule.id}-detail`} className="hover:bg-transparent">
+                        <TableCell colSpan={7} className="border-l-2 border-l-foreground/40 bg-secondary/30 px-4 py-4">
+                          <div className="space-y-4">
+                            {rule.description && <p className="text-sm text-muted-foreground">{rule.description}</p>}
+                            {rule.conditions && conditions > 0 && (
+                              <div>
+                                <p className="mb-2 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                                  <Filter className="h-3 w-3" aria-hidden />
+                                  {t('rules.conditionsLabel')}
+                                </p>
+                                <ConditionTreeDisplay node={rule.conditions} />
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-[12px] text-muted-foreground">
+                                {t('rules.createdAt')} <span className="font-mono">{formatRelativeTime(rule.createdAt)}</span>
+                                {rule.updatedAt !== rule.createdAt && (
+                                  <>
+                                    {' · '}
+                                    {t('rules.updatedAt')} <span className="font-mono">{formatRelativeTime(rule.updatedAt)}</span>
+                                  </>
+                                )}
                               </p>
-                              <ConditionTreeDisplay node={rule.conditions} />
+                              <PermissionGate allowed={canManage}>
+                                <span className="flex items-center gap-2">
+                                  <Button variant="outline" size="sm" onClick={() => openEdit(rule)}>
+                                    <Pencil className="h-3.5 w-3.5" /> {t('common.edit')}
+                                  </Button>
+                                  <Button variant="outline" size="sm" className="text-halt hover:text-halt" onClick={() => setDeleteId(rule.id)}>
+                                    <Trash2 className="h-3.5 w-3.5" /> {t('common.delete')}
+                                  </Button>
+                                </span>
+                              </PermissionGate>
                             </div>
-                          )}
-
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-[11px] text-muted-foreground">
-                              {t('rules.createdAt')} <span className="font-mono">{formatRelativeTime(rule.createdAt)}</span>
-                              {rule.updatedAt !== rule.createdAt && (
-                                <>
-                                  {' · '}
-                                  {t('rules.updatedAt')} <span className="font-mono">{formatRelativeTime(rule.updatedAt)}</span>
-                                </>
-                              )}
-                            </p>
-                            <PermissionGate allowed={canManage}>
-                              <span className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" onClick={() => openEdit(rule)}>
-                                  <Pencil className="h-3.5 w-3.5" /> {t('common.edit')}
-                                </Button>
-                                <Button variant="outline" size="sm" className="text-halt hover:text-halt" onClick={() => setDeleteId(rule.id)}>
-                                  <Trash2 className="h-3.5 w-3.5" /> {t('common.delete')}
-                                </Button>
-                              </span>
-                            </PermissionGate>
                           </div>
-                        </div>
-                      ) : undefined}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  ];
+                })}
+              </TableBody>
+            </Table>
           )}
         </div>
       )}

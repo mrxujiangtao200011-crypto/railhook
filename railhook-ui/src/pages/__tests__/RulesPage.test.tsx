@@ -100,7 +100,7 @@ function renderRules() {
 }
 
 function rowFor(name: string): HTMLElement {
-  const row = screen.getByText(name).closest('li');
+  const row = screen.getByText(name).closest('tr');
   expect(row, `no row rendered for ${name}`).not.toBeNull();
   return row as HTMLElement;
 }

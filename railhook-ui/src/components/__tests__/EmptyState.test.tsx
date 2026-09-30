@@ -12,12 +12,12 @@ function withRouter(ui: React.ReactElement) {
 
 describe('EmptyState', () => {
 
-  it('keeps its centred layout when a caller only changes the spacing', () => {
+  it('keeps its layout when a caller only changes the spacing', () => {
     // "py-10" used to replace the whole layout inside a card.
-    withRouter(<EmptyState icon={Webhook} title="No projects." className="py-10" />);
+    withRouter(<EmptyState icon={Webhook} title="No projects." className="py-6" />);
     const container = screen.getByText('No projects.').parentElement!;
-    expect(container).toHaveClass('flex', 'flex-col', 'items-center', 'justify-center', 'py-10');
-    expect(container).not.toHaveClass('py-16');
+    expect(container).toHaveClass('flex', 'flex-col', 'items-start', 'py-6');
+    expect(container).not.toHaveClass('py-10');
   });
 });
 

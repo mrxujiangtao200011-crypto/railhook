@@ -3,10 +3,9 @@ import { useParams } from 'react-router-dom';
 import { RotateCcw, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
-import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import PageSkeleton from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
-import StatusBadge from '../components/StatusBadge';
 import {
   useProject, useDlq, useDlqStats, useEndpoints, useDlqRetry, useDlqBulkRetry, useDlqPurge,
 } from '../api/queries';
@@ -19,18 +18,20 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { railFromCounts } from './attemptRailData';
-import { AttemptCell, CopyId, FilterBar, FilterField, SelectBox, SelectionBar, TimeCell } from './tableParts';
+import { AttemptCell, CopyId, FilterBar, FilterField, SelectBox, SelectionBar } from './tableParts';
+import { formatDateTime, formatRelativeTime } from '../lib/date';
+import { Dot } from '../components/port/p1/kit';
+
+function hostOf(url: string) {
+  try {
+    const u = new URL(url);
+    return u.host + (u.pathname === '/' ? '' : u.pathname);
+  } catch {
+    return url;
+  }
+}
 import DeliveryDetailsSheet from './DeliveryDetailsSheet';
 
-
-function Metric({ label, value, halt }: { label: string; value: number; halt?: boolean }) {
-  return (
-    <div className="border border-rail bg-card px-4 py-3">
-      <p className="mono-label">{label}</p>
-      <p className={`mt-1 font-mono text-2xl ${halt ? 'text-halt' : 'text-foreground'}`}>{value}</p>
-    </div>
-  );
-}
 
 export default function DlqPage() {
   const { t } = useTranslation();
@@ -120,7 +121,6 @@ export default function DlqPage() {
   if (loading) {
     return (
       <PageSkeleton maxWidth="max-w-none">
-        <SkeletonCards count={3} height="h-20" cols="grid-cols-3" />
         <div className="h-[300px] animate-pulse bg-muted" />
       </PageSkeleton>
     );
@@ -128,16 +128,16 @@ export default function DlqPage() {
 
   if (isError) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="p-4 lg:p-8">
         <ErrorState error={projectError ?? dlqError} fallbackKey="dlq.toast.loadFailed" onRetry={retry} />
       </div>
     );
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
       <PageHeader
-        eyebrow={t('nav.outgoing')}
+        title={t('nav.dlq')}
         description={<Trans i18nKey="dlq.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={
           <PermissionGate allowed={canManageDlq}>
@@ -150,12 +150,11 @@ export default function DlqPage() {
         }
       />
 
-      {stats && (
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Metric label={t('dlq.totalItems')} value={stats.totalItems} halt />
-          <Metric label={t('dlq.last24h')} value={stats.last24Hours} />
-          <Metric label={t('dlq.last7d')} value={stats.last7Days} />
-        </div>
+      {stats && stats.totalItems > 0 && (
+        <p className="mb-6 flex items-center gap-2.5 text-sm">
+          <Dot tone="halt" />
+          {t('dlq.statsLine', { total: stats.totalItems, day: stats.last24Hours, week: stats.last7Days })}
+        </p>
       )}
 
       <FilterBar>
@@ -191,9 +190,8 @@ export default function DlqPage() {
             </SelectionBar>
           </PermissionGate>
 
-          <div className="overflow-hidden border border-rail bg-card">
-            <Table>
-              <TableHeader>
+          <Table className="text-[13px]">
+              <TableHeader className="border-t border-rail">
                 <TableRow>
                   {canManageDlq && (
                     <TableHead className="w-10">
@@ -205,13 +203,12 @@ export default function DlqPage() {
                       />
                     </TableHead>
                   )}
-                  <TableHead>{t('deliveries.columns.status')}</TableHead>
-                  <TableHead>{t('dlq.columns.eventType')}</TableHead>
-                  <TableHead>{t('dlq.columns.endpoint')}</TableHead>
-                  <TableHead>{t('dlq.columns.attempts')}</TableHead>
-                  <TableHead className="hidden lg:table-cell">{t('dlq.columns.lastError')}</TableHead>
-                  <TableHead>{t('dlq.columns.failedAt')}</TableHead>
-                  <TableHead>{t('deliveries.columns.deliveryId')}</TableHead>
+                  <TableHead className="px-2">{t('dlq.columns.eventType')}</TableHead>
+                  <TableHead className="px-2">{t('dlq.columns.endpoint')}</TableHead>
+                  <TableHead className="px-2">{t('dlq.columns.lastError')}</TableHead>
+                  <TableHead className="px-2">{t('dlq.columns.attempts')}</TableHead>
+                  <TableHead className="px-2">{t('dlq.columns.failedAt')}</TableHead>
+                  <TableHead className="px-2">{t('deliveries.columns.deliveryId')}</TableHead>
                   {canManageDlq && <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
                 </TableRow>
               </TableHeader>
@@ -234,19 +231,19 @@ export default function DlqPage() {
                           />
                         </TableCell>
                       )}
-                      <TableCell>
-                        <span className="flex flex-col items-start gap-1">
-                          <StatusBadge kind="halt" label={t('dlq.abandoned')} />
-                          <span className="text-[11px] text-muted-foreground">
-                            {t('dlq.ladderExhausted', { count: item.attemptCount })}
-                          </span>
+                      <TableCell className="px-2 py-2.5">
+                        <code className="block break-all font-mono text-[12px]">{item.eventType}</code>
+                        <span className="text-[11px] text-muted-foreground">{t('dlq.ladderExhausted', { count: item.attemptCount })}</span>
+                      </TableCell>
+                      <TableCell className="px-2 py-2.5">
+                        <span className="block max-w-[240px] truncate font-mono text-[12px] text-muted-foreground" title={item.endpointUrl}>{hostOf(item.endpointUrl)}</span>
+                      </TableCell>
+                      <TableCell className="px-2 py-2.5">
+                        <span className="block max-w-[260px] truncate font-mono text-[12px] text-halt" title={item.lastError ?? undefined}>
+                          {item.lastError || t('dlq.unknownError')}
                         </span>
                       </TableCell>
-                      <TableCell><code className="font-mono text-[13px]">{item.eventType}</code></TableCell>
-                      <TableCell>
-                        <span className="block max-w-[200px] truncate font-mono text-[13px]" title={item.endpointUrl}>{item.endpointUrl}</span>
-                      </TableCell>
-                      <TableCell>
+                      <TableCell className="px-2 py-2.5">
                         <AttemptCell
                           rail={rail.attempts}
                           maxAttempts={rail.maxAttempts}
@@ -254,13 +251,10 @@ export default function DlqPage() {
                           ladderLength={item.maxAttempts}
                         />
                       </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <span className="block max-w-[220px] truncate text-[13px] text-halt" title={item.lastError ?? undefined}>
-                          {item.lastError || t('dlq.unknownError')}
-                        </span>
+                      <TableCell className="whitespace-nowrap px-2 py-2.5">
+                        <span className="font-mono text-[12px] text-muted-foreground" title={formatDateTime(item.failedAt)}>{formatRelativeTime(item.failedAt)}</span>
                       </TableCell>
-                      <TableCell><TimeCell value={item.failedAt} /></TableCell>
-                      <TableCell><CopyId value={item.deliveryId} /></TableCell>
+                      <TableCell className="px-2 py-2.5"><CopyId value={item.deliveryId} /></TableCell>
                       {canManageDlq && (
                         <TableCell>
                           <Button
@@ -279,8 +273,7 @@ export default function DlqPage() {
                   );
                 })}
               </TableBody>
-            </Table>
-          </div>
+          </Table>
 
           <TablePagination
             page={page}

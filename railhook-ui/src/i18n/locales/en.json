@@ -78,7 +78,14 @@
     "resolvedAtLabel": "Resolved {{time}}",
     "rules": {
       "desc": "Conditions that raise an alert when they are met",
-      "title": "What is watching"
+      "title": "What is watching",
+      "columns": {
+        "rule": "Rule",
+        "condition": "Fires when",
+        "channel": "Channel",
+        "severity": "Severity",
+        "state": "State"
+      }
     },
     "severities": {
       "CRITICAL": "Critical",
@@ -93,11 +100,7 @@
     "tiles": {
       "allClear": "All clear",
       "armed": "Armed rules",
-      "armedHint": "of {{total}} rules",
-      "silenced": "Silenced",
-      "silencedHint": "Muted, snoozed or turned off",
-      "unresolved": "Unresolved",
-      "unresolvedHint": "Alerts waiting on a decision"
+      "unresolved": "Unresolved"
     },
     "title": "Alerts",
     "toast": {
@@ -139,7 +142,31 @@
     "windowMinutes_few": "{{count}} minutes",
     "windowMinutes_many": "{{count}} minutes",
     "windowMinutes_one": "{{count}} minute",
-    "windowMinutes_other": "{{count}} minutes"
+    "windowMinutes_other": "{{count}} minutes",
+    "condition": {
+      "FAILURE_RATE": "Failure rate above {{v}}% over {{w}} min",
+      "DLQ_THRESHOLD": "More than {{v}} in Failed Messages within {{w}} min",
+      "CONSECUTIVE_FAILURES": "{{v}} deliveries fail in a row",
+      "LATENCY_THRESHOLD": "Average latency above {{v}} ms over {{w}} min"
+    },
+    "state": {
+      "firing": "Firing",
+      "firingValue": "{{current}} now, limit {{threshold}}",
+      "armed": "Armed",
+      "muted": "Muted",
+      "snoozed": "Snoozed",
+      "snoozedUntil": "Snoozed, back {{time}}",
+      "off": "Off"
+    },
+    "summary": {
+      "firing": "{{count}} alerts firing",
+      "firing_one": "{{count}} alert firing",
+      "firing_few": "{{count}} alerts firing",
+      "firing_many": "{{count}} alerts firing",
+      "firing_other": "{{count}} alerts firing",
+      "armed": "{{armed}} of {{total}} rules armed",
+      "silenced": "{{count}} muted, snoozed or off"
+    }
   },
   "analytics": {
     "apply": "Apply",
@@ -198,9 +225,6 @@
     "successRate": "Success Rate",
     "throughput": "Throughput",
     "tiles": {
-      "failedBadge": "Retrying",
-      "failedHint": "{{percent}}% of all deliveries",
-      "latencyHint": "p95 {{p95}} · p99 {{p99}}",
       "successRateHint": "{{delivered}} of {{total}} delivered"
     },
     "to": "To"
@@ -273,7 +297,6 @@
     "scopeReadOnly": "Read Only",
     "scopeReadWrite": "Read & Write",
     "stopsWorking": "Stops working",
-    "subtitle": "Manage API keys for <strong>{{project}}</strong>",
     "subtitlePlain": "Keys that authenticate calls to the API for this project.",
     "title": "API Keys",
     "toast": {
@@ -283,6 +306,11 @@
       "revokeFailed": "Failed to revoke API key",
       "revoked": "API key revoked successfully",
       "rotateFailed": "Could not rotate the key. Please try again."
+    },
+    "columns": {
+      "key": "Key",
+      "scope": "Scope",
+      "status": "Status"
     }
   },
   "auditLog": {
@@ -855,17 +883,44 @@
   "dashboard": {
     "attention": {
       "alerts": "Unresolved alerts",
-      "clearBadge": "All clear",
       "desc": "Work Railhook has stopped doing on its own",
       "dlq": "Abandoned in the DLQ",
       "failed": "Failed, retrying",
       "incidents": "Open incidents",
-      "title": "Needs a human"
+      "title": "Needs a human",
+      "count": "{{count}} things need attention",
+      "count_one": "{{count}} thing needs attention",
+      "count_few": "{{count}} things need attention",
+      "count_many": "{{count}} things need attention",
+      "count_other": "{{count}} things need attention",
+      "dlqItem": "{{count}} deliveries are in Failed Messages",
+      "dlqItem_one": "{{count}} delivery is in Failed Messages",
+      "dlqItem_few": "{{count}} deliveries are in Failed Messages",
+      "dlqItem_many": "{{count}} deliveries are in Failed Messages",
+      "dlqItem_other": "{{count}} deliveries are in Failed Messages",
+      "incidentsItem": "{{count}} incidents are open",
+      "incidentsItem_one": "{{count}} incident is open",
+      "incidentsItem_few": "{{count}} incidents are open",
+      "incidentsItem_many": "{{count}} incidents are open",
+      "incidentsItem_other": "{{count}} incidents are open",
+      "failedItem": "{{count}} deliveries are retrying",
+      "failedItem_one": "{{count}} delivery is retrying",
+      "failedItem_few": "{{count}} deliveries are retrying",
+      "failedItem_many": "{{count}} deliveries are retrying",
+      "failedItem_other": "{{count}} deliveries are retrying",
+      "alertsItem": "{{count}} alerts are firing",
+      "alertsItem_one": "{{count}} alert is firing",
+      "alertsItem_few": "{{count}} alerts are firing",
+      "alertsItem_many": "{{count}} alerts are firing",
+      "alertsItem_other": "{{count}} alerts are firing",
+      "endpointItem": "{{url}} delivered only {{rate}}% in the last 7 days",
+      "review": "Review",
+      "showMore": "Show {{count}} more",
+      "showLess": "Show fewer"
     },
     "endpointHealth": {
       "empty": "No endpoints configured",
       "emptyDesc": "Add endpoints to start receiving webhooks",
-      "subtitle": "Top endpoints by volume",
       "title": "Endpoint Health"
     },
     "headline": "Delivery health",
@@ -903,26 +958,16 @@
       "delivery_other": "{{count}} deliveries",
       "empty": "No recent events",
       "emptyDesc": "Events will appear here when sent",
-      "subtitle": "Latest webhook events",
       "title": "Recent Events"
-    },
-    "share": {
-      "abandoned": "Abandoned",
-      "delivered": "Delivered",
-      "failed": "Failed",
-      "inFlight": "In flight"
     },
     "stats": {
       "abandoned": "Abandoned",
-      "abandonedHint": "Retry ladder exhausted",
       "delivered": "Delivered",
-      "deliveredHint": "{{percent}}% of everything sent",
       "deliveries": "Deliveries",
       "dlq": "Failed Messages",
-      "dlqBadge": "In the DLQ",
       "inFlight": "In flight",
-      "inFlightHint": "Still owed an attempt",
-      "window": "Last 7 days"
+      "window": "Last 7 days",
+      "latencyP95": "Latency p95"
     },
     "toast": {
       "loadFailed": "Failed to load dashboard data"
@@ -1108,8 +1153,6 @@
     "ladderExhausted_many": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_one": "Retry ladder exhausted after {{count}} attempt",
     "ladderExhausted_other": "Retry ladder exhausted after {{count}} attempts",
-    "last24h": "Last 24 Hours",
-    "last7d": "Last 7 Days",
     "noItems": "No items in DLQ",
     "noItemsDesc": "No delivery has used up its retries.",
     "purgeAll": "Purge All",
@@ -1133,8 +1176,8 @@
       "purged": "{{count}} items purged from DLQ",
       "replayed": "Delivery queued for replay"
     },
-    "totalItems": "Total Items",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "statsLine": "{{total}} waiting · {{day}} in the last 24 hours · {{week}} in the last 7 days"
   },
   "emailChange": {
     "cancelPending": "Cancel change",
@@ -1276,7 +1319,25 @@
     "verificationRetry": "Verification failed — retry?",
     "verified": "Verified",
     "verify": "Verify",
-    "verifyEndpoint": "Verify endpoint"
+    "verifyEndpoint": "Verify endpoint",
+    "detail": {
+      "failingInARow": "{{count}} failed in a row since {{since}}",
+      "failingInARow_one": "{{count}} failure since {{since}}",
+      "failingInARow_few": "{{count}} failed in a row since {{since}}",
+      "failingInARow_many": "{{count}} failed in a row since {{since}}",
+      "failingInARow_other": "{{count}} failed in a row since {{since}}",
+      "health": "Last 24 hours",
+      "health24h": "Delivered, 24h",
+      "delivered": "Delivered",
+      "ofDeliveries": "{{delivered}} of {{total}}",
+      "p95": "Latency p95",
+      "lastDelivery": "Last delivery",
+      "noTraffic": "No deliveries to this endpoint in the last 24 hours.",
+      "recent": "Recent deliveries",
+      "noRecent": "Nothing has been sent to this endpoint yet.",
+      "subscriptions": "Event types it receives",
+      "noSubscriptions": "Not subscribed to any event type, so it receives nothing."
+    }
   },
   "errorBoundary": {
     "description": "Reload the page. If it happens again, send the details below to your team.",
@@ -1348,19 +1409,15 @@
     "deliveriesCount": "Deliveries",
     "eventIdCopied": "Event ID copied",
     "eventType": "Event Type",
-    "existingLinks": "Existing debug links (PII-safe):",
     "expires": "Expires {{time}}",
-    "linkCopied": "Link copied",
     "noDebugLinks": "No debug links created yet",
     "noSchema": "No schema registered for event type \"{{type}}\"",
-    "payloadCopied": "Payload copied",
     "payloadSize": "Payload Size",
     "project": "Project",
     "rawPayload": "Raw Payload",
     "replayFailed": "Replay {{count}} Failed",
     "replayed": "Replayed",
     "replayedFailed": "Replayed {{count}} failed deliveries",
-    "sanitized": "PII-Sanitized Payload",
     "sanitizedHint": "The payload with your PII masking rules applied.",
     "sanitizedUseDebug": "Use \"Share Debug\" to share it as a link.",
     "schemaInfo": "Schema Information",
@@ -1368,9 +1425,7 @@
     "tabs": {
       "debug": "Debug Links",
       "deliveries": "Deliveries",
-      "raw": "Raw Payload",
-      "sanitized": "Sanitized",
-      "schema": "Schema"
+      "raw": "Raw Payload"
     },
     "viewSchemaRegistry": "View in Schema Registry",
     "views": "{{count}} views"
@@ -1433,15 +1488,12 @@
     "details": {
       "deliveries": "Deliveries",
       "noDeliveries": "No deliveries for this event",
-      "noDeliveriesHint": "Events are only delivered to endpoints that have a matching subscription.",
       "noDeliveriesNoSub": "No active subscription matches <strong>{{eventType}}</strong>. Create one to deliver this type.",
       "noPayload": "No payload",
       "notFound": "Event not found",
       "openFull": "Open Full Details",
       "raw": "Raw",
       "replay": "Replay",
-      "sanitized": "Sanitized",
-      "sanitizedUnavailable": "Sanitized view unavailable. Configure PII rules first.",
       "title": "Event Details"
     },
     "eventId": "Event ID",
@@ -1480,8 +1532,7 @@
     "toast": {
       "loadFailed": "Failed to load events",
       "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created."
-    },
-    "viewDeliveries": "View deliveries for this event"
+    }
   },
   "footer": {
     "apiReference": "API reference",
@@ -1541,13 +1592,11 @@
       "title": "Add Timeline Note",
       "titlePlaceholder": "Contacted vendor support"
     },
-    "openCount": "{{count}} open incidents",
     "openOnly": "Open Only",
     "rcaNotes": "Root Cause Analysis",
     "rcaPlaceholder": "Document the root cause, impact, and remediation steps...",
     "reopen": "Reopen",
     "resolve": "Resolve",
-    "resolvedAt": "Resolved",
     "resolvedAtLabel": "Resolved {{time}}",
     "showAll": "Show All",
     "statuses": {
@@ -1559,11 +1608,8 @@
     "tiles": {
       "allClear": "All clear",
       "critical": "Critical",
-      "criticalHint": "Unresolved and marked critical",
       "investigating": "Investigating",
-      "investigatingHint": "Someone is on it",
-      "open": "Open",
-      "openHint": "Nobody has claimed these yet"
+      "open": "Open"
     },
     "timeline": "Timeline",
     "title": "Incidents",
@@ -1668,16 +1714,14 @@
       "destination": "Destination",
       "eventId": "Event ID",
       "failedAt": "Failed At",
-      "lastError": "Last Error",
-      "source": "Source"
+      "source": "Source",
+      "lastResponse": "Last response"
     },
     "ladderExhausted": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_few": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_many": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_one": "Retry ladder exhausted after {{count}} attempt",
     "ladderExhausted_other": "Retry ladder exhausted after {{count}} attempts",
-    "last24h": "Last 24 Hours",
-    "last7d": "Last 7 Days",
     "noItems": "No abandoned forwards",
     "noItemsDesc": "Every incoming webhook is reaching its destinations",
     "pageTitle": "Failed Forwards",
@@ -1704,8 +1748,8 @@
       "retried": "Forward queued for retry",
       "retryFailed": "Failed to retry forward"
     },
-    "totalItems": "Total Items",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "statsLine": "{{total}} waiting · {{day}} in the last 24 hours · {{week}} in the last 7 days"
   },
   "incomingEvents": {
     "columns": {
@@ -2329,7 +2373,9 @@
     "tunnels": "Tunnels",
     "usage": "Usage",
     "workflows": "Workflows",
-    "consumers": "Consumers"
+    "consumers": "Consumers",
+    "adminZone": "Admin",
+    "backToWorkspace": "Back to workspace"
   },
   "notFound": {
     "backToDashboard": "Back to Dashboard",
@@ -2458,7 +2504,6 @@
     "newRuleEyebrow": "New rule",
     "noRules": "No masking rules configured",
     "noRulesHint": "Seed defaults to add email, phone, and card masking",
-    "pattern": "Pattern",
     "patternName": "Pattern name",
     "patternNamePlaceholder": "email, phone, card",
     "preview": {
@@ -2478,12 +2523,6 @@
       "unchangedHint": "No enabled rule matched this payload."
     },
     "seedDefaults": "Seed defaults",
-    "stats": {
-      "active": "Active",
-      "builtin": "Built-in",
-      "custom": "Custom",
-      "total": "Total"
-    },
     "subtitle": "Configure which fields are masked before sharing event payloads",
     "title": "PII Masking Rules",
     "toast": {
@@ -2495,6 +2534,12 @@
       "seedFailed": "Failed to seed defaults",
       "seeded": "Default rules added",
       "updateFailed": "Failed to update rule"
+    },
+    "summary": "{{active}} of {{total}} rules on · {{builtin}} built in, {{custom}} custom.",
+    "columns": {
+      "pattern": "Pattern",
+      "field": "Field",
+      "state": "State"
     }
   },
   "platformAdmin": {
@@ -2562,16 +2607,11 @@
       "generatedAt": "As of {{time}}",
       "kpi": {
         "activeTunnels": "Active tunnels",
-        "deliveriesFailed": "Deliveries failed, 24h",
-        "deliveriesFailedHint": "Still retrying or given up",
-        "deliveriesSucceeded": "Deliveries succeeded, 24h",
         "events30d": "{{total}} in 30 days",
-        "eventsToday": "Events today",
         "nearQuota": "Near event limit",
         "nearQuotaHint": "At 80% or more of this month's plan limit",
         "organizations": "Organizations",
         "signupsPeriods": "{{week}} in 7 days · {{month}} in 30 days",
-        "signupsToday": "Sign-ups today",
         "suspended": "{{count}} suspended",
         "users": "Accounts"
       },
@@ -2589,9 +2629,42 @@
       "daily": {
         "period": "Last 30 days",
         "signups": "Sign-ups per day",
-        "signupsSeries": "Sign-ups",
         "events": "Events per day",
-        "eventsSeries": "Events"
+        "today": "today"
+      },
+      "attention": {
+        "failed_one": "{{value}} delivery failed in the last 24 hours",
+        "failed_few": "{{value}} deliveries failed in the last 24 hours",
+        "failed_many": "{{value}} deliveries failed in the last 24 hours",
+        "failed_other": "{{value}} deliveries failed in the last 24 hours",
+        "failedDetail": "{{rate}} of {{total}} deliveries.",
+        "suspended": "{{name}} is suspended",
+        "nearQuota_one": "{{count}} organization is at 80% or more of its event limit",
+        "nearQuota_few": "{{count}} organizations are at 80% or more of their event limit",
+        "nearQuota_many": "{{count}} organizations are at 80% or more of their event limit",
+        "nearQuota_other": "{{count}} organizations are at 80% or more of their event limit",
+        "title_one": "{{count}} thing needs attention",
+        "title_few": "{{count}} things need attention",
+        "title_many": "{{count}} things need attention",
+        "title_other": "{{count}} things need attention",
+        "clear": "Nothing needs attention.",
+        "clearDetail": "No suspended organizations, none near their event limit, delivery failures under 1%.",
+        "fresh": "New install. No events have been sent yet.",
+        "freshDetail": "This page fills in once an organization creates a project and sends its first event.",
+        "review": "Review",
+        "showMore": "Show {{count}} more",
+        "showLess": "Show fewer",
+        "failed": "{{value}} deliveries failed in the last 24 hours",
+        "nearQuota": "{{count}} organizations are at 80% or more of their event limit",
+        "title": "{{count}} things need attention"
+      },
+      "ledger": {
+        "events": "Events",
+        "today": "{{value}} today",
+        "deliveries": "Deliveries, 24h",
+        "delivered": "{{value}} delivered",
+        "failed": "{{value}} failed",
+        "signups": "Sign-ups"
       }
     },
     "reauth": {
@@ -2676,7 +2749,6 @@
     "deleteNamed": "Delete {{name}}",
     "health": {
       "endpoints": "{{count}} endpoints",
-      "lastEvent": "Last event {{time}}",
       "noDeliveries": "No deliveries yet",
       "noEndpoints": "No endpoints",
       "noEvents": "No events yet",
@@ -2700,6 +2772,13 @@
       "deleteFailed": "Failed to delete project",
       "deleted": "Project deleted successfully",
       "idCopied": "Project ID copied to clipboard"
+    },
+    "columns": {
+      "project": "Project",
+      "delivered": "Delivered",
+      "endpoints": "Endpoints",
+      "lastEvent": "Last event",
+      "created": "Created"
     }
   },
   "relativeTime": {
@@ -2893,9 +2972,6 @@
     "search": "Search rules…",
     "showDetails": "Show rule details",
     "stats": {
-      "active": "Active",
-      "executions": "Evaluations",
-      "matchRate": "Match Rate",
       "matches": "Matches",
       "total": "Total Rules"
     },
@@ -2903,7 +2979,14 @@
     "title": "Rules Engine",
     "toggleFailed": "Failed to toggle rule",
     "updated": "Rule updated successfully",
-    "updatedAt": "Updated"
+    "updatedAt": "Updated",
+    "summary": "{{active}} of {{total}} rules on · {{executions}} evaluations · {{rate}} matched. Rules run top to bottom.",
+    "columns": {
+      "rule": "Rule",
+      "when": "When",
+      "then": "Then",
+      "state": "State"
+    }
   },
   "schemas": {
     "addFirstType": "Add the first event type",
@@ -3205,7 +3288,12 @@
     },
     "toggleOrdering": "Keep {{eventType}} in sequence",
     "unknown": "Unknown endpoint",
-    "unnamed": "Unnamed endpoint"
+    "unnamed": "Unnamed endpoint",
+    "groupCount_one": "{{count}} endpoint",
+    "groupCount_other": "{{count}} endpoints",
+    "groupCount_few": "{{count}} endpoints",
+    "groupCount_many": "{{count}} endpoints",
+    "groupCount": "{{count}} endpoints"
   },
   "testConsole": {
     "attemptNumber": "Attempt #{{number}}",
@@ -3541,7 +3629,6 @@
     "viewTitle": "Version {{version}}"
   },
   "tunnels": {
-    "active": "Active",
     "client": "Client",
     "close": "Close tunnel",
     "closeDialog": {
@@ -3558,18 +3645,19 @@
     "noTunnelsDesc": "Start a tunnel from the CLI with `railhook listen 3000` to forward requests to your local machine. Install the CLI with `curl -fsSL https://railhook.io/install-cli.sh | bash` and sign in with `railhook login` first.",
     "openCount": "Open · {{count}}",
     "refresh": "Refresh",
-    "stats": {
-      "active": "Active tunnels",
-      "mine": "My tunnels",
-      "pending": "Pending requests"
-    },
     "subtitle": "CLI sessions forwarding webhooks to a local machine.",
     "title": "Tunnels",
     "toast": {
       "closeFailed": "Failed to close tunnel",
       "closed": "Tunnel closed",
       "loadFailed": "Failed to load tunnels"
-    }
+    },
+    "summary": "{{active}} active · {{pending}} requests waiting · {{mine}} started by you.",
+    "columns": {
+      "url": "Public URL"
+    },
+    "startTitle": "Start a tunnel",
+    "startBody": "Install the CLI, sign in, then forward webhooks to a port on your machine. The tunnel shows up here while the CLI stays connected."
   },
   "usage": {
     "description": "What this project has used, and what your plan allows.",
@@ -3618,12 +3706,8 @@
       "endpoints": "Active Endpoints"
     },
     "tiles": {
-      "alertRulesHint": "Watching this project",
-      "endpointsHint": "Registered and enabled",
       "events": "Events",
-      "eventsHint": "Announced by your systems",
-      "incoming": "Incoming events",
-      "incomingHint": "Received from your sources"
+      "incoming": "Incoming events"
     },
     "title": "Usage & Metrics",
     "traffic": {

@@ -26,9 +26,8 @@ import SecretField from '../components/SecretField';
 import ConnectionSetupDialog from '../components/ConnectionSetupDialog';
 import SignatureSchemePicker, { sendsStandardHeaders } from '../components/SignatureSchemePicker';
 import { Button } from '../components/ui/button';
-import { Card } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
-import { Badge } from '../components/ui/badge';
+import { PageBody } from '../components/port/p2/parts';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
@@ -255,7 +254,7 @@ export default function ConnectionsPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <PageBody>
       <PageHeader
         eyebrow={project?.name}
         title={t('connections.title')}
@@ -278,8 +277,7 @@ export default function ConnectionsPage() {
           docsLink="outgoing/endpoints-subscriptions"
         />
       ) : (
-        <Card className="overflow-hidden">
-          <Table>
+        <Table className="text-[13px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[36px]"><span className="sr-only">{t('connections.expand', 'Show details')}</span></TableHead>
@@ -297,7 +295,7 @@ export default function ConnectionsPage() {
                 const ladderSource = subs[0];
                 const scheme = pendingScheme[endpoint.id] ?? endpoint.signatureScheme;
                 return [
-                  <TableRow key={endpoint.id} className={cn(open && 'bg-secondary/40')}>
+                  <TableRow key={endpoint.id} className={cn(open && 'bg-secondary/40', !open && (endpoint.autoDisabledAt || health.kind === 'halt') && 'bg-halt-soft/40')}>
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -310,7 +308,7 @@ export default function ConnectionsPage() {
                       </Button>
                     </TableCell>
                     <TableCell className="max-w-[280px]">
-                      <div className="truncate font-mono text-[13px]" title={endpoint.url}>{endpoint.url}</div>
+                      <div className="truncate font-mono text-[12px]" title={endpoint.url}>{endpoint.url}</div>
                       {endpoint.description && (
                         <div className="truncate text-xs text-muted-foreground">{endpoint.description}</div>
                       )}
@@ -319,16 +317,12 @@ export default function ConnectionsPage() {
                       {subs.length === 0 ? (
                         <span className="text-xs text-muted-foreground">{t('connections.noSubscriptions')}</span>
                       ) : (
-                        <div className="flex flex-wrap items-center gap-1">
-                          {subs.slice(0, 2).map((s) => (
-                            <Badge key={s.id} variant="outline" className="font-mono text-[11px]">
-                              {s.eventType}
-                            </Badge>
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-mono text-[12px]">
+                          {subs.slice(0, 3).map((s) => (
+                            <span key={s.id} className={cn(!s.enabled && 'text-muted-foreground line-through')}>{s.eventType}</span>
                           ))}
-                          {subs.length > 2 && (
-                            <span className="font-mono text-[11px] text-muted-foreground">
-                              +{subs.length - 2}
-                            </span>
+                          {subs.length > 3 && (
+                            <span className="text-muted-foreground">+{subs.length - 3}</span>
                           )}
                         </div>
                       )}
@@ -348,7 +342,7 @@ export default function ConnectionsPage() {
                                   : t('connections.health.halt', 'Abandoned')
                             }
                           />
-                          <span className="font-mono text-[11px] text-muted-foreground">
+                          <span className="font-mono text-[12px] text-muted-foreground">
                             {health.ok}/{health.total}
                           </span>
                         </div>
@@ -420,8 +414,8 @@ export default function ConnectionsPage() {
 
                   open && (
                     <TableRow key={`${endpoint.id}-detail`} className="hover:bg-transparent">
-                      <TableCell colSpan={7} className="bg-secondary/30 p-0">
-                        <div className="grid gap-6 p-5 lg:grid-cols-2">
+                      <TableCell colSpan={7} className="border-l-2 border-l-foreground/40 bg-secondary/30 p-0">
+                        <div className="grid gap-8 px-4 py-5 lg:grid-cols-2 lg:px-6">
                           <div className="space-y-3">
                             <div className="mono-label">{t('connections.detailSubscriptions', 'Subscriptions')}</div>
                             {subs.length === 0 ? (
@@ -449,7 +443,7 @@ export default function ConnectionsPage() {
                                     />
                                     <code className="font-mono text-[13px]">{s.eventType}</code>
                                     {s.orderingEnabled && (
-                                      <Badge variant="outline" className="font-mono text-[10px]">{t('subscriptions.fifo')}</Badge>
+                                      <span className="text-[12px] text-muted-foreground">{t('subscriptions.fifo')}</span>
                                     )}
                                     <Button
                                       variant="ghost"
@@ -532,7 +526,6 @@ export default function ConnectionsPage() {
               })}
             </TableBody>
           </Table>
-        </Card>
       )}
 
       <ConnectionSetupDialog projectId={projectId} open={showSetup} onOpenChange={setShowSetup} />
@@ -589,6 +582,6 @@ export default function ConnectionsPage() {
           onSuccess={() => qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId) })}
         />
       )}
-    </div>
+    </PageBody>
   );
 }
