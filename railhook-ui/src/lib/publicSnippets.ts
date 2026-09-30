@@ -1,4 +1,3 @@
-import type { ProviderType } from '../types/api.types';
 
 /** The port is positional; `-p` is `--project`. */
 export const CLI_LISTEN_EXAMPLE = 'railhook listen 3000';
@@ -31,17 +30,3 @@ const RENAMED_ZONES: Record<string, string> = {
 export function canonicalTimezone(tz: string): string {
   return RENAMED_ZONES[tz] ?? tz;
 }
-
-/** Must match the header the API's verifier for that provider reads. */
-export const PROVIDER_SIGNATURE_HEADERS: Partial<Record<ProviderType, string>> = {
-  GITHUB: 'X-Hub-Signature-256',
-  STRIPE: 'Stripe-Signature',
-  SHOPIFY: 'X-Shopify-Hmac-SHA256',
-  SLACK: 'X-Slack-Signature',
-  GITLAB: 'X-Gitlab-Token',
-  TWILIO: 'X-Twilio-Signature',
-  SQUARE: 'x-square-hmacsha256-signature',
-  SENDGRID: 'X-Twilio-Email-Event-Webhook-Signature',
-  HUBSPOT: 'X-HubSpot-Signature-v3',
-  // No Adyen entry: its payments webhook signs inside the body, not a header.
-};

@@ -18,6 +18,8 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 ## Провайдери
 
+`GET /api/v1/incoming-providers` повертає провайдерів, яких перевіряє запущений Railhook, і заголовок, у якому підписує кожен. Провайдера, якого немає в списку, можна додати одним класом; як саме, описано в [CONTRIBUTING.md](https://github.com/vadymkykalo/railhook/blob/develop/CONTRIBUTING.md#adding-an-inbound-provider).
+
 | `providerType` | Заголовок, що перевіряється | Як |
 |---|---|---|
 | `GITHUB` | `X-Hub-Signature-256` | `sha256=`, а за ним HMAC-SHA256 необробленого тіла в hex. |

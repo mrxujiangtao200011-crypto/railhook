@@ -1,11 +1,16 @@
 import { http } from './http';
 import type {
   PageResponse,
+  IncomingProviderResponse,
   IncomingSourceRequest,
   IncomingSourceResponse,
 } from '../types/api.types';
 
 export const incomingSourcesApi = {
+  providers: (): Promise<IncomingProviderResponse[]> => {
+    return http.get<IncomingProviderResponse[]>('/api/v1/incoming-providers');
+  },
+
   list: (projectId: string, page = 0, size = 20): Promise<PageResponse<IncomingSourceResponse>> => {
     return http.get<PageResponse<IncomingSourceResponse>>(
       `/api/v1/projects/${projectId}/incoming-sources?page=${page}&size=${size}`

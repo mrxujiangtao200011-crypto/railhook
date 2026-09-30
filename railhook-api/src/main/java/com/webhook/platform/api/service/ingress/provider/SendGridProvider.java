@@ -1,6 +1,7 @@
-package com.webhook.platform.api.service.verification;
+package com.webhook.platform.api.service.ingress.provider;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -11,10 +12,26 @@ import java.util.Base64;
 
 // ECDSA with SendGrid's public key. No timestamp window: SendGrid posts batches long after the
 // fact, so replay detection bounds replays instead.
-public class SendGridVerifier implements WebhookVerificationStrategy {
+@Component
+public class SendGridProvider implements InboundProvider {
 
     private static final String SIGNATURE_HEADER = "X-Twilio-Email-Event-Webhook-Signature";
     private static final String TIMESTAMP_HEADER = "X-Twilio-Email-Event-Webhook-Timestamp";
+
+    @Override
+    public String id() {
+        return "SENDGRID";
+    }
+
+    @Override
+    public String displayName() {
+        return "SendGrid";
+    }
+
+    @Override
+    public String signatureHeader() {
+        return SIGNATURE_HEADER;
+    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

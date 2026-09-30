@@ -1,6 +1,5 @@
 package com.webhook.platform.api.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.dto.IngressResponse;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.service.IngressService;
@@ -34,10 +33,10 @@ class IngressControllerTest {
     }
 
     @Test
-    void aSlackUrlVerificationIsAnswered200WithTheChallengeAsJson() throws Exception {
+    void aProviderHandshakeIsAnswered200WithItsJson() throws Exception {
         IngressService service = mock(IngressService.class);
         when(service.receiveWebhook(eq("tok"), any(), any()))
-                .thenReturn(new IngressOutcome.SlackUrlVerification("3eZbrw1aBm2rZgRNFdxV"));
+                .thenReturn(new IngressOutcome.Handshake("{\"challenge\":\"3eZbrw1aBm2rZgRNFdxV\"}"));
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/ingress/tok");
         request.setContent("{\"type\":\"url_verification\",\"challenge\":\"3eZbrw1aBm2rZgRNFdxV\"}".getBytes());
 
@@ -45,8 +44,7 @@ class IngressControllerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
-        assertThat(new ObjectMapper().writeValueAsString(response.getBody()))
-                .isEqualTo("{\"challenge\":\"3eZbrw1aBm2rZgRNFdxV\"}");
+        assertThat(response.getBody()).isEqualTo("{\"challenge\":\"3eZbrw1aBm2rZgRNFdxV\"}");
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.webhook.platform.api.dto;
 
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +19,7 @@ public class IncomingSourceResponse {
     private UUID projectId;
     private String name;
     private String slug;
-    private ProviderType providerType;
+    private String providerType;
     private IncomingSourceStatus status;
     private String ingressPathToken;
     private String ingressUrl;

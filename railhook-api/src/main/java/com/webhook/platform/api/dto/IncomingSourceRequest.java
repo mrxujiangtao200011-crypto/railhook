@@ -1,7 +1,6 @@
 package com.webhook.platform.api.dto;
 
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.dto.validation.WithinPlanRateLimit;
 import jakarta.validation.constraints.Max;
@@ -32,8 +31,9 @@ public class IncomingSourceRequest {
     @Pattern(regexp = "^[a-z0-9][a-z0-9-]*$", message = "Slug must contain only lowercase letters, digits, and hyphens")
     private String slug;
 
-    @Schema(description = "Provider type", example = "GITHUB")
-    private ProviderType providerType;
+    @Schema(description = "GENERIC, or the id of a provider listed by GET /api/v1/incoming-providers",
+            example = "GITHUB")
+    private String providerType;
 
     @Schema(description = "Source status")
     private IncomingSourceStatus status;

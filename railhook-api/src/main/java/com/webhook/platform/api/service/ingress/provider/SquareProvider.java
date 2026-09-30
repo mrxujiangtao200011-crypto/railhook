@@ -1,6 +1,8 @@
-package com.webhook.platform.api.service.verification;
+package com.webhook.platform.api.service.ingress.provider;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -13,12 +15,34 @@ import lombok.RequiredArgsConstructor;
  * The signed URL must match the Square console exactly, so it comes from webhook.ingress-base-url,
  * not Host and X-Forwarded-Proto, which break behind a proxy.
  */
+@Component
 @RequiredArgsConstructor
-public class SquareVerifier implements WebhookVerificationStrategy {
+public class SquareProvider implements InboundProvider {
 
     private static final String HEADER = "x-square-hmacsha256-signature";
 
+    @Value("${webhook.ingress-base-url:}")
     private final String ingressBaseUrl;
+
+    @Override
+    public String id() {
+        return "SQUARE";
+    }
+
+    @Override
+    public String displayName() {
+        return "Square";
+    }
+
+    @Override
+    public String signatureHeader() {
+        return HEADER;
+    }
+
+    @Override
+    public String eventId(HttpServletRequest request, String body) {
+        return JsonBodies.text(JsonBodies.parse(body), "event_id");
+    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 
 import {
   CLI_LISTEN_EXAMPLE,
-  PROVIDER_SIGNATURE_HEADERS,
   canonicalTimezone,
   formatBytes,
   sendEventCurl,
@@ -71,27 +70,5 @@ describe('canonicalTimezone', () => {
     ['UTC', 'UTC'],
   ])('names %s by its current IANA name, %s', (zone, canonical) => {
     expect(canonicalTimezone(zone)).toBe(canonical);
-  });
-});
-
-describe('PROVIDER_SIGNATURE_HEADERS', () => {
-  const verifiers: Record<string, string> = {
-    GITHUB: 'GitHubVerifier',
-    STRIPE: 'StripeVerifier',
-    SHOPIFY: 'ShopifyVerifier',
-    SLACK: 'SlackVerifier',
-    GITLAB: 'GitLabVerifier',
-    TWILIO: 'TwilioVerifier',
-  };
-
-  it.each(Object.entries(verifiers))('%s matches %s', (provider, verifier) => {
-    const source = read(`railhook-api/src/main/java/com/webhook/platform/api/service/verification/${verifier}.java`);
-    const header = PROVIDER_SIGNATURE_HEADERS[provider as keyof typeof PROVIDER_SIGNATURE_HEADERS];
-    expect(header, provider).toBeTruthy();
-    expect(source).toContain(`"${header}"`);
-  });
-
-  it('has no header for a generic source, which names its own', () => {
-    expect(PROVIDER_SIGNATURE_HEADERS.GENERIC).toBeUndefined();
   });
 });

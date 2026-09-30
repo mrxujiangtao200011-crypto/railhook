@@ -1,9 +1,10 @@
-package com.webhook.platform.api.service.verification;
+package com.webhook.platform.api.service.ingress.provider;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.IncomingSource;
-import com.webhook.platform.common.enums.ProviderType;
+import com.webhook.platform.api.service.verification.GenericHmacVerifier;
+import com.webhook.platform.api.service.verification.WebhookVerificationStrategy;
 import com.webhook.platform.common.enums.VerificationMode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,7 @@ class WebhookVerifierTest {
 
     @Test
     void github_success() {
-        GitHubVerifier verifier = new GitHubVerifier();
+        GitHubProvider verifier = new GitHubProvider();
         String hmac = hmacSha256Hex(SECRET, BODY);
         when(request.getHeader("X-Hub-Signature-256")).thenReturn("sha256=" + hmac);
 
@@ -84,7 +85,7 @@ class WebhookVerifierTest {
 
     @Test
     void github_wrongPrefix() {
-        GitHubVerifier verifier = new GitHubVerifier();
+        GitHubProvider verifier = new GitHubProvider();
         when(request.getHeader("X-Hub-Signature-256")).thenReturn("md5=abcdef");
 
         var result = verifier.verify(SECRET, BODY_BYTES, request);
@@ -95,7 +96,7 @@ class WebhookVerifierTest {
 
     @Test
     void stripe_success() {
-        StripeVerifier verifier = new StripeVerifier();
+        StripeProvider verifier = new StripeProvider();
         long timestamp = Instant.now().getEpochSecond();
         String signedPayload = timestamp + "." + BODY;
         String hmac = hmacSha256Hex(SECRET, signedPayload);
@@ -110,7 +111,7 @@ class WebhookVerifierTest {
 
     @Test
     void stripe_expiredTimestamp() {
-        StripeVerifier verifier = new StripeVerifier();
+        StripeProvider verifier = new StripeProvider();
         long oldTimestamp = Instant.now().getEpochSecond() - 600;
         String signedPayload = oldTimestamp + "." + BODY;
         String hmac = hmacSha256Hex(SECRET, signedPayload);
@@ -124,7 +125,7 @@ class WebhookVerifierTest {
 
     @Test
     void stripe_invalidFormat() {
-        StripeVerifier verifier = new StripeVerifier();
+        StripeProvider verifier = new StripeProvider();
         when(request.getHeader("Stripe-Signature")).thenReturn("garbage");
 
         var result = verifier.verify(SECRET, BODY_BYTES, request);
@@ -137,7 +138,7 @@ class WebhookVerifierTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void stripe_severalSignatures_verifiesWhereverTheValidOneSits(boolean validFirst) {
-        StripeVerifier verifier = new StripeVerifier();
+        StripeProvider verifier = new StripeProvider();
         long timestamp = Instant.now().getEpochSecond();
         String valid = hmacSha256Hex(SECRET, timestamp + "." + BODY);
         String header = validFirst
@@ -153,7 +154,7 @@ class WebhookVerifierTest {
 
     @Test
     void stripe_severalSignatures_noneValid_fails() {
-        StripeVerifier verifier = new StripeVerifier();
+        StripeProvider verifier = new StripeProvider();
         long timestamp = Instant.now().getEpochSecond();
         when(request.getHeader("Stripe-Signature"))
                 .thenReturn("t=" + timestamp + ",v1=" + "0".repeat(64) + ",v1=" + "f".repeat(64));
@@ -166,7 +167,7 @@ class WebhookVerifierTest {
 
     @Test
     void slack_success() {
-        SlackVerifier verifier = new SlackVerifier();
+        SlackProvider verifier = new SlackProvider();
         long timestamp = Instant.now().getEpochSecond();
         String baseString = "v0:" + timestamp + ":" + BODY;
         String hmac = hmacSha256Hex(SECRET, baseString);
@@ -183,7 +184,7 @@ class WebhookVerifierTest {
 
     @Test
     void slack_expiredTimestamp() {
-        SlackVerifier verifier = new SlackVerifier();
+        SlackProvider verifier = new SlackProvider();
         long oldTs = Instant.now().getEpochSecond() - 600;
         String baseString = "v0:" + oldTs + ":" + BODY;
         String hmac = hmacSha256Hex(SECRET, baseString);
@@ -198,7 +199,7 @@ class WebhookVerifierTest {
 
     @Test
     void shopify_success() {
-        ShopifyVerifier verifier = new ShopifyVerifier();
+        ShopifyProvider verifier = new ShopifyProvider();
         String hmacBase64 = hmacSha256Base64(SECRET, BODY);
         when(request.getHeader("X-Shopify-Hmac-SHA256")).thenReturn(hmacBase64);
 
@@ -210,7 +211,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsNullForNone() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
+        var factory = TestInboundProviders.verifierFactory();
         var source = buildSource(VerificationMode.NONE, null);
 
         assertThat(factory.getVerifier(source)).isNull();
@@ -219,34 +220,34 @@ class WebhookVerifierTest {
     static Stream<Arguments> verifierPerSource() {
         return Stream.of(
                 Arguments.of(VerificationMode.HMAC_GENERIC, null, GenericHmacVerifier.class),
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.GITHUB, GitHubVerifier.class),
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.STRIPE, StripeVerifier.class),
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.SLACK, SlackVerifier.class),
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.SHOPIFY, ShopifyVerifier.class),
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.TWILIO, TwilioVerifier.class),
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.SQUARE, SquareVerifier.class),
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.ADYEN, AdyenVerifier.class),
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.SENDGRID, SendGridVerifier.class),
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.HUBSPOT, HubSpotVerifier.class),
-                // GITLAB was once routed to GitHubVerifier and failed every delivery.
-                Arguments.of(VerificationMode.PROVIDER, ProviderType.GITLAB, GitLabVerifier.class));
+                Arguments.of(VerificationMode.PROVIDER, "GITHUB", GitHubProvider.class),
+                Arguments.of(VerificationMode.PROVIDER, "STRIPE", StripeProvider.class),
+                Arguments.of(VerificationMode.PROVIDER, "SLACK", SlackProvider.class),
+                Arguments.of(VerificationMode.PROVIDER, "SHOPIFY", ShopifyProvider.class),
+                Arguments.of(VerificationMode.PROVIDER, "TWILIO", TwilioProvider.class),
+                Arguments.of(VerificationMode.PROVIDER, "SQUARE", SquareProvider.class),
+                Arguments.of(VerificationMode.PROVIDER, "ADYEN", AdyenProvider.class),
+                Arguments.of(VerificationMode.PROVIDER, "SENDGRID", SendGridProvider.class),
+                Arguments.of(VerificationMode.PROVIDER, "HUBSPOT", HubSpotProvider.class),
+                // GITLAB was once routed to GitHubProvider and failed every delivery.
+                Arguments.of(VerificationMode.PROVIDER, "GITLAB", GitLabProvider.class));
     }
 
     @ParameterizedTest
     @MethodSource("verifierPerSource")
-    void factory_picksTheVerifierForTheSource(VerificationMode mode, ProviderType provider, Class<?> expected) {
-        assertThat(new WebhookVerifierFactory(TWILIO_URL).getVerifier(buildSource(mode, provider)))
+    void factory_picksTheVerifierForTheSource(VerificationMode mode, String provider, Class<?> expected) {
+        assertThat(TestInboundProviders.verifierFactory().getVerifier(buildSource(mode, provider)))
                 .isInstanceOf(expected);
     }
 
     @Test
-    void factory_throwsForGenericProviderInProviderMode() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.GENERIC);
+    void factory_failsTheRequestForAProviderNothingIsInstalledFor() {
+        var source = buildSource(VerificationMode.PROVIDER, "PADDLE");
 
-        assertThatThrownBy(() -> factory.getVerifier(source))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No verifier available for provider type");
+        var result = TestInboundProviders.verifierFactory().getVerifier(source).verify(SECRET, BODY_BYTES, request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("PADDLE");
     }
 
     private static final String TWILIO_URL = "https://hooks.example.com";
@@ -265,7 +266,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(null);
         when(request.getContentType()).thenReturn("application/x-www-form-urlencoded");
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body.getBytes(StandardCharsets.UTF_8), request);
+        var result = new TwilioProvider(TWILIO_URL).verify(SECRET, body.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
         assertThat(result.verified()).isTrue();
@@ -282,7 +283,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(null);
         when(request.getContentType()).thenReturn("application/x-www-form-urlencoded");
 
-        var result = new TwilioVerifier(TWILIO_URL)
+        var result = new TwilioProvider(TWILIO_URL)
                 .verify(SECRET, "To=%2B15550000000&Body=hi+there".getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
@@ -299,7 +300,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(query);
         when(request.getContentType()).thenReturn("application/json");
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body.getBytes(StandardCharsets.UTF_8), request);
+        var result = new TwilioProvider(TWILIO_URL).verify(SECRET, body.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
         assertThat(result.verified()).isTrue();
@@ -315,7 +316,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(query);
         when(request.getContentType()).thenReturn("application/json");
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "{\"kind\":\"other\"}".getBytes(StandardCharsets.UTF_8), request);
+        var result = new TwilioProvider(TWILIO_URL).verify(SECRET, "{\"kind\":\"other\"}".getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("bodySHA256");
@@ -338,7 +339,7 @@ class WebhookVerifierTest {
         when(request.getRequestURI()).thenReturn(SQUARE_PATH);
         when(request.getQueryString()).thenReturn(null);
 
-        var result = new SquareVerifier(SQUARE_URL)
+        var result = new SquareProvider(SQUARE_URL)
                 .verify(SECRET, SQUARE_BODY.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
@@ -354,7 +355,7 @@ class WebhookVerifierTest {
         when(request.getRequestURI()).thenReturn(SQUARE_PATH);
         when(request.getQueryString()).thenReturn(null);
 
-        var result = new SquareVerifier(SQUARE_URL)
+        var result = new SquareProvider(SQUARE_URL)
                 .verify(SECRET, SQUARE_BODY.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
@@ -369,7 +370,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(null);
 
         byte[] tampered = SQUARE_BODY.replace("\"amount\":100", "\"amount\":1").getBytes(StandardCharsets.UTF_8);
-        var result = new SquareVerifier(SQUARE_URL).verify(SECRET, tampered, request);
+        var result = new SquareProvider(SQUARE_URL).verify(SECRET, tampered, request);
 
         assertThat(result.verified()).isFalse();
     }
@@ -393,7 +394,7 @@ class WebhookVerifierTest {
     // Pinned against the literal string Adyen's documentation prints.
     @Test
     void adyen_buildsTheDataToSignAdyenDocuments() {
-        assertThat(AdyenVerifier.dataToSign(adyenItem(adyenStandardBody("sig"))))
+        assertThat(AdyenProvider.dataToSign(adyenItem(adyenStandardBody("sig"))))
                 .isEqualTo("7914073381342284::TestMerchant:TestPayment-1407325143704:1130:EUR:AUTHORISATION:true");
     }
 
@@ -403,7 +404,7 @@ class WebhookVerifierTest {
                 "7914073381342284::TestMerchant:TestPayment-1407325143704:1130:EUR:AUTHORISATION:true");
         String body = adyenStandardBody(signature);
 
-        var result = new AdyenVerifier().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
+        var result = new AdyenProvider().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
         assertThat(result.verified()).isTrue();
@@ -417,7 +418,7 @@ class WebhookVerifierTest {
                 "7914073381342284::TestMerchant:TestPayment-1407325143704:1130:EUR:AUTHORISATION:true");
         String body = adyenStandardBody(signature).replace("\"value\":1130", "\"value\":1");
 
-        var result = new AdyenVerifier().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
+        var result = new AdyenProvider().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("mismatch");
@@ -428,7 +429,7 @@ class WebhookVerifierTest {
         String body = "{\"live\":\"false\",\"notificationItems\":[{\"NotificationRequestItem\":{"
                 + "\"eventCode\":\"AUTHORISATION\",\"success\":\"true\"}}]}";
 
-        var result = new AdyenVerifier().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
+        var result = new AdyenProvider().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("hmacSignature");
@@ -441,7 +442,7 @@ class WebhookVerifierTest {
         String signature = hmacSha256Base64OfHexKey(ADYEN_KEY, body);
         when(request.getHeader("hmacsignature")).thenReturn(signature);
 
-        var result = new AdyenVerifier().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
+        var result = new AdyenProvider().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
         assertThat(result.verified()).isTrue();
@@ -453,7 +454,7 @@ class WebhookVerifierTest {
         String signature = hmacSha256Base64OfHexKey(ADYEN_KEY, "{\"type\":\"a\"}");
         when(request.getHeader("hmacsignature")).thenReturn(signature);
 
-        var result = new AdyenVerifier().verify(ADYEN_KEY, "{\"type\":\"b\"}".getBytes(StandardCharsets.UTF_8), request);
+        var result = new AdyenProvider().verify(ADYEN_KEY, "{\"type\":\"b\"}".getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
     }
@@ -463,7 +464,7 @@ class WebhookVerifierTest {
     void adyen_nonHexKeyIsRefusedWithAReasonRatherThanAMismatch() {
         String body = adyenStandardBody("whatever");
 
-        var result = new AdyenVerifier().verify("not-hex!", body.getBytes(StandardCharsets.UTF_8), request);
+        var result = new AdyenProvider().verify("not-hex!", body.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("hexadecimal");
@@ -484,7 +485,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn(signature);
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn(timestamp);
 
-        var result = new SendGridVerifier()
+        var result = new SendGridProvider()
                 .verify(publicKey, SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
@@ -501,7 +502,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn(signature);
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn("1771075999");
 
-        var result = new SendGridVerifier().verify(
+        var result = new SendGridProvider().verify(
                 Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded()),
                 SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
 
@@ -517,7 +518,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn(signature);
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn(timestamp);
 
-        var result = new SendGridVerifier().verify(
+        var result = new SendGridProvider().verify(
                 Base64.getEncoder().encodeToString(generateEcKeyPair().getPublic().getEncoded()),
                 SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
 
@@ -537,7 +538,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn(signature);
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn(timestamp);
 
-        assertThat(new SendGridVerifier().verify(pem, SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request)
+        assertThat(new SendGridProvider().verify(pem, SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request)
                 .verified()).isTrue();
     }
 
@@ -547,7 +548,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn("sig");
         when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn("1771075200");
 
-        var result = new SendGridVerifier()
+        var result = new SendGridProvider()
                 .verify("whsec_not_a_key", SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
@@ -576,7 +577,7 @@ class WebhookVerifierTest {
         when(request.getRequestURI()).thenReturn(HUBSPOT_PATH);
         when(request.getQueryString()).thenReturn(null);
 
-        var result = new HubSpotVerifier(SQUARE_URL)
+        var result = new HubSpotProvider(SQUARE_URL)
                 .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
@@ -593,7 +594,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-HubSpot-Signature-v3")).thenReturn(signature);
         when(request.getHeader("X-HubSpot-Request-Timestamp")).thenReturn(timestamp);
 
-        var result = new HubSpotVerifier(SQUARE_URL)
+        var result = new HubSpotProvider(SQUARE_URL)
                 .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
@@ -612,7 +613,7 @@ class WebhookVerifierTest {
         when(request.getRequestURI()).thenReturn(HUBSPOT_PATH);
         when(request.getQueryString()).thenReturn(null);
 
-        var result = new HubSpotVerifier(SQUARE_URL)
+        var result = new HubSpotProvider(SQUARE_URL)
                 .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
@@ -632,15 +633,15 @@ class WebhookVerifierTest {
         when(request.getRequestURI()).thenReturn(HUBSPOT_PATH);
         when(request.getQueryString()).thenReturn("to=a%40b.com&at=12%3A30");
 
-        assertThat(new HubSpotVerifier(SQUARE_URL)
+        assertThat(new HubSpotProvider(SQUARE_URL)
                 .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request).verified()).isTrue();
     }
 
-    private IncomingSource buildSource(VerificationMode mode, ProviderType providerType) {
+    private IncomingSource buildSource(VerificationMode mode, String providerType) {
         return IncomingSource.builder()
                 .id(UUID.randomUUID())
                 .verificationMode(mode)
-                .providerType(providerType != null ? providerType : ProviderType.GENERIC)
+                .providerType(providerType != null ? providerType : "GENERIC")
                 .hmacHeaderName("X-Signature")
                 .hmacSignaturePrefix("")
                 .build();
@@ -726,7 +727,7 @@ class WebhookVerifierTest {
 
     @Test
     void gitlab_success() {
-        GitLabVerifier verifier = new GitLabVerifier();
+        GitLabProvider verifier = new GitLabProvider();
         when(request.getHeader("X-Gitlab-Token")).thenReturn(SECRET);
         when(request.getHeader("X-Gitlab-Event-UUID")).thenReturn("d9c1f0a2-1111-2222-3333-444455556666");
 
@@ -741,7 +742,7 @@ class WebhookVerifierTest {
 
     @Test
     void gitlab_withoutEventUuidSkipsReplayDetection() {
-        GitLabVerifier verifier = new GitLabVerifier();
+        GitLabProvider verifier = new GitLabProvider();
         when(request.getHeader("X-Gitlab-Token")).thenReturn(SECRET);
         when(request.getHeader("X-Gitlab-Event-UUID")).thenReturn(null);
 
@@ -753,7 +754,7 @@ class WebhookVerifierTest {
 
     @Test
     void gitlab_noSecretConfigured() {
-        GitLabVerifier verifier = new GitLabVerifier();
+        GitLabProvider verifier = new GitLabProvider();
         when(request.getHeader("X-Gitlab-Token")).thenReturn("anything");
 
         var result = verifier.verify(null, BODY_BYTES, request);
@@ -766,23 +767,23 @@ class WebhookVerifierTest {
         String sendGridKey = Base64.getEncoder().encodeToString(generateEcKeyPair().getPublic().getEncoded());
         return Stream.of(
                 Arguments.of(new GenericHmacVerifier("X-Signature", ""), SECRET, BODY, "X-Signature", Map.of(), "Missing signature header"),
-                Arguments.of(new GitHubVerifier(), SECRET, BODY, "X-Hub-Signature-256", Map.of(), "Missing header"),
-                Arguments.of(new StripeVerifier(), SECRET, BODY, "Stripe-Signature", Map.of(), "Missing header"),
-                Arguments.of(new SlackVerifier(), SECRET, BODY, "X-Slack-Signature",
+                Arguments.of(new GitHubProvider(), SECRET, BODY, "X-Hub-Signature-256", Map.of(), "Missing header"),
+                Arguments.of(new StripeProvider(), SECRET, BODY, "Stripe-Signature", Map.of(), "Missing header"),
+                Arguments.of(new SlackProvider(), SECRET, BODY, "X-Slack-Signature",
                         Map.of("X-Slack-Request-Timestamp", "12345"), "Missing header: X-Slack-Signature"),
-                Arguments.of(new SlackVerifier(), SECRET, BODY, "X-Slack-Request-Timestamp",
+                Arguments.of(new SlackProvider(), SECRET, BODY, "X-Slack-Request-Timestamp",
                         Map.of("X-Slack-Signature", "v0=abc"), "Missing header: X-Slack-Request-Timestamp"),
-                Arguments.of(new ShopifyVerifier(), SECRET, BODY, "X-Shopify-Hmac-SHA256", Map.of(), "Missing header"),
-                Arguments.of(new TwilioVerifier(TWILIO_URL), SECRET, "To=x", "X-Twilio-Signature", Map.of(), "X-Twilio-Signature"),
-                Arguments.of(new SquareVerifier(SQUARE_URL), SECRET, SQUARE_BODY, "x-square-hmacsha256-signature",
+                Arguments.of(new ShopifyProvider(), SECRET, BODY, "X-Shopify-Hmac-SHA256", Map.of(), "Missing header"),
+                Arguments.of(new TwilioProvider(TWILIO_URL), SECRET, "To=x", "X-Twilio-Signature", Map.of(), "X-Twilio-Signature"),
+                Arguments.of(new SquareProvider(SQUARE_URL), SECRET, SQUARE_BODY, "x-square-hmacsha256-signature",
                         Map.of(), "x-square-hmacsha256-signature"),
-                Arguments.of(new SendGridVerifier(), sendGridKey, SENDGRID_BODY, "X-Twilio-Email-Event-Webhook-Timestamp",
+                Arguments.of(new SendGridProvider(), sendGridKey, SENDGRID_BODY, "X-Twilio-Email-Event-Webhook-Timestamp",
                         Map.of("X-Twilio-Email-Event-Webhook-Signature", "sig"), "X-Twilio-Email-Event-Webhook-Timestamp"),
-                Arguments.of(new HubSpotVerifier(SQUARE_URL), SECRET, HUBSPOT_BODY, "X-HubSpot-Signature-v3",
+                Arguments.of(new HubSpotProvider(SQUARE_URL), SECRET, HUBSPOT_BODY, "X-HubSpot-Signature-v3",
                         Map.of(), "X-HubSpot-Signature-v3"),
-                Arguments.of(new HubSpotVerifier(SQUARE_URL), SECRET, HUBSPOT_BODY, "X-HubSpot-Request-Timestamp",
+                Arguments.of(new HubSpotProvider(SQUARE_URL), SECRET, HUBSPOT_BODY, "X-HubSpot-Request-Timestamp",
                         Map.of("X-HubSpot-Signature-v3", "sig"), "X-HubSpot-Request-Timestamp"),
-                Arguments.of(new GitLabVerifier(), SECRET, BODY, "X-Gitlab-Token", Map.of(), "X-Gitlab-Token"));
+                Arguments.of(new GitLabProvider(), SECRET, BODY, "X-Gitlab-Token", Map.of(), "X-Gitlab-Token"));
     }
 
     @ParameterizedTest
@@ -801,10 +802,10 @@ class WebhookVerifierTest {
     static Stream<Arguments> mismatch() {
         return Stream.of(
                 Arguments.of(new GenericHmacVerifier("X-Signature", ""), "X-Signature", "wrong_signature"),
-                Arguments.of(new GitHubVerifier(), "X-Hub-Signature-256", "sha256=0000000000"),
-                Arguments.of(new StripeVerifier(), "Stripe-Signature", "t=" + Instant.now().getEpochSecond() + ",v1=wrong"),
-                Arguments.of(new ShopifyVerifier(), "X-Shopify-Hmac-SHA256", "wrongBase64=="),
-                Arguments.of(new GitLabVerifier(), "X-Gitlab-Token", "someone-elses-token"));
+                Arguments.of(new GitHubProvider(), "X-Hub-Signature-256", "sha256=0000000000"),
+                Arguments.of(new StripeProvider(), "Stripe-Signature", "t=" + Instant.now().getEpochSecond() + ",v1=wrong"),
+                Arguments.of(new ShopifyProvider(), "X-Shopify-Hmac-SHA256", "wrongBase64=="),
+                Arguments.of(new GitLabProvider(), "X-Gitlab-Token", "someone-elses-token"));
     }
 
     @ParameterizedTest

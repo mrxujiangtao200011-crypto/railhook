@@ -79,6 +79,8 @@ Railhook signs it and delivers it to every endpoint subscribed to `order.complet
 - Incoming webhooks: one URL per source, signature verified (Stripe, GitHub, GitLab, Shopify,
   Slack, Twilio, Square, Adyen, SendGrid, HubSpot, or generic HMAC), raw request stored, then
   forwarded to your destinations with retries after 1m, 5m, 15m and 1h (5 attempts).
+  A missing provider is one class to add: see
+  [Adding an inbound provider](CONTRIBUTING.md#adding-an-inbound-provider).
 - Every attempt is recorded with its request, response and timing.
 - SDKs for [Node](sdks/node), [Python](sdks/python) and [PHP](sdks/php), a [CLI](railhook-cli)
   that tunnels webhooks to `localhost`, and an MCP server at `/mcp`.

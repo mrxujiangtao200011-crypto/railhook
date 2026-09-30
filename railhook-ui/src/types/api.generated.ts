@@ -3442,6 +3442,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/incoming-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List incoming providers
+         * @description Providers whose signatures an incoming source verifies in PROVIDER mode. GENERIC is not listed: it is verified with HMAC_GENERIC.
+         */
+        get: operations["listIncomingProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/deliveries": {
         parameters: {
             query?: never;
@@ -4485,11 +4505,10 @@ export interface components {
              */
             slug?: string;
             /**
-             * @description Provider type
+             * @description GENERIC, or the id of a provider listed by GET /api/v1/incoming-providers
              * @example GITHUB
-             * @enum {string}
              */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "SQUARE" | "ADYEN" | "SENDGRID" | "HUBSPOT";
+            providerType?: string;
             /**
              * @description Source status
              * @enum {string}
@@ -4526,8 +4545,7 @@ export interface components {
             projectId?: string;
             name?: string;
             slug?: string;
-            /** @enum {string} */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "SQUARE" | "ADYEN" | "SENDGRID" | "HUBSPOT";
+            providerType?: string;
             /** @enum {string} */
             status?: "ACTIVE" | "DISABLED";
             ingressPathToken?: string;
@@ -4806,14 +4824,6 @@ export interface components {
             fullName?: string;
             /** @enum {string} */
             status?: "ACTIVE" | "PENDING_VERIFICATION" | "DISABLED";
-        };
-        /** @description Answer to Slack's url_verification handshake: the challenge Slack sent, echoed back */
-        SlackUrlVerificationResponse: {
-            /**
-             * @description The challenge from the verified url_verification request
-             * @example 3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P
-             */
-            challenge: string;
         };
         /** @description Response from incoming webhook ingress endpoint */
         IngressResponse: {
@@ -5689,12 +5699,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
+            unpaged?: boolean;
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
-            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -6566,6 +6576,21 @@ export interface components {
             canGrantWrite?: boolean;
             /** Format: date-time */
             expiresAt?: string;
+        };
+        /** @description A provider whose webhooks Railhook verifies natively */
+        IncomingProviderResponse: {
+            /**
+             * @description The value to send as an incoming source's providerType
+             * @example STRIPE
+             */
+            id: string;
+            /** @example Stripe */
+            displayName: string;
+            /**
+             * @description Null when the provider signs inside the body
+             * @example Stripe-Signature
+             */
+            signatureHeader?: string;
         };
         DeliveryResponse: {
             /** Format: uuid */
@@ -9001,13 +9026,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Slack url_verification handshake on a SLACK source, answered once its signature is verified. The challenge is echoed and nothing is stored or forwarded. */
+            /** @description A provider's URL-ownership handshake, such as Slack's url_verification, answered in the provider's own format once its signature is verified. Nothing is stored or forwarded. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SlackUrlVerificationResponse"];
+                    "application/json": Record<string, never>;
                 };
             };
             /** @description Webhook accepted for processing */
@@ -13572,6 +13597,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listIncomingProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IncomingProviderResponse"][];
                 };
             };
         };

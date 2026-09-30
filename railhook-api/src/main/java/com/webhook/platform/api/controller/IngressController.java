@@ -2,7 +2,6 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.dto.IngressResponse;
-import com.webhook.platform.api.dto.SlackUrlVerificationResponse;
 import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.service.IngressService;
@@ -46,11 +45,10 @@ public class IngressController {
             description = "Public endpoint for third-party providers to send webhooks. " +
                     "The token in the path identifies the incoming source configuration.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Slack url_verification handshake on a SLACK "
-                    + "source, answered once its signature is verified. The challenge is echoed and "
-                    + "nothing is stored or forwarded.",
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = SlackUrlVerificationResponse.class))),
+            @ApiResponse(responseCode = "200", description = "A provider's URL-ownership handshake, such as "
+                    + "Slack's url_verification, answered in the provider's own format once its signature "
+                    + "is verified. Nothing is stored or forwarded.",
+                    content = @Content(mediaType = "application/json", schema = @Schema(type = "object"))),
             @ApiResponse(responseCode = "202", description = "Webhook accepted for processing",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class))),
             @ApiResponse(responseCode = "404", description = "Invalid ingress token",
@@ -77,10 +75,10 @@ public class IngressController {
         // Signatures are checked over the exact bytes sent. A String would be charset-decoded,
         // and @RequestBody byte[] on a form POST is rebuilt from the parsed parameters.
         IngressOutcome outcome = ingressService.receiveWebhook(token, rawBody(request), request);
-        if (outcome instanceof IngressOutcome.SlackUrlVerification handshake) {
+        if (outcome instanceof IngressOutcome.Handshake handshake) {
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new SlackUrlVerificationResponse(handshake.challenge()));
+                    .body(handshake.json());
         }
         IncomingEvent event = ((IngressOutcome.Accepted) outcome).event();
         return ResponseEntity.status(HttpStatus.ACCEPTED)

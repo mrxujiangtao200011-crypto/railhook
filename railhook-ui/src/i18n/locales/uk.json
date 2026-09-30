@@ -1792,19 +1792,7 @@
     "noSources": "Вхідних джерел поки немає",
     "noSourcesDesc": "Джерело дає Stripe, GitHub чи іншому провайдеру URL для вебхуків.",
     "provider": "Провайдер",
-    "providerNames": {
-      "GENERIC": "Інший (generic)",
-      "GITHUB": "GitHub",
-      "GITLAB": "GitLab",
-      "STRIPE": "Stripe",
-      "SHOPIFY": "Shopify",
-      "SLACK": "Slack",
-      "TWILIO": "Twilio",
-      "SQUARE": "Square",
-      "ADYEN": "Adyen",
-      "SENDGRID": "SendGrid",
-      "HUBSPOT": "HubSpot"
-    },
+    "genericProvider": "Інший (generic)",
     "rateLimit": "Ліміт запитів",
     "security": {
       "noVerificationDesc": "Без перевірки будь-хто, хто знає ingress-адресу, може надсилати події. Увімкніть перевірку HMAC або провайдера.",

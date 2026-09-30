@@ -1,7 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
 import jakarta.persistence.*;
 import lombok.*;
@@ -39,10 +38,9 @@ public class IncomingSource {
     @Column(nullable = false, length = 64)
     private String slug;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "provider_type", nullable = false, length = 50)
     @Builder.Default
-    private ProviderType providerType = ProviderType.GENERIC;
+    private String providerType = "GENERIC";
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
