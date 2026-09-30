@@ -78,7 +78,14 @@
     "resolvedAtLabel": "Resolved {{time}}",
     "rules": {
       "desc": "Conditions that raise an alert when they are met",
-      "title": "What is watching"
+      "title": "What is watching",
+      "columns": {
+        "rule": "Rule",
+        "condition": "Fires when",
+        "channel": "Channel",
+        "severity": "Severity",
+        "state": "State"
+      }
     },
     "severities": {
       "CRITICAL": "Critical",
@@ -139,7 +146,31 @@
     "windowMinutes_few": "{{count}} minutes",
     "windowMinutes_many": "{{count}} minutes",
     "windowMinutes_one": "{{count}} minute",
-    "windowMinutes_other": "{{count}} minutes"
+    "windowMinutes_other": "{{count}} minutes",
+    "condition": {
+      "FAILURE_RATE": "Failure rate above {{v}}% over {{w}} min",
+      "DLQ_THRESHOLD": "More than {{v}} in Failed Messages within {{w}} min",
+      "CONSECUTIVE_FAILURES": "{{v}} deliveries fail in a row",
+      "LATENCY_THRESHOLD": "Average latency above {{v}} ms over {{w}} min"
+    },
+    "state": {
+      "firing": "Firing",
+      "firingValue": "{{current}} now, limit {{threshold}}",
+      "armed": "Armed",
+      "muted": "Muted",
+      "snoozed": "Snoozed",
+      "snoozedUntil": "Snoozed, back {{time}}",
+      "off": "Off"
+    },
+    "summary": {
+      "firing": "{{count}} alerts firing",
+      "firing_one": "{{count}} alert firing",
+      "firing_few": "{{count}} alerts firing",
+      "firing_many": "{{count}} alerts firing",
+      "firing_other": "{{count}} alerts firing",
+      "armed": "{{armed}} of {{total}} rules armed",
+      "silenced": "{{count}} muted, snoozed or off"
+    }
   },
   "analytics": {
     "apply": "Apply",
@@ -3687,7 +3718,13 @@
       "closeFailed": "Failed to close tunnel",
       "closed": "Tunnel closed",
       "loadFailed": "Failed to load tunnels"
-    }
+    },
+    "summary": "{{active}} active · {{pending}} requests waiting · {{mine}} started by you.",
+    "columns": {
+      "url": "Public URL"
+    },
+    "startTitle": "Start a tunnel",
+    "startBody": "Install the CLI, sign in, then forward webhooks to a port on your machine. The tunnel shows up here while the CLI stays connected."
   },
   "usage": {
     "description": "What this project has used, and what your plan allows.",

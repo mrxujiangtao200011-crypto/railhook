@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Bell, BellOff, Check, ChevronDown, Clock, KeyRound, Loader2, Mail, MessageSquare, Plus, Search, Siren,
+  Bell, Check, ChevronDown, Clock, Loader2, Mail, MessageSquare, Plus, Search, Siren,
   Trash2, VolumeX, Webhook,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ import {
 import type {
   AlertRuleRequest, AlertType, AlertSeverity, AlertChannel, OpsgenieRegion,
 } from '../api/alerts.api';
-import { formatDateTime, formatRelativeTime } from '../lib/date';
+import { formatDateTime, formatRelativeFuture, formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
@@ -38,7 +38,7 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { cn } from '../lib/utils';
-import { STATUS_FILL, STATUS_TEXT, StatTile, formatCompact, kindOfSeverity } from '../components/charts';
+import { STATUS_FILL, STATUS_TEXT, kindOfSeverity } from '../components/charts';
 
 const ALERT_TYPE_VALUES: AlertType[] = ['FAILURE_RATE', 'DLQ_THRESHOLD', 'CONSECUTIVE_FAILURES', 'LATENCY_THRESHOLD'];
 const SEVERITY_VALUES: AlertSeverity[] = ['INFO', 'WARNING', 'CRITICAL'];
@@ -101,6 +101,16 @@ export default function AlertsPage() {
   const events = eventsData?.content ?? [];
   const armedCount = rules.filter(isArmed).length;
   const silencedCount = rules.length - armedCount;
+  const firingByRule = new Map(events.filter((e) => !e.resolved).map((e) => [e.alertRuleId, e] as const));
+  const ruleState = (rule: (typeof rules)[number], firing: unknown): 'firing' | 'armed' | 'muted' | 'snoozed' | 'off' => {
+    if (!rule.enabled) return 'off';
+    if (firing) return 'firing';
+    if (rule.muted) return 'muted';
+    if (rule.snoozedUntil && new Date(rule.snoozedUntil) > new Date()) return 'snoozed';
+    return 'armed';
+  };
+  const STATE_ORDER = { firing: 0, armed: 1, snoozed: 2, muted: 3, off: 4 } as const;
+  const sortedRules = [...rules].sort((a, b) => STATE_ORDER[ruleState(a, firingByRule.get(a.id))] - STATE_ORDER[ruleState(b, firingByRule.get(b.id))]);
 
   const resetForm = () => {
     setFormName('');
@@ -208,7 +218,7 @@ export default function AlertsPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
       <PageHeader
         title={t('alerts.title')}
         description={t('alerts.subtitle')}
@@ -234,28 +244,160 @@ export default function AlertsPage() {
         }
       />
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          <StatTile
-            label={t('alerts.tiles.unresolved')}
-            value={formatCompact(unresolvedCount)}
-            hint={t('alerts.tiles.unresolvedHint')}
-            badge={unresolvedCount > 0
-              ? <StatusBadge kind="halt" label={t('alerts.active')} icon={false} />
-              : <StatusBadge kind="ok" label={t('alerts.tiles.allClear')} icon={false} />}
-          />
-          <StatTile
-            label={t('alerts.tiles.armed')}
-            value={formatCompact(armedCount)}
-            hint={t('alerts.tiles.armedHint', { total: rules.length })}
-          />
-          <StatTile
-            label={t('alerts.tiles.silenced')}
-            value={formatCompact(silencedCount)}
-            hint={t('alerts.tiles.silencedHint')}
-            badge={silencedCount > 0 ? <StatusBadge kind="idle" label={t('alerts.muted')} icon={false} /> : undefined}
-          />
-        </div>
+      <div className="space-y-10">
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="flex items-center gap-2">
+            <span aria-hidden className={cn('h-2 w-2 rounded-full', unresolvedCount > 0 ? 'bg-halt' : 'bg-ok')} />
+            {unresolvedCount > 0 ? t('alerts.summary.firing', { count: unresolvedCount }) : t('alerts.tiles.allClear')}
+          </span>
+          <span className="text-muted-foreground">{t('alerts.summary.armed', { armed: armedCount, total: rules.length })}</span>
+          {silencedCount > 0 && <span className="text-muted-foreground">{t('alerts.summary.silenced', { count: silencedCount })}</span>}
+        </p>
+
+        <section>
+          <div className="mb-3">
+            <h3 className="text-[15px] font-medium leading-tight">{t('alerts.rules.title')}</h3>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">{t('alerts.rules.desc')}</p>
+          </div>
+
+          {rulesIsError ? (
+            <ErrorState error={rulesError} fallbackKey="alerts.loadFailed" onRetry={() => refetchRules()} />
+          ) : rules.length === 0 ? (
+            <EmptyState
+              icon={Bell}
+              title={t('alerts.noRules')}
+              description={t('alerts.noRulesDesc')}
+              action={
+                <PermissionGate allowed={canManageEndpoints}>
+                  <VerificationGate>
+                    <Button onClick={() => setShowCreateDialog(true)}>
+                      <Plus className="h-4 w-4" /> {t('alerts.createRule')}
+                    </Button>
+                  </VerificationGate>
+                </PermissionGate>
+              }
+            />
+          ) : (
+            <Table className="text-[13px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('alerts.rules.columns.rule')}</TableHead>
+                  <TableHead>{t('alerts.rules.columns.condition')}</TableHead>
+                  <TableHead className="hidden xl:table-cell">{t('alerts.rules.columns.channel')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('alerts.rules.columns.severity')}</TableHead>
+                  <TableHead>{t('alerts.rules.columns.state')}</TableHead>
+                  <TableHead className="w-[150px] text-right"><span className="sr-only">{t('common.actions')}</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedRules.map((rule) => {
+                  const ChannelIcon = CHANNEL_ICON[rule.channel] ?? Bell;
+                  const firing = firingByRule.get(rule.id);
+                  const state = ruleState(rule, firing);
+                  return (
+                    <TableRow key={rule.id} data-firing={state === 'firing' || undefined} className={cn(state === 'firing' && 'bg-halt-soft/60 hover:bg-halt-soft')}>
+                      <TableCell className="relative max-w-[18rem]">
+                        {state === 'firing' && <span aria-hidden className="absolute bottom-0 left-0 top-0 w-[2px] bg-halt max-md:hidden" />}
+                        <p className="truncate">{rule.name}</p>
+                        {rule.description && <p className="truncate text-[12px] text-muted-foreground">{rule.description}</p>}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {t(`alerts.condition.${rule.alertType}`, { v: rule.thresholdValue, w: rule.windowMinutes })}
+                      </TableCell>
+                      <TableCell className="hidden xl:table-cell">
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <ChannelIcon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                          {t(`alerts.channels.${rule.channel}`)}
+                        </span>
+                      </TableCell>
+                      <TableCell className={cn('hidden lg:table-cell', STATUS_TEXT[kindOfSeverity(rule.severity)])}>
+                        {t(`alerts.severities.${rule.severity}`)}
+                      </TableCell>
+                      <TableCell>
+                        {state === 'firing' ? (
+                          <span className="block">
+                            <StatusBadge kind="halt" label={t('alerts.state.firing')} />
+                            {firing?.currentValue != null && firing.thresholdValue != null && (
+                              <span className="block pl-4 text-[12px] text-muted-foreground">
+                                {t('alerts.state.firingValue', { current: firing.currentValue, threshold: firing.thresholdValue })}
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <StatusBadge
+                            kind={state === 'armed' ? 'ok' : state === 'snoozed' ? 'retry' : 'idle'}
+                            label={state === 'snoozed' && rule.snoozedUntil
+                              ? t('alerts.state.snoozedUntil', { time: formatRelativeFuture(rule.snoozedUntil) })
+                              : t(`alerts.state.${state}`)}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          <Switch
+                            checked={rule.enabled}
+                            onCheckedChange={(v) => handleToggleRule(rule.id, v)}
+                            aria-label={t('alerts.toggleRule', { name: rule.name })}
+                            disabled={!canManageEndpoints}
+                          />
+                          {canManageEndpoints && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => handleMuteRule(rule.id, !rule.muted)}
+                                aria-label={t(rule.muted ? 'alerts.unmute' : 'alerts.mute')}
+                                title={t(rule.muted ? 'alerts.unmute' : 'alerts.mute')}
+                              >
+                                <VolumeX className={cn('h-3.5 w-3.5', rule.muted && 'text-foreground')} />
+                              </Button>
+                              <div className="relative">
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => setSnoozeDropdownId(snoozeDropdownId === rule.id ? null : rule.id)}
+                                  aria-label={t('alerts.snooze')}
+                                  title={t('alerts.snooze')}
+                                  aria-expanded={snoozeDropdownId === rule.id}
+                                >
+                                  <Clock className="h-3.5 w-3.5" />
+                                </Button>
+                                {snoozeDropdownId === rule.id && (
+                                  <div className="absolute right-0 top-full z-10 mt-1 min-w-[130px] border border-rail bg-popover py-1 shadow-elevated">
+                                    {SNOOZE_HOURS.map((h) => (
+                                      <button
+                                        key={h}
+                                        type="button"
+                                        className="w-full px-3 py-2 text-left text-xs transition-colors hover:bg-secondary"
+                                        onClick={() => { handleSnoozeRule(rule.id, h); setSnoozeDropdownId(null); }}
+                                      >
+                                        {t('alerts.snoozeFor', { hours: h })}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="text-muted-foreground hover:text-halt"
+                                onClick={() => setDeleteRuleId(rule.id)}
+                                aria-label={t('alerts.deleteRule')}
+                                title={t('alerts.deleteRule')}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </section>
 
         <section>
           <div className="mb-3">
@@ -404,151 +546,6 @@ export default function AlertsPage() {
           )}
         </section>
 
-        <section>
-          <div className="mb-3">
-            <h3 className="text-sm font-medium leading-tight">{t('alerts.rules.title')}</h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">{t('alerts.rules.desc')}</p>
-          </div>
-
-          {rulesIsError ? (
-            <ErrorState error={rulesError} fallbackKey="alerts.loadFailed" onRetry={() => refetchRules()} />
-          ) : rules.length === 0 ? (
-            <EmptyState
-              icon={Bell}
-              title={t('alerts.noRules')}
-              description={t('alerts.noRulesDesc')}
-              action={
-                <PermissionGate allowed={canManageEndpoints}>
-                  <VerificationGate>
-                    <Button onClick={() => setShowCreateDialog(true)}>
-                      <Plus className="h-4 w-4" /> {t('alerts.createRule')}
-                    </Button>
-                  </VerificationGate>
-                </PermissionGate>
-              }
-            />
-          ) : (
-            <div className="grid animate-fade-in gap-4 md:grid-cols-2">
-              {rules.map((rule) => {
-                const ChannelIcon = CHANNEL_ICON[rule.channel] ?? Bell;
-                const armed = isArmed(rule);
-                const snoozed = !!rule.snoozedUntil && new Date(rule.snoozedUntil) > new Date();
-                return (
-                  <Card key={rule.id} className="p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h4 className="truncate text-sm font-medium">{rule.name}</h4>
-                        {rule.description && (
-                          <p className="mt-0.5 text-xs text-muted-foreground">{rule.description}</p>
-                        )}
-                      </div>
-                      <Switch
-                        checked={rule.enabled}
-                        onCheckedChange={(v) => handleToggleRule(rule.id, v)}
-                        aria-label={t('alerts.toggleRule', { name: rule.name })}
-                      />
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <StatusBadge
-                        kind={armed ? kindOfSeverity(rule.severity) : 'idle'}
-                        label={t(`alerts.severities.${rule.severity}`)}
-                        icon={false}
-                      />
-                      <Badge variant="outline">{t(`alerts.types.${rule.alertType}.label`)}</Badge>
-                      <Badge variant="secondary">
-                        <ChannelIcon className="h-3 w-3" aria-hidden />
-                        {t(`alerts.channels.${rule.channel}`)}
-                      </Badge>
-                      {rule.muted && (
-                        <Badge variant="outline"><VolumeX className="h-3 w-3" aria-hidden />{t('alerts.muted')}</Badge>
-                      )}
-                      {snoozed && (
-                        <Badge variant="outline"><BellOff className="h-3 w-3" aria-hidden />{t('alerts.snoozed')}</Badge>
-                      )}
-                    </div>
-
-                    <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="flex items-baseline gap-1.5">
-                        <dt className="text-muted-foreground">{t('alerts.threshold')}</dt>
-                        <dd className="font-mono tabular-nums">{rule.thresholdValue}</dd>
-                      </div>
-                      <div className="flex items-baseline gap-1.5">
-                        <dt className="text-muted-foreground">{t('alerts.window')}</dt>
-                        <dd className="font-mono tabular-nums">{t('alerts.windowMinutes', { count: rule.windowMinutes })}</dd>
-                      </div>
-                    </dl>
-
-                    {(rule.channel === 'WEBHOOK' || rule.channel === 'SLACK') && rule.webhookUrl && (
-                      <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground">{rule.webhookUrl}</p>
-                    )}
-                    {rule.integrationKeyConfigured && (
-                      <p className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <KeyRound className="h-3 w-3" aria-hidden />
-                        {rule.channel === 'OPSGENIE'
-                          ? `${t('alerts.form.opsgenieApiKey')} · ${rule.opsgenieRegion ?? 'US'}`
-                          : t('alerts.form.pagerDutyRoutingKey')}
-                      </p>
-                    )}
-                    {rule.channel === 'EMAIL' && rule.emailRecipients && (
-                      <p className="mt-2 truncate font-mono text-[11px] text-muted-foreground">{rule.emailRecipients}</p>
-                    )}
-
-                    <div className="mt-4 flex items-center justify-between border-t border-rail pt-3">
-                      <span className="text-[11px] text-muted-foreground">{formatRelativeTime(rule.createdAt)}</span>
-                      {canManageEndpoints && (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => handleMuteRule(rule.id, !rule.muted)}
-                            aria-label={t(rule.muted ? 'alerts.unmute' : 'alerts.mute')}
-                          >
-                            <VolumeX className={cn('h-3.5 w-3.5', rule.muted && 'text-muted-foreground')} />
-                          </Button>
-                          <div className="relative">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => setSnoozeDropdownId(snoozeDropdownId === rule.id ? null : rule.id)}
-                              aria-label={t('alerts.snooze')}
-                              aria-expanded={snoozeDropdownId === rule.id}
-                            >
-                              <Clock className="h-3.5 w-3.5" />
-                            </Button>
-                            {snoozeDropdownId === rule.id && (
-                              <div className="absolute right-0 top-full z-10 mt-1 min-w-[130px] border border-rail bg-popover py-1 shadow-elevated">
-                                {SNOOZE_HOURS.map((h) => (
-                                  <button
-                                    key={h}
-                                    type="button"
-                                    className="w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-secondary"
-                                    onClick={() => { handleSnoozeRule(rule.id, h); setSnoozeDropdownId(null); }}
-                                  >
-                                    {t('alerts.snoozeFor', { hours: h })}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-halt"
-                            onClick={() => setDeleteRuleId(rule.id)}
-                            aria-label={t('alerts.deleteRule')}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </section>
       </div>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

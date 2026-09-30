@@ -78,7 +78,14 @@
     "resolvedAtLabel": "Закрито {{time}}",
     "rules": {
       "desc": "Умови, за яких спрацьовує сповіщення",
-      "title": "Що відстежуємо"
+      "title": "Що відстежуємо",
+      "columns": {
+        "rule": "Правило",
+        "condition": "Спрацьовує, коли",
+        "channel": "Канал",
+        "severity": "Рівень",
+        "state": "Стан"
+      }
     },
     "severities": {
       "CRITICAL": "Критичний",
@@ -139,7 +146,31 @@
     "windowMinutes_few": "{{count}} хвилини",
     "windowMinutes_many": "{{count}} хвилин",
     "windowMinutes_one": "{{count}} хвилина",
-    "windowMinutes_other": "{{count}} хвилин"
+    "windowMinutes_other": "{{count}} хвилин",
+    "condition": {
+      "FAILURE_RATE": "Частка збоїв понад {{v}}% за {{w}} хв",
+      "DLQ_THRESHOLD": "Понад {{v}} у недоставлених за {{w}} хв",
+      "CONSECUTIVE_FAILURES": "{{v}} доставок поспіль не вдаються",
+      "LATENCY_THRESHOLD": "Середня затримка понад {{v}} мс за {{w}} хв"
+    },
+    "state": {
+      "firing": "Спрацювало",
+      "firingValue": "зараз {{current}}, поріг {{threshold}}",
+      "armed": "Увімкнено",
+      "muted": "Без звуку",
+      "snoozed": "Відкладено",
+      "snoozedUntil": "Відкладено, повернеться {{time}}",
+      "off": "Вимкнено"
+    },
+    "summary": {
+      "firing": "Активних сповіщень: {{count}}",
+      "firing_one": "Активних сповіщень: {{count}}",
+      "firing_few": "Активних сповіщень: {{count}}",
+      "firing_many": "Активних сповіщень: {{count}}",
+      "firing_other": "Активних сповіщень: {{count}}",
+      "armed": "Увімкнено {{armed}} з {{total}} правил",
+      "silenced": "Без звуку, відкладено або вимкнено: {{count}}"
+    }
   },
   "analytics": {
     "apply": "Застосувати",
@@ -3687,7 +3718,13 @@
       "closeFailed": "Не вдалося закрити тунель",
       "closed": "Тунель закрито",
       "loadFailed": "Не вдалося завантажити тунелі"
-    }
+    },
+    "summary": "Активних {{active}} · запитів у черзі {{pending}} · запущено вами {{mine}}.",
+    "columns": {
+      "url": "Публічний URL"
+    },
+    "startTitle": "Запустити тунель",
+    "startBody": "Встановіть CLI, увійдіть і перенаправляйте вебхуки на порт вашої машини. Тунель видно тут, доки CLI на зв’язку."
   },
   "usage": {
     "description": "Скільки цей проєкт уже використав і що дозволяє ваш тариф.",
