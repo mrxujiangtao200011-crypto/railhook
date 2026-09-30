@@ -10,9 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -60,12 +59,9 @@ class WorkflowExecutionRecoveryJobIntegrationTest extends AbstractIntegrationTes
                 .build());
     }
 
-    // Through ZoneOffset.UTC, as Hibernate writes it; a default-zone Timestamp misses on a non-UTC host.
     private void backdateStartedAt(UUID executionId, long minutesAgo) {
-        Instant target = Instant.now().minus(minutesAgo, ChronoUnit.MINUTES);
-        Timestamp utcWallClock = Timestamp.valueOf(LocalDateTime.ofInstant(target, ZoneOffset.UTC));
-        jdbcTemplate.update("UPDATE workflow_executions SET started_at = ? WHERE id = ?",
-                utcWallClock, executionId);
+        OffsetDateTime target = Instant.now().minus(minutesAgo, ChronoUnit.MINUTES).atOffset(ZoneOffset.UTC);
+        jdbcTemplate.update("UPDATE workflow_executions SET started_at = ? WHERE id = ?", target, executionId);
     }
 
     private int runRecoverySweep() {
