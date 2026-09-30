@@ -312,9 +312,6 @@ doctor: ## Run pre-flight checks
 		if [ "$(SWAGGER_ENABLED)" = "true" ]; then \
 			echo "$(YELLOW)WARNING: SWAGGER_ENABLED=true in production$(NC)"; \
 		fi; \
-		if [ "$(DB_SSL_MODE)" = "disable" ]; then \
-			echo "$(YELLOW)WARNING: DB_SSL_MODE=disable in production$(NC)"; \
-		fi; \
 		if [ $$fail -ne 0 ]; then exit 1; fi; \
 	fi
 	@if [ "$(DB_MODE)" = "external" ]; then \

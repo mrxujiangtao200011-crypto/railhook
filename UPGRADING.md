@@ -3,6 +3,21 @@
 Only the releases that need something from you are listed. Everything else upgrades with
 `./railhook upgrade` (Compose) or `helm upgrade`.
 
+## v3.1.0
+
+- The migration history starts again at `V001__schema.sql`, so a database created by an earlier
+  release will not start. Back up what you need, remove the database volume and let the API create
+  the schema:
+
+  ```bash
+  ./railhook backup
+  docker compose down
+  docker volume rm railhook_webhook_pgdata
+  ./railhook upgrade v3.1.0
+  ```
+
+- Remove `DB_SSL_MODE` and `DB_JDBC_URL` from `.env`; nothing reads them.
+
 ## v3.0.0
 
 - Kafka is gone. The worker takes due deliveries and forwards straight from PostgreSQL.

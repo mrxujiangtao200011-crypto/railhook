@@ -81,7 +81,6 @@ class SeededPlanIntegrationTest extends AbstractIntegrationTest {
         assertThat(plan("starter").hasFeature("mTLS")).isFalse();
         assertThat(plan("pro").hasFeature("mTLS")).isTrue();
 
-        // V059 dropped the "sso" key seeded with no SSO implementation; keep it dropped.
         for (String name : new String[] { "free", "starter", "pro", "enterprise", "self_hosted" }) {
             assertThat(plan(name).getFeatures().has("sso"))
                     .as("%s must not advertise SSO: no implementation exists", name)

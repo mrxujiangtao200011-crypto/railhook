@@ -299,19 +299,6 @@ SELECT version, description FROM flyway_schema_history ORDER BY installed_rank D
 Anything newer is about to run. `MigrationIndexLockingTest` blocks new ones: indexes on these
 tables must use `CONCURRENTLY` with `-- flyway:executeInTransaction=false`.
 
-### V056: the tenant column is not an instant migration
-
-`V056__tenant_organization_id.sql` adds `organization_id` to 31 tables, backfills it and sets
-`NOT NULL`. The backfill and the `NOT NULL` scan take time, including across every partition of
-`delivery_attempts` and `tunnel_request_log`. Run it in a window.
-
-`SET NOT NULL` fails on orphan rows. Check first:
-
-```sql
-SELECT count(*) FROM deliveries d LEFT JOIN endpoints e ON e.id = d.endpoint_id
-WHERE e.id IS NULL;
-```
-
 ### Open Session In View is off
 
 `spring.jpa.open-in-view: false`. A handler that returns a lazy association outside a transaction
@@ -322,7 +309,6 @@ fails with `LazyInitializationException: could not initialize proxy - no session
 Start with [Settings you must decide](https://railhook.io/docs/self-hosting/configuration/). On top
 of that, production should have:
 
-- `DB_SSL_MODE=require`
 - `SWAGGER_ENABLED=false`
 - TLS terminated at the ingress or load balancer
 - `AUTH_BCRYPT_STRENGTH` at 12 unless login is measurably slow

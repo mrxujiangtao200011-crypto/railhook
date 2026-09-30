@@ -39,70 +39,33 @@ class SchemaRetryLadderDefaultsTest {
     private static final Path MIGRATIONS = Paths.get("src/main/resources/db/migration");
 
     @Test
-    @DisplayName("V001's outgoing ladder defaults match RetryLadderDefaults.OUTGOING_*")
+    @DisplayName("the outgoing tables default to RetryLadderDefaults.OUTGOING_*")
     void outgoingSchemaDefaultsMatchConstants() throws IOException {
-        String v001 = read("V001__initial_schema.sql");
-
-        List<String> ladders = allMatches(RETRY_DELAYS_DEFAULT, v001);
-        assertFalse(ladders.isEmpty(), "V001 declares no retry_delays default — did the column move?");
-        for (String ladder : ladders) {
-            assertEquals(RetryLadderDefaults.OUTGOING_DELAYS, ladder,
-                    "V001 retry_delays default has drifted from RetryLadderDefaults.OUTGOING_DELAYS. "
-                            + "Change both, or neither.");
-        }
-
-        List<String> attempts = allMatches(MAX_ATTEMPTS_DEFAULT, v001);
-        assertFalse(attempts.isEmpty(), "V001 declares no max_attempts default — did the column move?");
-        for (String attempt : attempts) {
-            assertEquals(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS, Integer.parseInt(attempt),
-                    "V001 max_attempts default has drifted from RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS.");
+        for (String table : List.of("deliveries", "subscriptions")) {
+            assertLadder(table, RetryLadderDefaults.OUTGOING_DELAYS, RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS);
         }
     }
 
     @Test
-    @DisplayName("V005's incoming ladder defaults match RetryLadderDefaults.INCOMING_*")
+    @DisplayName("incoming_destinations defaults to RetryLadderDefaults.INCOMING_*")
     void incomingSchemaDefaultsMatchConstants() throws IOException {
-        String v005 = read("V005__incoming_webhooks.sql");
-
-        List<String> ladders = allMatches(RETRY_DELAYS_DEFAULT, v005);
-        assertFalse(ladders.isEmpty(), "V005 declares no retry_delays default — did the column move?");
-        for (String ladder : ladders) {
-            assertEquals(RetryLadderDefaults.INCOMING_DELAYS, ladder,
-                    "V005 retry_delays default has drifted from RetryLadderDefaults.INCOMING_DELAYS. "
-                            + "Change both, or neither.");
-        }
-
-        List<String> attempts = allMatches(MAX_ATTEMPTS_DEFAULT, v005);
-        assertFalse(attempts.isEmpty(), "V005 declares no max_attempts default — did the column move?");
-        for (String attempt : attempts) {
-            assertEquals(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS, Integer.parseInt(attempt),
-                    "V005 max_attempts default has drifted from RetryLadderDefaults.INCOMING_MAX_ATTEMPTS.");
-        }
+        assertLadder("incoming_destinations", RetryLadderDefaults.INCOMING_DELAYS,
+                RetryLadderDefaults.INCOMING_MAX_ATTEMPTS);
     }
 
-    @Test
-    @DisplayName("no later migration silently redefines a retry ladder default")
-    void noLaterMigrationRedefinesALadder() throws IOException {
-        List<String> offenders = new ArrayList<>();
-        try (Stream<Path> files = Files.list(MIGRATIONS)) {
-            for (Path file : files.sorted().toList()) {
-                String name = file.getFileName().toString();
-                if (name.equals("V001__initial_schema.sql") || name.equals("V005__incoming_webhooks.sql")) {
-                    continue;
-                }
-                String sql = Files.readString(file, StandardCharsets.UTF_8);
-                for (String ladder : allMatches(RETRY_DELAYS_DEFAULT, sql)) {
-                    if (!ladder.equals(RetryLadderDefaults.OUTGOING_DELAYS)
-                            && !ladder.equals(RetryLadderDefaults.INCOMING_DELAYS)) {
-                        offenders.add(name + " sets retry_delays default to '" + ladder + "'");
-                    }
-                }
-            }
-        }
-        assertTrue(offenders.isEmpty(),
-                "A migration introduced a retry ladder default that matches neither direction's "
-                        + "declared default. Add it to RetryLadderDefaults or align it:\n  "
-                        + String.join("\n  ", offenders));
+    private static void assertLadder(String table, String delays, int maxAttempts) throws IOException {
+        String columns = createTable(table);
+        assertEquals(List.of(delays), allMatches(RETRY_DELAYS_DEFAULT, columns),
+                table + ".retry_delays default has drifted from RetryLadderDefaults. Change both, or neither.");
+        assertEquals(List.of(String.valueOf(maxAttempts)), allMatches(MAX_ATTEMPTS_DEFAULT, columns),
+                table + ".max_attempts default has drifted from RetryLadderDefaults. Change both, or neither.");
+    }
+
+    private static String createTable(String table) throws IOException {
+        String sql = read("V001__schema.sql");
+        Matcher m = Pattern.compile("CREATE TABLE " + table + " \\((.*?)\\n\\);", Pattern.DOTALL).matcher(sql);
+        assertTrue(m.find(), "V001 has no CREATE TABLE " + table);
+        return m.group(1);
     }
 
     // A Subscription's copy lands on its Deliveries and a Destination's is read directly, so all three must agree.

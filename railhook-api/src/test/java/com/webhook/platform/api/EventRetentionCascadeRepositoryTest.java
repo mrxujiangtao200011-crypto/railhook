@@ -75,7 +75,7 @@ public class EventRetentionCascadeRepositoryTest extends AbstractIntegrationTest
                 "deliveries.event_id must cascade, or a purge leaves rows nothing can reach");
         assertEquals(0L, countWhere("delivery_attempts", "delivery_id", deliveryId),
                 "delivery_attempts.delivery_id must cascade through the delivery — this is the "
-                        + "constraint V052 dropped and V061 restored");
+                        + "constraint on the partitioned delivery_attempts table");
     }
 
     @Test

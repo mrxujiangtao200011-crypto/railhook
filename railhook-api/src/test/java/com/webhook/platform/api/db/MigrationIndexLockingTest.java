@@ -32,33 +32,8 @@ class MigrationIndexLockingTest {
             "incoming_events", "incoming_forward_attempts",
             "tunnel_request_log", "audit_log", "usage_daily");
 
-    // Frozen: shipped migrations cannot be edited, so this set must not grow.
-    private static final Set<String> SHIPPED_WITH_BLOCKING_INDEXES = new TreeSet<>(Set.of(
-            // V001 and V002 run against an empty database by definition.
-            "V001__initial_schema.sql",
-            "V002__audit_log.sql",
-            "V005__incoming_webhooks.sql",
-            "V006__incoming_webhooks_highload.sql",
-            "V011__deterministic_replay.sql",
-            "V013__replay_sessions.sql",
-            "V015__delivery_dashboard_indexes.sql",
-            "V016__incoming_event_dedup.sql",
-            "V018__replay_unique_constraint.sql",
-            "V019__highload_partial_indexes.sql",
-            "V020__alerts_and_usage.sql",
-            "V022__highload_exists_indexes.sql",
-            "V023__transformations.sql",
-            "V032__event_payload_compression.sql",
-            "V035__delivery_attempts_cleanup_index.sql",
-            "V041__tunnel_request_log.sql",
-            "V045__p0_delivery_fixes.sql",
-            "V046__p1_noisy_neighbor_fixes.sql",
-            "V047__p1_outbox_kafka_key_index.sql",
-            "V048__outbox_correlation_id.sql",
-            "V052__partition_delivery_attempts.sql",
-            "V053__partition_tunnel_request_log.sql",
-            "V057__replay_deliveries_unique.sql",
-            "V064__incoming_forward_replay_session.sql"));
+    // V001 runs against an empty database by definition; every later migration builds concurrently.
+    private static final Set<String> SHIPPED_WITH_BLOCKING_INDEXES = Set.of("V001__schema.sql");
 
     private static final Pattern CREATE_INDEX = Pattern.compile(
             "CREATE\\s+(UNIQUE\\s+)?INDEX\\s+(CONCURRENTLY\\s+)?(IF\\s+NOT\\s+EXISTS\\s+)?"
