@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The dashboard has a new layout. A dark sidebar holds the project switcher and each section's pages, with counts for Failed Messages, Failed Forwards, firing alerts and open incidents. The project overview leads with what needs attention. Deliveries opens a delivery's attempts beside the list. Endpoints shows each endpoint's delivered share and p95 over 24 hours and why a failing one is failing. Alerts is a table of rules with their current state. Every page has its own mobile layout. Workflows and the workflow builder are unchanged.
+
 ## [3.4.1] - 2026-10-01
 
 ### Fixed
