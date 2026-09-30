@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { IncidentResponse } from '../../api/incidents.api';
@@ -54,9 +54,9 @@ function renderIncidents() {
   });
 }
 
-function tileValue(label: RegExp): string | undefined {
-  const heading = screen.getAllByText(label)[0];
-  return heading?.closest('div')?.parentElement?.querySelector('p')?.textContent ?? undefined;
+function countOf(label: RegExp): string | undefined {
+  const term = screen.queryAllByText(label).find((el) => el.tagName === 'DT');
+  return term?.nextElementSibling?.textContent ?? undefined;
 }
 
 describe('IncidentsPage', () => {
@@ -67,7 +67,7 @@ describe('IncidentsPage', () => {
   });
 
   it('counts incidents the list has not loaded', async () => {
-    // Every tile is a number the rows on screen cannot produce.
+    // Every count is a number the rows on screen cannot produce.
     vi.mocked(incidentsApi.list).mockResolvedValue(
       page(Array.from({ length: 20 }, (_, i) => incident({ id: `incident-${i}`, title: `Routine ${i}` })), 24),
     );
@@ -76,9 +76,9 @@ describe('IncidentsPage', () => {
     renderIncidents();
 
     await screen.findByText('Routine 0');
-    await waitFor(() => expect(tileValue(/investigat/i)).toBe('2'));
-    expect(tileValue(/critical/i)).toBe('1');
-    expect(tileValue(/^open$/i)).toBe('24');
+    await waitFor(() => expect(countOf(/investigat/i)).toBe('2'));
+    expect(countOf(/critical/i)).toBe('1');
+    expect(countOf(/^open$/i)).toBe('24');
   });
 
   it('says all clear only when nothing is unresolved', async () => {
@@ -88,17 +88,21 @@ describe('IncidentsPage', () => {
     renderIncidents();
 
     await waitFor(() => expect(incidentsApi.countOpen).toHaveBeenCalled());
-    await waitFor(() => expect(tileValue(/^open$/i)).toBe('0'));
+    expect(await screen.findByText('All clear')).toBeInTheDocument();
+    expect(countOf(/^open$/i)).toBeUndefined();
     expect(document.body.textContent).not.toMatch(/incidents\.tiles/);
   });
 
-  it('renders the tiles at zero rather than blank while the counts are still loading', async () => {
-    vi.mocked(incidentsApi.countOpen).mockImplementation(() => new Promise(() => {}));
+  it('opens the incident with its timeline when you pick it from the list', async () => {
+    vi.mocked(incidentsApi.get).mockResolvedValue(incident({
+      timeline: [{ id: 't-1', entryType: 'NOTE', title: 'Gateway rolled back', detail: null, deliveryId: null, endpointId: null, createdAt: now }],
+    }));
 
     renderIncidents();
+    fireEvent.click(await screen.findByText('Checkout webhooks failing'));
 
-    await screen.findByText('Checkout webhooks failing');
-    expect(tileValue(/critical/i)).toBe('0');
+    expect(await screen.findByText('Gateway rolled back')).toBeInTheDocument();
+    expect(incidentsApi.get).toHaveBeenCalledWith(TEST_PROJECT_ID, 'incident-1');
   });
 
   it('names the alert rule that opened an incident and says it resolved on its own', async () => {
