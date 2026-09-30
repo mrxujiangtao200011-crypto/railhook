@@ -64,10 +64,10 @@ CREATE TABLE api_keys (
     name character varying(255) NOT NULL,
     key_hash character varying(255) NOT NULL,
     key_prefix character varying(16) NOT NULL,
-    last_used_at timestamp without time zone,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    revoked_at timestamp without time zone,
-    expires_at timestamp without time zone,
+    last_used_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    revoked_at timestamp with time zone,
+    expires_at timestamp with time zone,
     scope character varying(20) DEFAULT 'READ_WRITE'::character varying NOT NULL,
     organization_id uuid NOT NULL,
     rotated_at timestamp with time zone,
@@ -98,7 +98,7 @@ CREATE TABLE audit_log (
     status character varying(20) NOT NULL,
     error_message text,
     duration_ms integer,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
     client_ip character varying(45),
     details text
 );
@@ -287,7 +287,7 @@ CREATE TABLE captured_requests (
     content_type character varying(255),
     source_ip character varying(45),
     user_agent character varying(512),
-    received_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    received_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     organization_id uuid NOT NULL
 );
 
@@ -328,21 +328,21 @@ CREATE TABLE deliveries (
     retry_delays text DEFAULT '60,300,900,3600,21600,86400'::text,
     payload_template text,
     custom_headers text,
-    next_retry_at timestamp without time zone,
-    last_attempt_at timestamp without time zone,
-    succeeded_at timestamp without time zone,
-    failed_at timestamp without time zone,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    next_retry_at timestamp with time zone,
+    last_attempt_at timestamp with time zone,
+    succeeded_at timestamp with time zone,
+    failed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     idempotency_key character varying(255),
     replay_session_id uuid,
     version bigint DEFAULT 0 NOT NULL,
     transformation_id uuid,
     delivery_origin character varying(20) DEFAULT 'SUBSCRIPTION'::character varying NOT NULL,
-    ordering_first_buffered_at timestamp without time zone,
+    ordering_first_buffered_at timestamp with time zone,
     claim_token uuid,
     organization_id uuid NOT NULL,
-    ladder_resumed_at timestamp without time zone,
+    ladder_resumed_at timestamp with time zone,
     retryable_statuses text DEFAULT '408,429,500-599'::text NOT NULL,
     CONSTRAINT deliveries_active_has_due_time CHECK ((((status)::text <> ALL ((ARRAY['PENDING'::character varying, 'PROCESSING'::character varying])::text[])) OR (next_retry_at IS NOT NULL)))
 );
@@ -399,7 +399,7 @@ CREATE TABLE delivery_attempts (
     request_headers jsonb,
     request_body text,
     response_headers jsonb,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     organization_id uuid NOT NULL
 )
 PARTITION BY RANGE (created_at);
@@ -478,7 +478,7 @@ CREATE TABLE endpoints (
     secret_iv text NOT NULL,
     secret_previous_encrypted text,
     secret_previous_iv text,
-    secret_rotated_at timestamp without time zone,
+    secret_rotated_at timestamp with time zone,
     secret_rotation_grace_period_hours integer DEFAULT 24,
     allowed_source_ips text,
     mtls_enabled boolean DEFAULT false NOT NULL,
@@ -489,12 +489,12 @@ CREATE TABLE endpoints (
     ca_cert text,
     verification_status character varying(32) DEFAULT 'SKIPPED'::character varying NOT NULL,
     verification_token character varying(64),
-    verification_attempted_at timestamp without time zone,
-    verification_completed_at timestamp without time zone,
+    verification_attempted_at timestamp with time zone,
+    verification_completed_at timestamp with time zone,
     verification_skip_reason character varying(255),
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_at timestamp without time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    deleted_at timestamp with time zone,
     encryption_key_version integer DEFAULT 1 NOT NULL,
     organization_id uuid NOT NULL,
     signature_scheme character varying(20) DEFAULT 'BOTH'::character varying NOT NULL,
@@ -571,7 +571,7 @@ CREATE TABLE events (
     idempotency_key character varying(255),
     payload jsonb NOT NULL,
     sequence_number bigint,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     payload_compressed boolean DEFAULT false NOT NULL,
     organization_id uuid NOT NULL
 );
@@ -644,8 +644,8 @@ CREATE TABLE incoming_destinations (
     max_attempts integer DEFAULT 5 NOT NULL,
     timeout_seconds integer DEFAULT 30 NOT NULL,
     retry_delays text DEFAULT '60,300,900,3600,21600'::text NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     payload_transform text,
     transformation_id uuid,
     encryption_key_version integer DEFAULT 1 NOT NULL,
@@ -685,7 +685,7 @@ CREATE TABLE incoming_events (
     user_agent character varying(512),
     verified boolean,
     verification_error text,
-    received_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    received_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     provider_event_id character varying(255),
     organization_id uuid NOT NULL,
     body_bytes bytea
@@ -715,14 +715,14 @@ CREATE TABLE incoming_forward_attempts (
     destination_id uuid NOT NULL,
     attempt_number integer DEFAULT 1 NOT NULL,
     status character varying(20) DEFAULT 'PENDING'::character varying NOT NULL,
-    started_at timestamp without time zone,
-    finished_at timestamp without time zone,
+    started_at timestamp with time zone,
+    finished_at timestamp with time zone,
     response_code integer,
     response_headers_json text,
     response_body_snippet text,
     error_message text,
-    next_retry_at timestamp without time zone,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    next_retry_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     organization_id uuid NOT NULL,
     claim_token uuid,
     request_headers_json text,
@@ -769,8 +769,8 @@ CREATE TABLE incoming_sources (
     hmac_secret_iv text,
     hmac_header_name character varying(255) DEFAULT 'X-Signature'::character varying,
     hmac_signature_prefix character varying(50) DEFAULT ''::character varying,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     rate_limit_per_second integer,
     encryption_key_version integer DEFAULT 1 NOT NULL,
     organization_id uuid NOT NULL
@@ -797,10 +797,10 @@ CREATE TABLE memberships (
     user_id uuid NOT NULL,
     organization_id uuid NOT NULL,
     role character varying(50) NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     invite_token_hash character varying(64),
-    invite_expires_at timestamp without time zone,
+    invite_expires_at timestamp with time zone,
     status character varying(50) DEFAULT 'ACTIVE'::character varying NOT NULL
 );
 
@@ -826,9 +826,9 @@ CREATE TABLE oauth_authorization_requests (
     state character varying(1000),
     requested_scope character varying(500),
     resource character varying(2000),
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    expires_at timestamp without time zone NOT NULL,
-    completed_at timestamp without time zone
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    completed_at timestamp with time zone
 );
 
 ALTER TABLE ONLY oauth_authorization_requests
@@ -844,7 +844,7 @@ CREATE TABLE oauth_clients (
     client_name character varying(200) NOT NULL,
     client_uri character varying(2000),
     redirect_uris text NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 ALTER TABLE ONLY oauth_clients
@@ -863,17 +863,17 @@ CREATE TABLE oauth_grants (
     redirect_uri character varying(2000) NOT NULL,
     code_challenge character varying(128) NOT NULL,
     code_hash character varying(64),
-    code_expires_at timestamp without time zone,
-    code_used_at timestamp without time zone,
+    code_expires_at timestamp with time zone,
+    code_used_at timestamp with time zone,
     access_token_hash character varying(64),
-    access_token_expires_at timestamp without time zone,
+    access_token_expires_at timestamp with time zone,
     refresh_token_hash character varying(64),
-    refresh_token_expires_at timestamp without time zone,
+    refresh_token_expires_at timestamp with time zone,
     previous_refresh_token_hash character varying(64),
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    activated_at timestamp without time zone,
-    last_used_at timestamp without time zone,
-    revoked_at timestamp without time zone
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    activated_at timestamp with time zone,
+    last_used_at timestamp with time zone,
+    revoked_at timestamp with time zone
 );
 
 ALTER TABLE ONLY oauth_grants
@@ -895,7 +895,7 @@ CREATE INDEX idx_oauth_grants_project ON oauth_grants USING btree (project_id);
 CREATE TABLE ordering_cursors (
     endpoint_id uuid NOT NULL,
     last_delivered_sequence bigint NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 ALTER TABLE ONLY ordering_cursors
@@ -906,7 +906,7 @@ CREATE INDEX idx_ordering_cursors_updated_at ON ordering_cursors USING btree (up
 CREATE TABLE organizations (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     name character varying(255) NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     plan_id uuid NOT NULL,
     billing_email character varying(255),
     billing_status character varying(30) DEFAULT 'ACTIVE'::character varying NOT NULL,
@@ -958,7 +958,7 @@ CREATE TABLE plans (
     features jsonb DEFAULT '{}'::jsonb NOT NULL,
     price_monthly_cents integer DEFAULT 0 NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     price_yearly_cents integer DEFAULT 0 NOT NULL,
     max_active_tunnels integer DEFAULT 0 NOT NULL,
     max_fanout_per_event integer DEFAULT 100 NOT NULL
@@ -996,9 +996,9 @@ CREATE TABLE projects (
     organization_id uuid NOT NULL,
     name character varying(255) NOT NULL,
     description text,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    deleted_at timestamp without time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    deleted_at timestamp with time zone,
     schema_validation_enabled boolean DEFAULT false NOT NULL,
     schema_validation_policy character varying(10) DEFAULT 'WARN'::character varying NOT NULL,
     idempotency_policy character varying(10) DEFAULT 'NONE'::character varying NOT NULL
@@ -1024,7 +1024,7 @@ CREATE TABLE public_bin_requests (
     size_bytes bigint NOT NULL,
     content_type character varying(255),
     source_ip character varying(45),
-    received_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    received_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 ALTER TABLE ONLY public_bin_requests ALTER COLUMN id SET DEFAULT nextval('public_bin_requests_id_seq'::regclass);
@@ -1037,8 +1037,8 @@ CREATE INDEX idx_public_bin_requests_bin ON public_bin_requests USING btree (bin
 CREATE TABLE public_bins (
     id uuid NOT NULL,
     slug character varying(32) NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    expires_at timestamp without time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
     request_count bigint DEFAULT 0 NOT NULL,
     creator_ip character varying(45)
 );
@@ -1198,8 +1198,8 @@ CREATE INDEX idx_shared_debug_links_token ON shared_debug_links USING btree (tok
 
 CREATE TABLE shedlock (
     name character varying(64) NOT NULL,
-    lock_until timestamp without time zone NOT NULL,
-    locked_at timestamp without time zone NOT NULL,
+    lock_until timestamp with time zone NOT NULL,
+    locked_at timestamp with time zone NOT NULL,
     locked_by character varying(255) NOT NULL
 );
 
@@ -1234,8 +1234,8 @@ CREATE TABLE subscriptions (
     retry_delays text DEFAULT '60,300,900,3600,21600,86400'::text,
     payload_template text,
     custom_headers text,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     transformation_id uuid,
     organization_id uuid NOT NULL,
     retryable_statuses text DEFAULT '408,429,500-599'::text NOT NULL
@@ -1264,8 +1264,8 @@ CREATE TABLE test_endpoints (
     slug character varying(12) NOT NULL,
     name character varying(255),
     description text,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    expires_at timestamp without time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
     request_count integer DEFAULT 0 NOT NULL,
     organization_id uuid NOT NULL
 );
@@ -1464,12 +1464,12 @@ CREATE TABLE users (
     email character varying(255) NOT NULL,
     password_hash character varying(255),
     status character varying(50) NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     email_verified boolean DEFAULT false NOT NULL,
     verification_token character varying(64),
-    verification_token_expires_at timestamp without time zone,
+    verification_token_expires_at timestamp with time zone,
     password_reset_token character varying(64),
-    password_reset_token_expires_at timestamp without time zone,
+    password_reset_token_expires_at timestamp with time zone,
     full_name character varying(255),
     failed_login_attempts integer DEFAULT 0 NOT NULL,
     last_failed_login_at timestamp with time zone,
@@ -1514,13 +1514,13 @@ CREATE TABLE workflow_executions (
     trigger_event_id uuid,
     status character varying(50) DEFAULT 'RUNNING'::character varying NOT NULL,
     trigger_data jsonb,
-    started_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    completed_at timestamp without time zone,
+    started_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    completed_at timestamp with time zone,
     error_message text,
     duration_ms integer,
     depth integer DEFAULT 0 NOT NULL,
     organization_id uuid NOT NULL,
-    resume_at timestamp without time zone,
+    resume_at timestamp with time zone,
     resume_state jsonb,
     working_ms bigint
 );
@@ -1551,9 +1551,9 @@ CREATE TABLE workflow_step_executions (
     error_message text,
     attempt_count integer DEFAULT 0 NOT NULL,
     duration_ms integer,
-    started_at timestamp without time zone,
-    completed_at timestamp without time zone,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     organization_id uuid NOT NULL
 );
 
@@ -1596,8 +1596,8 @@ CREATE TABLE workflows (
     trigger_type character varying(50) DEFAULT 'WEBHOOK_EVENT'::character varying NOT NULL,
     trigger_config jsonb DEFAULT '{}'::jsonb NOT NULL,
     version integer DEFAULT 1 NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     organization_id uuid NOT NULL
 );
 
@@ -1887,22 +1887,22 @@ CREATE MATERIALIZED VIEW mv_delivery_stats AS
     e.project_id,
     (d.status)::text AS status,
     count(*) AS cnt,
-    date_trunc('day'::text, d.created_at) AS day
+    date_trunc('day'::text, d.created_at, 'UTC'::text) AS day
    FROM (deliveries d
      JOIN events e ON ((d.event_id = e.id)))
   WHERE (d.created_at > (now() - '30 days'::interval))
-  GROUP BY e.organization_id, e.project_id, d.status, (date_trunc('day'::text, d.created_at))
+  GROUP BY e.organization_id, e.project_id, d.status, (date_trunc('day'::text, d.created_at, 'UTC'::text))
   WITH DATA;
 
 CREATE MATERIALIZED VIEW mv_incoming_stats AS
  SELECT s.organization_id,
     s.project_id,
     count(e.id) AS event_count,
-    date_trunc('day'::text, e.received_at) AS day
+    date_trunc('day'::text, e.received_at, 'UTC'::text) AS day
    FROM (incoming_events e
      JOIN incoming_sources s ON ((e.incoming_source_id = s.id)))
   WHERE (e.received_at > (now() - '30 days'::interval))
-  GROUP BY s.organization_id, s.project_id, (date_trunc('day'::text, e.received_at))
+  GROUP BY s.organization_id, s.project_id, (date_trunc('day'::text, e.received_at, 'UTC'::text))
   WITH DATA;
 
 CREATE UNIQUE INDEX idx_mv_delivery_stats ON mv_delivery_stats USING btree (project_id, status, day);
@@ -1927,12 +1927,12 @@ BEGIN
     FOR i IN 0..3 LOOP
         m := month_start + make_interval(months => i);
         EXECUTE format('CREATE TABLE delivery_attempts_y%s_m%s PARTITION OF delivery_attempts FOR VALUES FROM (%L) TO (%L)',
-            to_char(m, 'YYYY'), to_char(m, 'MM'), m, m + interval '1 month');
+            to_char(m, 'YYYY'), to_char(m, 'MM'), m AT TIME ZONE 'UTC', (m + interval '1 month') AT TIME ZONE 'UTC');
     END LOOP;
     FOR i IN 0..3 LOOP
         w := week_start + make_interval(weeks => i);
         EXECUTE format('CREATE TABLE tunnel_request_log_y%s_w%s PARTITION OF tunnel_request_log FOR VALUES FROM (%L) TO (%L)',
-            to_char(w, 'IYYY'), to_char(w, 'IW'), w, w + interval '1 week');
+            to_char(w, 'IYYY'), to_char(w, 'IW'), w AT TIME ZONE 'UTC', (w + interval '1 week') AT TIME ZONE 'UTC');
     END LOOP;
 END $$;
 

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Every time column is `timestamptz`. 72 columns were `timestamp` without a zone, which read correctly only while the database session ran in UTC. Partition bounds and the daily statistics buckets are fixed to UTC explicitly.
+
 ## [3.1.0] - 2026-09-30
 
 ### Changed
