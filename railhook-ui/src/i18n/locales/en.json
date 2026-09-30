@@ -2593,7 +2593,42 @@
         "signups": "Sign-ups per day",
         "signupsSeries": "Sign-ups",
         "events": "Events per day",
-        "eventsSeries": "Events"
+        "eventsSeries": "Events",
+        "today": "today"
+      },
+      "attention": {
+        "failed_one": "{{value}} delivery failed in the last 24 hours",
+        "failed_few": "{{value}} deliveries failed in the last 24 hours",
+        "failed_many": "{{value}} deliveries failed in the last 24 hours",
+        "failed_other": "{{value}} deliveries failed in the last 24 hours",
+        "failedDetail": "{{rate}} of {{total}} deliveries.",
+        "suspended": "{{name}} is suspended",
+        "nearQuota_one": "{{count}} organization is at 80% or more of its event limit",
+        "nearQuota_few": "{{count}} organizations are at 80% or more of their event limit",
+        "nearQuota_many": "{{count}} organizations are at 80% or more of their event limit",
+        "nearQuota_other": "{{count}} organizations are at 80% or more of their event limit",
+        "title_one": "{{count}} thing needs attention",
+        "title_few": "{{count}} things need attention",
+        "title_many": "{{count}} things need attention",
+        "title_other": "{{count}} things need attention",
+        "clear": "Nothing needs attention.",
+        "clearDetail": "No suspended organizations, none near their event limit, delivery failures under 1%.",
+        "fresh": "New install. No events have been sent yet.",
+        "freshDetail": "This page fills in once an organization creates a project and sends its first event.",
+        "review": "Review",
+        "showMore": "Show {{count}} more",
+        "showLess": "Show fewer",
+        "failed": "{{value}} deliveries failed in the last 24 hours",
+        "nearQuota": "{{count}} organizations are at 80% or more of their event limit",
+        "title": "{{count}} things need attention"
+      },
+      "ledger": {
+        "events": "Events",
+        "today": "{{value}} today",
+        "deliveries": "Deliveries, 24h",
+        "delivered": "{{value}} delivered",
+        "failed": "{{value}} failed",
+        "signups": "Sign-ups"
       }
     },
     "reauth": {
@@ -2702,6 +2737,13 @@
       "deleteFailed": "Failed to delete project",
       "deleted": "Project deleted successfully",
       "idCopied": "Project ID copied to clipboard"
+    },
+    "columns": {
+      "project": "Project",
+      "delivered": "Delivered",
+      "endpoints": "Endpoints",
+      "lastEvent": "Last event",
+      "created": "Created"
     }
   },
   "relativeTime": {
@@ -3207,7 +3249,12 @@
     },
     "toggleOrdering": "Keep {{eventType}} in sequence",
     "unknown": "Unknown endpoint",
-    "unnamed": "Unnamed endpoint"
+    "unnamed": "Unnamed endpoint",
+    "groupCount_one": "{{count}} endpoint",
+    "groupCount_other": "{{count}} endpoints",
+    "groupCount_few": "{{count}} endpoints",
+    "groupCount_many": "{{count}} endpoints",
+    "groupCount": "{{count}} endpoints"
   },
   "testConsole": {
     "attemptNumber": "Attempt #{{number}}",

@@ -1,81 +1,194 @@
+import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { UserPlus } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
-import EmptyState from '../components/EmptyState';
 import { SkeletonTable } from '../components/PageSkeleton';
-import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { ChartCard, SERIES, TrendChart } from '../components/charts';
-import { usePlatformOverview } from '../api/queries';
-import type { PlatformActivation } from '../api/platformAdmin.api';
-import { formatDateTimeCompact, formatNumber, formatRelativeTime } from '../lib/date';
+import { usePlatformOrganizations, usePlatformOverview } from '../api/queries';
+import type { AdminOrganization, PlatformActivation, PlatformOverview } from '../api/platformAdmin.api';
+import { formatDateTimeCompact, formatNumber, formatRelativeTime, formatTime } from '../lib/date';
+import { cn } from '../lib/utils';
 import {
-  EmailText, OrganizationLink, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PanelTitle, PlatformErrorState, PlatformScope, SignInMethods, VerifiedBadge,
+  DailyBars, EmailText, OrganizationLink, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PlatformErrorState, PlatformScope, SignInMethods, VerifiedBadge,
 } from './platformAdminParts';
 
-function Kpi({ label, value, hint }: { label: string; value: number; hint?: string }) {
+const FAILURE_ATTENTION = 0.01;
+const VISIBLE_ITEMS = 3;
+
+function percent(value: number, lang: string) {
+  return new Intl.NumberFormat(lang, value > 0 && value < 0.1 ? { style: 'percent', maximumSignificantDigits: 2 } : { style: 'percent', maximumFractionDigits: 0 }).format(value);
+}
+
+interface Item { key: string; tone: 'halt' | 'retry'; title: string; detail?: string; to?: string }
+
+function Attention({ overview, suspended }: { overview: PlatformOverview; suspended: AdminOrganization[] }) {
+  const { t, i18n } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const total = overview.deliveriesSucceeded24h + overview.deliveriesFailed24h;
+  const rate = total > 0 ? overview.deliveriesFailed24h / total : 0;
+  const items: Item[] = [];
+  if (rate >= FAILURE_ATTENTION) {
+    items.push({
+      key: 'failed',
+      tone: 'halt',
+      title: t('platformAdmin.overview.attention.failed', { count: overview.deliveriesFailed24h, value: formatNumber(overview.deliveriesFailed24h) }),
+      detail: t('platformAdmin.overview.attention.failedDetail', { rate: percent(rate, i18n.language), total: formatNumber(total) }),
+    });
+  }
+  for (const org of suspended) {
+    items.push({
+      key: org.id,
+      tone: 'halt',
+      title: t('platformAdmin.overview.attention.suspended', { name: org.name }),
+      detail: [org.suspensionReason, org.suspendedAt && formatRelativeTime(org.suspendedAt)].filter(Boolean).join(' · '),
+      to: `/admin/platform/organizations/${org.id}`,
+    });
+  }
+  if (overview.organizationsNearQuota > 0) {
+    items.push({
+      key: 'quota',
+      tone: 'retry',
+      title: t('platformAdmin.overview.attention.nearQuota', { count: overview.organizationsNearQuota }),
+      detail: t('platformAdmin.overview.kpi.nearQuotaHint'),
+      to: '/admin/platform/organizations',
+    });
+  }
+
+  if (items.length === 0) {
+    const fresh = overview.events30d === 0 && overview.organizations <= 1;
+    return (
+      <section>
+        <p className="flex items-center gap-2.5 text-[15px]">
+          <span aria-hidden className={cn('h-2 w-2 rounded-full', fresh ? 'bg-idle' : 'bg-ok')} />
+          {t(fresh ? 'platformAdmin.overview.attention.fresh' : 'platformAdmin.overview.attention.clear')}
+        </p>
+        <p className="mt-1 pl-[18px] text-[13px] text-muted-foreground">
+          {t(fresh ? 'platformAdmin.overview.attention.freshDetail' : 'platformAdmin.overview.attention.clearDetail')}
+        </p>
+      </section>
+    );
+  }
+
+  const shown = expanded ? items : items.slice(0, VISIBLE_ITEMS);
   return (
-    <Card className="p-4">
-      <p className="mono-label">{label}</p>
-      <p className="mt-1.5 font-mono text-2xl font-medium tabular-nums">{formatNumber(value)}</p>
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-    </Card>
+    <section aria-labelledby="platform-attention">
+      <h3 id="platform-attention" className="text-[22px] font-normal leading-tight tracking-[-0.015em]">
+        {t('platformAdmin.overview.attention.title', { count: items.length })}
+      </h3>
+      <ul className="mt-4 border-t border-rail">
+        {shown.map((item) => (
+          <li key={item.key} className="flex items-start gap-3 border-b border-rail py-3">
+            <span aria-hidden className={cn('mt-[7px] h-2 w-2 flex-shrink-0 rounded-full', item.tone === 'halt' ? 'bg-halt' : 'bg-retry')} />
+            <div className="min-w-0 flex-1">
+              <p className="break-words text-[15px] leading-snug">{item.title}</p>
+              {item.detail && <p className="mt-0.5 break-words text-[13px] text-muted-foreground">{item.detail}</p>}
+            </div>
+            {item.to && (
+              <Link to={item.to} className="-my-1.5 flex min-h-[44px] flex-shrink-0 items-center px-1 text-[13px] underline decoration-rail underline-offset-4 hover:decoration-foreground">
+                {t('platformAdmin.overview.attention.review')}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
+      {items.length > VISIBLE_ITEMS && (
+        <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-1 min-h-[44px] text-[13px] text-muted-foreground hover:text-foreground">
+          {expanded ? t('platformAdmin.overview.attention.showLess') : t('platformAdmin.overview.attention.showMore', { count: items.length - VISIBLE_ITEMS })}
+        </button>
+      )}
+    </section>
   );
 }
 
-/** Each step is shown against the one before it: that ratio is where people are lost. */
-function ActivationFunnel({ activation }: { activation: PlatformActivation }) {
-  const { t } = useTranslation();
-  const steps: { key: string; value: number; base: number; previous?: number }[] = [
-    { key: 'signups', value: activation.signups, base: activation.signups },
-    { key: 'verified', value: activation.verified, base: activation.signups, previous: activation.signups },
-    { key: 'organizations', value: activation.organizations, base: activation.organizations },
-    { key: 'withProject', value: activation.withProject, base: activation.organizations, previous: activation.organizations },
-    { key: 'withEvent', value: activation.withEvent, base: activation.organizations, previous: activation.withProject },
+function Row({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-rail py-2.5 text-sm">
+      <dt className="flex-shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 text-right tabular-nums">{children}</dd>
+    </div>
+  );
+}
+
+function Secondary({ children, className }: { children: ReactNode; className?: string }) {
+  return <span className={cn('block text-[13px] text-muted-foreground', className)}>{children}</span>;
+}
+
+function Ledger({ overview }: { overview: PlatformOverview }) {
+  const { t, i18n } = useTranslation();
+  const total = overview.deliveriesSucceeded24h + overview.deliveriesFailed24h;
+  const rate = total > 0 ? overview.deliveriesFailed24h / total : 0;
+  return (
+    <dl className="border-t border-rail">
+      <Row label={t('platformAdmin.overview.ledger.events')}>
+        {t('platformAdmin.overview.ledger.today', { value: formatNumber(overview.eventsToday) })}
+        <Secondary>{t('platformAdmin.overview.kpi.events30d', { total: formatNumber(overview.events30d) })}</Secondary>
+      </Row>
+      <Row label={t('platformAdmin.overview.ledger.deliveries')}>
+        {t('platformAdmin.overview.ledger.delivered', { value: formatNumber(overview.deliveriesSucceeded24h) })}
+        <Secondary className={cn(rate >= FAILURE_ATTENTION && 'text-halt')}>
+          {t('platformAdmin.overview.ledger.failed', { value: formatNumber(overview.deliveriesFailed24h) })}
+          {overview.deliveriesFailed24h > 0 && ` · ${percent(rate, i18n.language)}`}
+        </Secondary>
+      </Row>
+      <Row label={t('platformAdmin.overview.ledger.signups')}>
+        {t('platformAdmin.overview.ledger.today', { value: formatNumber(overview.signupsToday) })}
+        <Secondary>{t('platformAdmin.overview.kpi.signupsPeriods', { week: formatNumber(overview.signups7d), month: formatNumber(overview.signups30d) })}</Secondary>
+      </Row>
+      <Row label={t('platformAdmin.overview.kpi.organizations')}>
+        <span>{formatNumber(overview.organizations)}</span>
+        {overview.suspendedOrganizations > 0 && (
+          <Secondary className="text-halt">{t('platformAdmin.overview.kpi.suspended', { count: overview.suspendedOrganizations })}</Secondary>
+        )}
+      </Row>
+      <Row label={t('platformAdmin.overview.kpi.users')}>{formatNumber(overview.users)}</Row>
+      <Row label={t('platformAdmin.overview.kpi.nearQuota')}>
+        <span className={cn(overview.organizationsNearQuota > 0 && 'text-retry')}>{formatNumber(overview.organizationsNearQuota)}</span>
+      </Row>
+      <Row label={t('platformAdmin.overview.kpi.activeTunnels')}>{formatNumber(overview.activeTunnels)}</Row>
+    </dl>
+  );
+}
+
+function Activation({ activation }: { activation: PlatformActivation }) {
+  const { t, i18n } = useTranslation();
+  const steps: { key: string; value: number; previous?: number }[] = [
+    { key: 'signups', value: activation.signups },
+    { key: 'verified', value: activation.verified, previous: activation.signups },
+    { key: 'organizations', value: activation.organizations },
+    { key: 'withProject', value: activation.withProject, previous: activation.organizations },
+    { key: 'withEvent', value: activation.withEvent, previous: activation.withProject },
   ];
   const title = t('platformAdmin.overview.activation.title');
-
   return (
-    <Card className="p-5">
-      <h3 className="text-sm font-medium leading-tight">{title}</h3>
-      <p className="mt-1 text-xs text-muted-foreground">{t('platformAdmin.overview.activation.description')}</p>
-      <ul aria-label={title} className="mt-4 grid gap-3">
-        {steps.map((step) => {
-          const width = step.base > 0 ? (step.value / step.base) * 100 : 0;
-          const rate = step.previous !== undefined && step.previous > 0
-            ? Math.round((step.value / step.previous) * 100)
-            : undefined;
-          return (
-            <li key={step.key} className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3 text-sm max-sm:grid-cols-[1fr_auto]">
-              <span className="truncate text-muted-foreground">{t(`platformAdmin.overview.activation.${step.key}`)}</span>
-              <span className="h-2 bg-muted max-sm:order-last max-sm:col-span-2" aria-hidden="true">
-                <span className="block h-full" style={{ width: `${width}%`, backgroundColor: SERIES.brand }} />
-              </span>
-              <span className="whitespace-nowrap text-right font-mono tabular-nums">
-                {formatNumber(step.value)}
-                {rate !== undefined && <span className="ml-2 text-xs text-muted-foreground">{rate}%</span>}
-              </span>
-            </li>
-          );
-        })}
+    <section>
+      <h3 className="text-[13px] text-muted-foreground">{title}</h3>
+      <ul aria-label={title} className="mt-3 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-rail pt-3 sm:grid-cols-5">
+        {steps.map((step) => (
+          <li key={step.key} className="min-w-0">
+            <p className="text-[13px] leading-snug text-muted-foreground sm:min-h-[2.5em]">{t(`platformAdmin.overview.activation.${step.key}`)}</p>
+            <p className="mt-1 whitespace-nowrap text-[15px] tabular-nums">
+              {formatNumber(step.value)}
+              {step.previous !== undefined && step.previous > 0 && (
+                <span className="ml-2 text-[13px] text-muted-foreground">{percent(step.value / step.previous, i18n.language)}</span>
+              )}
+            </p>
+          </li>
+        ))}
       </ul>
-    </Card>
+    </section>
   );
 }
 
 export default function PlatformOverviewPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { data, isLoading, isError, error, refetch, isRefetching } = usePlatformOverview();
-  // TrendChart plots against `timestamp`; the days are UTC dates, so they are labelled in UTC too.
-  const dailyPoints = (data?.daily30d ?? []).map((d) => ({ ...d, timestamp: d.date }));
-  const formatDay = (date: string) =>
-    new Date(`${date}T00:00:00Z`).toLocaleDateString(i18n.language, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const { data: suspended } = usePlatformOrganizations(0, 5, { suspendedOnly: true });
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
       <PageHeader
         eyebrow={data
-          ? t('platformAdmin.overview.generatedAt', { time: formatDateTimeCompact(data.generatedAt) })
+          ? <span className="font-mono">{t('platformAdmin.overview.generatedAt', { time: formatTime(data.generatedAt) })}</span>
           : t('platformAdmin.eyebrow')}
         description={t('platformAdmin.overview.description')}
       />
@@ -84,79 +197,35 @@ export default function PlatformOverviewPage() {
       {isError ? (
         <PlatformErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />
       ) : isLoading || !data ? (
-        <Card className="overflow-hidden"><SkeletonTable rows={6} /></Card>
+        <SkeletonTable rows={6} />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Kpi
-              label={t('platformAdmin.overview.kpi.organizations')}
-              value={data.organizations}
-              hint={t('platformAdmin.overview.kpi.suspended', { count: data.suspendedOrganizations })}
-            />
-            <Kpi label={t('platformAdmin.overview.kpi.users')} value={data.users} />
-            <Kpi
-              label={t('platformAdmin.overview.kpi.signupsToday')}
-              value={data.signupsToday}
-              hint={t('platformAdmin.overview.kpi.signupsPeriods', { week: data.signups7d, month: data.signups30d })}
-            />
-            <Kpi
-              label={t('platformAdmin.overview.kpi.eventsToday')}
-              value={data.eventsToday}
-              hint={t('platformAdmin.overview.kpi.events30d', { total: formatNumber(data.events30d) })}
-            />
-            <Kpi
-              label={t('platformAdmin.overview.kpi.deliveriesSucceeded')}
-              value={data.deliveriesSucceeded24h}
-            />
-            <Kpi
-              label={t('platformAdmin.overview.kpi.deliveriesFailed')}
-              value={data.deliveriesFailed24h}
-              hint={t('platformAdmin.overview.kpi.deliveriesFailedHint')}
-            />
-            <Kpi label={t('platformAdmin.overview.kpi.activeTunnels')} value={data.activeTunnels} />
-            <Kpi
-              label={t('platformAdmin.overview.kpi.nearQuota')}
-              value={data.organizationsNearQuota}
-              hint={t('platformAdmin.overview.kpi.nearQuotaHint')}
-            />
+          <div className="grid gap-x-16 gap-y-10 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 space-y-10">
+              <Attention overview={data} suspended={data.suspendedOrganizations > 0 ? suspended?.content ?? [] : []} />
+              <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
+                <DailyBars
+                  label={t('platformAdmin.overview.daily.events')}
+                  days={data.daily30d.map((d) => ({ date: d.date, value: d.events }))}
+                />
+                <DailyBars
+                  label={t('platformAdmin.overview.daily.signups')}
+                  days={data.daily30d.map((d) => ({ date: d.date, value: d.signups }))}
+                />
+              </div>
+            </div>
+            <div className="min-w-0 max-xl:max-w-xl xl:row-span-2">
+              <Ledger overview={data} />
+            </div>
+            <div className="min-w-0">
+              <Activation activation={data.activation30d} />
+            </div>
           </div>
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-3">
-            <ActivationFunnel activation={data.activation30d} />
-            <ChartCard
-              title={t('platformAdmin.overview.daily.signups')}
-              eyebrow={t('platformAdmin.overview.daily.period')}
-              bodyClass="h-[220px]"
-            >
-              <TrendChart
-                data={dailyPoints}
-                dataKey="signups"
-                seriesLabel={t('platformAdmin.overview.daily.signupsSeries')}
-                formatTick={formatDay}
-                formatStamp={formatDay}
-                formatValue={formatNumber}
-              />
-            </ChartCard>
-            <ChartCard
-              title={t('platformAdmin.overview.daily.events')}
-              eyebrow={t('platformAdmin.overview.daily.period')}
-              bodyClass="h-[220px]"
-            >
-              <TrendChart
-                data={dailyPoints}
-                dataKey="events"
-                seriesLabel={t('platformAdmin.overview.daily.eventsSeries')}
-                formatTick={formatDay}
-                formatStamp={formatDay}
-                formatValue={formatNumber}
-              />
-            </ChartCard>
-          </div>
-
-          <Card className="mt-6 overflow-hidden">
-            <PanelTitle title={t('platformAdmin.overview.recentSignups')} />
+          <section className="mt-14">
+            <h3 className="mb-3 text-[15px] font-medium">{t('platformAdmin.overview.recentSignups')}</h3>
             {data.recentSignups.length === 0 ? (
-              <EmptyState icon={UserPlus} title={t('platformAdmin.overview.noSignups')} className="border-0 py-10" />
+              <p className="border-t border-rail py-8 text-[13px] text-muted-foreground">{t('platformAdmin.overview.noSignups')}</p>
             ) : (
               <Table className={PLATFORM_TABLE}>
                 <TableHeader className={PLATFORM_TABLE_HEADER}>
@@ -182,10 +251,7 @@ export default function PlatformOverviewPage() {
                       </TableCell>
                       <TableCell><SignInMethods methods={signup.signInMethods} /></TableCell>
                       <TableCell><VerifiedBadge verified={signup.emailVerified} /></TableCell>
-                      <TableCell
-                        className="whitespace-nowrap text-right font-mono text-xs text-muted-foreground"
-                        title={formatDateTimeCompact(signup.createdAt)}
-                      >
+                      <TableCell className="whitespace-nowrap text-right text-[13px] text-muted-foreground" title={formatDateTimeCompact(signup.createdAt)}>
                         {formatRelativeTime(signup.createdAt)}
                       </TableCell>
                     </TableRow>
@@ -193,7 +259,7 @@ export default function PlatformOverviewPage() {
                 </TableBody>
               </Table>
             )}
-          </Card>
+          </section>
         </>
       )}
     </div>

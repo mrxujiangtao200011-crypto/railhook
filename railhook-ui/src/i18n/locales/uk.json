@@ -2593,7 +2593,42 @@
         "signups": "Реєстрації за днями",
         "signupsSeries": "Реєстрації",
         "events": "Події за днями",
-        "eventsSeries": "Події"
+        "eventsSeries": "Події",
+        "today": "сьогодні"
+      },
+      "attention": {
+        "failed_one": "Невдалих доставок за 24 години: {{value}}",
+        "failed_few": "Невдалих доставок за 24 години: {{value}}",
+        "failed_many": "Невдалих доставок за 24 години: {{value}}",
+        "failed_other": "Невдалих доставок за 24 години: {{value}}",
+        "failedDetail": "{{rate}} із {{total}}.",
+        "suspended": "{{name}}: організацію призупинено",
+        "nearQuota_one": "Організацій на 80% і більше ліміту подій: {{count}}",
+        "nearQuota_few": "Організацій на 80% і більше ліміту подій: {{count}}",
+        "nearQuota_many": "Організацій на 80% і більше ліміту подій: {{count}}",
+        "nearQuota_other": "Організацій на 80% і більше ліміту подій: {{count}}",
+        "title_one": "{{count}} питання потребує уваги",
+        "title_few": "{{count}} питання потребують уваги",
+        "title_many": "{{count}} питань потребують уваги",
+        "title_other": "{{count}} питання потребують уваги",
+        "clear": "Нічого не потребує уваги.",
+        "clearDetail": "Немає призупинених організацій, ніхто не підійшов до ліміту подій, невдалих доставок менше 1%.",
+        "fresh": "Нова інсталяція. Подій ще не надсилали.",
+        "freshDetail": "Сторінка заповниться, щойно організація створить проєкт і надішле першу подію.",
+        "review": "Переглянути",
+        "showMore": "Показати ще {{count}}",
+        "showLess": "Згорнути",
+        "failed": "Невдалих доставок за 24 години: {{value}}",
+        "nearQuota": "Організацій на 80% і більше ліміту подій: {{count}}",
+        "title": "{{count}} питання потребують уваги"
+      },
+      "ledger": {
+        "events": "Події",
+        "today": "{{value}} сьогодні",
+        "deliveries": "Доставки, 24 год",
+        "delivered": "доставлено {{value}}",
+        "failed": "не вдалося {{value}}",
+        "signups": "Реєстрації"
       }
     },
     "reauth": {
@@ -2702,6 +2737,13 @@
       "deleteFailed": "Не вдалося видалити проєкт",
       "deleted": "Проєкт видалено",
       "idCopied": "ID проєкту скопійовано"
+    },
+    "columns": {
+      "project": "Проєкт",
+      "delivered": "Доставлено",
+      "endpoints": "Ендпоінти",
+      "lastEvent": "Остання подія",
+      "created": "Створено"
     }
   },
   "relativeTime": {
@@ -3207,7 +3249,12 @@
     },
     "toggleOrdering": "Доставляти {{eventType}} по порядку",
     "unknown": "Невідомий ендпоінт",
-    "unnamed": "Ендпоінт без назви"
+    "unnamed": "Ендпоінт без назви",
+    "groupCount_one": "{{count}} ендпоінт",
+    "groupCount_few": "{{count}} ендпоінти",
+    "groupCount_many": "{{count}} ендпоінтів",
+    "groupCount_other": "{{count}} ендпоінта",
+    "groupCount": "{{count}} ендпоінтів"
   },
   "testConsole": {
     "attemptNumber": "Спроба #{{number}}",

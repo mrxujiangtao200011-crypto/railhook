@@ -6,11 +6,11 @@ import EmptyState from '../components/EmptyState';
 import { SkeletonTable } from '../components/PageSkeleton';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { Select } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { TablePagination } from '../components/ui/table-pagination';
 import { usePlatformOrganizations } from '../api/queries';
 import { formatDate } from '../lib/date';
+import { cn } from '../lib/utils';
 import { FilterBar } from './tableParts';
 import {
   EmailText, EventsAgainstLimit, OrganizationLink, OrganizationStatusBadge, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PlatformErrorState,
@@ -45,15 +45,22 @@ export default function PlatformOrganizationsPage() {
           aria-label={t('platformAdmin.organizations.search')}
           className="h-9 w-full sm:w-72"
         />
-        <Select
-          value={suspendedOnly ? 'suspended' : 'all'}
-          onChange={(e) => { setSuspendedOnly(e.target.value === 'suspended'); setPage(0); }}
-          aria-label={t('platformAdmin.organizations.statusFilter')}
-          className="h-9 w-full sm:w-48"
-        >
-          <option value="all">{t('platformAdmin.organizations.all')}</option>
-          <option value="suspended">{t('platformAdmin.organizations.suspendedOnly')}</option>
-        </Select>
+        <div role="group" aria-label={t('platformAdmin.organizations.statusFilter')} className="flex">
+          {(['all', 'suspended'] as const).map((key) => {
+            const active = (key === 'suspended') === suspendedOnly;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => { setSuspendedOnly(key === 'suspended'); setPage(0); }}
+                className={cn('h-9 whitespace-nowrap px-3 text-[13px] transition-colors max-sm:h-11', active ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground')}
+              >
+                {t(key === 'all' ? 'platformAdmin.organizations.all' : 'platformAdmin.organizations.suspendedOnly')}
+              </button>
+            );
+          })}
+        </div>
       </FilterBar>
 
       {isError ? (
@@ -87,12 +94,12 @@ export default function PlatformOrganizationsPage() {
                   <TableCell>
                     <OrganizationLink id={organization.id} name={organization.name} className="font-medium" />
                   </TableCell>
-                  <TableCell className="font-mono text-[13px]">{organization.planName ?? '—'}</TableCell>
+                  <TableCell className="text-[13px] text-muted-foreground">{organization.planName ?? '—'}</TableCell>
                   <TableCell className="text-muted-foreground">
                     <EmailText email={organization.ownerEmail} />
                   </TableCell>
-                  <TableCell className="text-right font-mono text-[13px]">{organization.memberCount}</TableCell>
-                  <TableCell className="text-right font-mono text-[13px]">{organization.projectCount}</TableCell>
+                  <TableCell className="text-right text-[13px] tabular-nums">{organization.memberCount}</TableCell>
+                  <TableCell className="text-right text-[13px] tabular-nums">{organization.projectCount}</TableCell>
                   <TableCell>
                     <EventsAgainstLimit current={organization.eventsThisMonth} limit={organization.eventsLimit} />
                   </TableCell>
