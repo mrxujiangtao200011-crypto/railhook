@@ -16,7 +16,6 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -221,7 +220,7 @@ class IncomingDlqServiceTest {
                 .projectId(projectId)
                 .name("Stripe")
                 .slug("stripe")
-                .providerType(ProviderType.GENERIC)
+                .providerType("GENERIC")
                 .status(IncomingSourceStatus.ACTIVE)
                 .ingressPathToken("tok")
                 .build();

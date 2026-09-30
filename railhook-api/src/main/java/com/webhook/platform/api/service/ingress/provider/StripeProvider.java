@@ -1,6 +1,8 @@
-package com.webhook.platform.api.service.verification;
+package com.webhook.platform.api.service.ingress.provider;
 
+import com.webhook.platform.api.service.verification.GenericHmacVerifier;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -9,10 +11,33 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Stripe-Signature: t=timestamp,v1=hex HMAC-SHA256 of "timestamp.body". */
-public class StripeVerifier implements WebhookVerificationStrategy {
+@Component
+public class StripeProvider implements InboundProvider {
 
     private static final String HEADER = "Stripe-Signature";
     private static final long TOLERANCE_SECONDS = 300;
+
+    @Override
+    public String id() {
+        return "STRIPE";
+    }
+
+    @Override
+    public String displayName() {
+        return "Stripe";
+    }
+
+    @Override
+    public String signatureHeader() {
+        return HEADER;
+    }
+
+    // Stripe re-signs a resend with a fresh timestamp, so only the body's evt_ id catches it.
+    @Override
+    public String eventId(HttpServletRequest request, String body) {
+        String id = JsonBodies.text(JsonBodies.parse(body), "id");
+        return id != null && id.startsWith("evt_") ? id : null;
+    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

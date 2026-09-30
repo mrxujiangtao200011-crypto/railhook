@@ -17,7 +17,6 @@ import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,7 +84,7 @@ class IncomingEventServiceTest {
         project = Project.builder().id(projectId).organizationId(orgId).name("Test").build();
         source = IncomingSource.builder()
                 .id(sourceId).projectId(projectId).name("Test Source")
-                .slug("test").providerType(ProviderType.GENERIC)
+                .slug("test").providerType("GENERIC")
                 .status(IncomingSourceStatus.ACTIVE)
                 .ingressPathToken("tok").verificationMode(VerificationMode.NONE)
                 .createdAt(Instant.now()).updatedAt(Instant.now())
@@ -147,7 +146,7 @@ class IncomingEventServiceTest {
         UUID otherProjectId = UUID.randomUUID();
         IncomingSource foreignSource = IncomingSource.builder()
                 .id(foreignSourceId).projectId(otherProjectId).name("Foreign Source")
-                .slug("foreign").providerType(ProviderType.GENERIC)
+                .slug("foreign").providerType("GENERIC")
                 .status(IncomingSourceStatus.ACTIVE)
                 .ingressPathToken("tok2").verificationMode(VerificationMode.NONE)
                 .createdAt(Instant.now()).updatedAt(Instant.now())

@@ -7,8 +7,9 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.IncomingSourceRequest;
 import com.webhook.platform.api.dto.IncomingSourceResponse;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
+import com.webhook.platform.api.service.ingress.provider.InboundProvider;
+import com.webhook.platform.api.service.ingress.provider.TestInboundProviders;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +54,7 @@ class IncomingSourceServiceTest {
         service = new IncomingSourceService(
                 sourceRepository, projectRepository,
                 registry,
-                new WebhookVerifierFactory("http://localhost:8080"),
+                TestInboundProviders.verifierFactory(),
                 "http://localhost:8080"
         );
         project = Project.builder()
@@ -69,7 +70,7 @@ class IncomingSourceServiceTest {
                 .projectId(projectId)
                 .name("GitHub Webhooks")
                 .slug("github-webhooks")
-                .providerType(ProviderType.GITHUB)
+                .providerType("GITHUB")
                 .status(IncomingSourceStatus.ACTIVE)
                 .ingressPathToken("abc123token")
                 .verificationMode(VerificationMode.NONE)
@@ -86,7 +87,7 @@ class IncomingSourceServiceTest {
 
         IncomingSourceResponse response = service.createSource(projectId, IncomingSourceRequest.builder()
                 .name("GitHub Webhooks")
-                .providerType(ProviderType.GITHUB)
+                .providerType("GITHUB")
                 .verificationMode(VerificationMode.HMAC_GENERIC)
                 .hmacSecret("my-secret")
                 .hmacHeaderName("X-Hub-Signature-256")
@@ -102,7 +103,7 @@ class IncomingSourceServiceTest {
     // A secret with no mode once saved as NONE, so a Stripe source accepted forged webhooks in production.
     @ParameterizedTest
     @CsvSource({"STRIPE, PROVIDER", "GENERIC, HMAC_GENERIC"})
-    void createSource_secretWithoutMode_verifiesAnyway(ProviderType provider, VerificationMode expected) {
+    void createSource_secretWithoutMode_verifiesAnyway(String provider, VerificationMode expected) {
         stubSave();
 
         IncomingSourceResponse response = service.createSource(projectId, IncomingSourceRequest.builder()
@@ -176,7 +177,7 @@ class IncomingSourceServiceTest {
 
         IncomingSourceRequest request = new IncomingSourceRequest();
         request.setName("Some provider");
-        request.setProviderType(ProviderType.GENERIC);
+        request.setProviderType("GENERIC");
         request.setVerificationMode(VerificationMode.PROVIDER);
 
         assertThatThrownBy(() -> service.createSource(projectId, request))
@@ -193,9 +194,7 @@ class IncomingSourceServiceTest {
         when(sourceRepository.existsByIngressPathToken(any())).thenReturn(false);
         when(sourceRepository.saveAndFlush(any(IncomingSource.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        for (ProviderType provider : new ProviderType[] {
-                ProviderType.STRIPE, ProviderType.GITHUB, ProviderType.GITLAB,
-                ProviderType.SLACK, ProviderType.SHOPIFY, ProviderType.TWILIO }) {
+        for (String provider : TestInboundProviders.registry().all().stream().map(InboundProvider::id).toList()) {
             IncomingSourceRequest request = new IncomingSourceRequest();
             request.setName("Source " + provider);
             request.setProviderType(provider);
@@ -224,7 +223,7 @@ class IncomingSourceServiceTest {
     @Test
     void updateIsJudgedOnTheResultingRowNotTheRequest() {
         IncomingSource existing = buildSource();
-        existing.setProviderType(ProviderType.GENERIC);
+        existing.setProviderType("GENERIC");
         existing.setVerificationMode(VerificationMode.NONE);
         when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(existing));
 
@@ -236,4 +235,30 @@ class IncomingSourceServiceTest {
                 .hasMessageContaining("no built-in verifier");
     }
 
+    @Test
+    void createRejectsAProviderNothingIsInstalledFor() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+        IncomingSourceRequest request = new IncomingSourceRequest();
+        request.setName("Paddle");
+        request.setProviderType("PADDLE");
+
+        assertThatThrownBy(() -> service.createSource(projectId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown provider 'PADDLE'");
+        verify(sourceRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateRejectsAProviderNothingIsInstalledFor() {
+        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(buildSource()));
+
+        IncomingSourceRequest request = new IncomingSourceRequest();
+        request.setName("GitHub Webhooks");
+        request.setProviderType("github");
+
+        assertThatThrownBy(() -> service.updateSource(projectId, sourceId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown provider 'github'");
+    }
 }

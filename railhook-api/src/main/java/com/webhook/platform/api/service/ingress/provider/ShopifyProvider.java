@@ -1,6 +1,7 @@
-package com.webhook.platform.api.service.verification;
+package com.webhook.platform.api.service.ingress.provider;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -9,9 +10,30 @@ import java.security.MessageDigest;
 import java.util.Base64;
 
 /** Shopify's HMAC is base64, not hex. */
-public class ShopifyVerifier implements WebhookVerificationStrategy {
+@Component
+public class ShopifyProvider implements InboundProvider {
 
     private static final String HEADER = "X-Shopify-Hmac-SHA256";
+
+    @Override
+    public String id() {
+        return "SHOPIFY";
+    }
+
+    @Override
+    public String displayName() {
+        return "Shopify";
+    }
+
+    @Override
+    public String signatureHeader() {
+        return HEADER;
+    }
+
+    @Override
+    public String eventId(HttpServletRequest request, String body) {
+        return request.getHeader("X-Shopify-Webhook-Id");
+    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

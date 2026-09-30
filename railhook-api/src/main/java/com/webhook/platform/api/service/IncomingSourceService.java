@@ -5,7 +5,7 @@ import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
+import com.webhook.platform.api.service.ingress.provider.InboundProviderRegistry;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
@@ -48,6 +48,13 @@ public class IncomingSourceService {
                 : VerificationMode.HMAC_GENERIC;
     }
 
+    private void requireKnownProvider(String providerType) {
+        if (providerType != null && !verifierFactory.isKnownProvider(providerType)) {
+            throw new IllegalArgumentException("Unknown provider '" + providerType
+                    + "'. Use GENERIC or an id from GET /api/v1/incoming-providers.");
+        }
+    }
+
     // Checks the row as saved, not the request: an update is partial.
     private void validateVerificationSettings(IncomingSource source) {
         VerificationMode mode = source.getVerificationMode();
@@ -75,6 +82,7 @@ public class IncomingSourceService {
     @Transactional
     public IncomingSourceResponse createSource(UUID projectId, IncomingSourceRequest request) {
         validateProjectOwnership(projectId);
+        requireKnownProvider(request.getProviderType());
 
         String slug = request.getSlug();
         if (slug == null || slug.isBlank()) {
@@ -93,7 +101,7 @@ public class IncomingSourceService {
                 .projectId(projectId)
                 .name(request.getName())
                 .slug(slug)
-                .providerType(request.getProviderType() != null ? request.getProviderType() : ProviderType.GENERIC)
+                .providerType(request.getProviderType() != null ? request.getProviderType() : InboundProviderRegistry.GENERIC)
                 .status(IncomingSourceStatus.ACTIVE)
                 .ingressPathToken(ingressPathToken)
                 .verificationMode(request.getVerificationMode() != null ? request.getVerificationMode()
@@ -152,6 +160,7 @@ public class IncomingSourceService {
         }
 
         if (request.getProviderType() != null) {
+            requireKnownProvider(request.getProviderType());
             source.setProviderType(request.getProviderType());
         }
         if (request.getStatus() != null) {

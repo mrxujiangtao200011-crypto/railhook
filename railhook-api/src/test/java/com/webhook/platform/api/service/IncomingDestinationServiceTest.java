@@ -14,7 +14,6 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +66,7 @@ class IncomingDestinationServiceTest {
         );
         source = IncomingSource.builder()
                 .id(sourceId).projectId(projectId).name("src")
-                .slug("src").providerType(ProviderType.GENERIC)
+                .slug("src").providerType("GENERIC")
                 .status(IncomingSourceStatus.ACTIVE)
                 .ingressPathToken("tok").verificationMode(VerificationMode.NONE)
                 .build();

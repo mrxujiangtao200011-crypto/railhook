@@ -48,7 +48,7 @@ public class GenericHmacVerifier implements WebhookVerificationStrategy {
     }
 
     // Joined as bytes so the body is never re-encoded before hashing.
-    static String computeHmacSha256(String secret, String prefix, byte[] body) {
+    public static String computeHmacSha256(String secret, String prefix, byte[] body) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             SecretKeySpec keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
@@ -61,7 +61,7 @@ public class GenericHmacVerifier implements WebhookVerificationStrategy {
         }
     }
 
-    static String computeHmacSha256(String secret, byte[] body) {
+    public static String computeHmacSha256(String secret, byte[] body) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             SecretKeySpec keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,7 +89,7 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
         IncomingSourceRequest request = IncomingSourceRequest.builder()
                 .name("GitHub Webhooks")
                 .slug("github-webhooks")
-                .providerType(ProviderType.GITHUB)
+                .providerType("GITHUB")
                 .verificationMode(VerificationMode.NONE)
                 .build();
         MvcResult created = mockMvc.perform(post(sources())
@@ -119,7 +118,7 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
 
         IncomingSourceRequest update = IncomingSourceRequest.builder()
                 .name("GitHub Webhooks Updated")
-                .providerType(ProviderType.GITHUB)
+                .providerType("GITHUB")
                 .status(IncomingSourceStatus.ACTIVE)
                 .verificationMode(VerificationMode.HMAC_GENERIC)
                 .hmacSecret("test-hmac-secret")

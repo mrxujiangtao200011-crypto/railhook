@@ -1,6 +1,8 @@
-package com.webhook.platform.api.service.verification;
+package com.webhook.platform.api.service.ingress.provider;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -14,8 +16,9 @@ import lombok.RequiredArgsConstructor;
  * Signature v3 only, since v1 and v2 carry no timestamp. The signed URI is rebuilt from the
  * ingress base URL rather than trusting Host headers behind a proxy.
  */
+@Component
 @RequiredArgsConstructor
-public class HubSpotVerifier implements WebhookVerificationStrategy {
+public class HubSpotProvider implements InboundProvider {
 
     private static final String SIGNATURE_HEADER = "X-HubSpot-Signature-v3";
     private static final String TIMESTAMP_HEADER = "X-HubSpot-Request-Timestamp";
@@ -28,7 +31,23 @@ public class HubSpotVerifier implements WebhookVerificationStrategy {
             Map.entry("%27", "'"), Map.entry("%28", "("), Map.entry("%29", ")"),
             Map.entry("%2A", "*"), Map.entry("%2C", ","), Map.entry("%3B", ";"));
 
+    @Value("${webhook.ingress-base-url:}")
     private final String ingressBaseUrl;
+
+    @Override
+    public String id() {
+        return "HUBSPOT";
+    }
+
+    @Override
+    public String displayName() {
+        return "HubSpot";
+    }
+
+    @Override
+    public String signatureHeader() {
+        return SIGNATURE_HEADER;
+    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

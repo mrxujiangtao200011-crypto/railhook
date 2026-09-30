@@ -1,8 +1,9 @@
-package com.webhook.platform.api.service.verification;
+package com.webhook.platform.api.service.ingress.provider;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -17,11 +18,42 @@ import java.util.List;
  * The hex key is decoded to bytes before use. Standard webhooks sign per item, and every item
  * must verify so a forged one cannot ride along; other webhooks sign the raw body in a header.
  */
-public class AdyenVerifier implements WebhookVerificationStrategy {
+@Component
+public class AdyenProvider implements InboundProvider {
 
     private static final String HEADER = "hmacsignature";
     private static final String SIGNATURE_FIELD = "hmacSignature";
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    @Override
+    public String id() {
+        return "ADYEN";
+    }
+
+    @Override
+    public String displayName() {
+        return "Adyen";
+    }
+
+    @Override
+    public String signatureHeader() {
+        return null;
+    }
+
+    // Adyen has no event id; pspReference plus eventCode identify one. Single-item notifications
+    // only, or the other items of a later request would be dropped.
+    @Override
+    public String eventId(HttpServletRequest request, String body) {
+        JsonNode root = JsonBodies.parse(body);
+        JsonNode items = root == null ? null : root.get("notificationItems");
+        if (items == null || !items.isArray() || items.size() != 1) {
+            return null;
+        }
+        JsonNode item = items.get(0).get("NotificationRequestItem");
+        String pspReference = JsonBodies.text(item, "pspReference");
+        String eventCode = JsonBodies.text(item, "eventCode");
+        return pspReference != null && eventCode != null ? pspReference + ":" + eventCode : null;
+    }
 
     @Override
     public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {

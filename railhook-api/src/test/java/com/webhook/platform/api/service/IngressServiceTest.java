@@ -18,7 +18,6 @@ import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
@@ -29,6 +28,7 @@ import com.webhook.platform.api.exception.SignatureVerificationFailedException;
 import com.webhook.platform.api.exception.SourceDisabledException;
 import com.webhook.platform.api.exception.SourceNotFoundException;
 import com.webhook.platform.api.service.verification.ReplayDetectionService;
+import com.webhook.platform.api.service.ingress.provider.TestInboundProviders;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -117,7 +117,7 @@ class IngressServiceTest {
         when(rateLimiterService.tryAcquireForSourceFailClosed(any(UUID.class), anyInt())).thenReturn(true);
         when(projectRepository.existsById(any())).thenReturn(true);
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
-        verifierFactory = new WebhookVerifierFactory("http://localhost:8080");
+        verifierFactory = TestInboundProviders.verifierFactory();
         TrustedProxyResolver clientIpResolver = new TrustedProxyResolver(
                 List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"));
         service = new IngressService(
@@ -149,7 +149,7 @@ class IngressServiceTest {
     private IncomingSource buildActiveSource() {
         return IncomingSource.builder()
                 .id(sourceId).projectId(UUID.randomUUID()).organizationId(orgId)
-                .name("Test").slug("test").providerType(ProviderType.GENERIC)
+                .name("Test").slug("test").providerType("GENERIC")
                 .status(IncomingSourceStatus.ACTIVE)
                 .ingressPathToken("validtoken")
                 .verificationMode(VerificationMode.NONE)
@@ -516,6 +516,7 @@ class IngressServiceTest {
     @Test
     void aGitLabResendCarryingTheSameIdempotencyKeyReturnsTheStoredEvent() {
         IncomingSource source = buildActiveSource();
+        source.setProviderType("GITLAB");
         IncomingEvent existing = IncomingEvent.builder()
                 .id(eventId).incomingSourceId(sourceId)
                 .requestId("old-req").method("POST")
@@ -525,8 +526,6 @@ class IngressServiceTest {
 
         when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
         stubHttpRequest();
-        when(httpRequest.getHeader("X-Gitlab-Event")).thenReturn("Push Hook");
-        when(httpRequest.getHeader("X-Gitlab-Event-UUID")).thenReturn("13792a34-cac6-4fda-95a8-c58e00a3954e");
         when(httpRequest.getHeader("Idempotency-Key")).thenReturn("f5e5f430-f57b-4e6e-9fac-d9128cd7232f");
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "f5e5f430-f57b-4e6e-9fac-d9128cd7232f"))
                 .thenReturn(Optional.of(existing));
@@ -541,6 +540,7 @@ class IngressServiceTest {
     @Test
     void aGitLabDeliveryIsKeyedByWebhookIdWhenGitLabSendsIt() {
         IncomingSource source = buildActiveSource();
+        source.setProviderType("GITLAB");
         when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(eq(sourceId), anyString()))
                 .thenReturn(Optional.empty());
@@ -551,7 +551,6 @@ class IngressServiceTest {
         });
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
-        when(httpRequest.getHeader("X-Gitlab-Event")).thenReturn("Push Hook");
         when(httpRequest.getHeader("webhook-id")).thenReturn("msg_2b3c");
 
         IncomingEvent result = accepted(service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest));
@@ -563,6 +562,7 @@ class IngressServiceTest {
     @Test
     void aGitLabEventUuidAloneIsNotTakenForADeliveryId() {
         IncomingSource source = buildActiveSource();
+        source.setProviderType("GITLAB");
         when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
         when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
             IncomingEvent e = inv.getArgument(0);
@@ -571,8 +571,6 @@ class IngressServiceTest {
         });
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
-        when(httpRequest.getHeader("X-Gitlab-Event")).thenReturn("Pipeline Hook");
-        when(httpRequest.getHeader("X-Gitlab-Event-UUID")).thenReturn("13792a34-cac6-4fda-95a8-c58e00a3954e");
 
         IncomingEvent result = accepted(service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
@@ -649,7 +647,7 @@ class IngressServiceTest {
     private IncomingSource slackSource() {
         SecretEncryption.EncryptedData encrypted = SecretEncryption.encrypt(SLACK_SECRET, ENCRYPTION_KEY, ENCRYPTION_SALT);
         IncomingSource source = buildActiveSource();
-        source.setProviderType(ProviderType.SLACK);
+        source.setProviderType("SLACK");
         source.setVerificationMode(VerificationMode.PROVIDER);
         source.setHmacSecretEncrypted(encrypted.getCiphertext());
         source.setHmacSecretIv(encrypted.getIv());
@@ -672,8 +670,8 @@ class IngressServiceTest {
         IngressOutcome outcome = service.receiveWebhook("validtoken",
                 URL_VERIFICATION.getBytes(StandardCharsets.UTF_8), httpRequest);
 
-        assertThat(outcome).isEqualTo(new IngressOutcome.SlackUrlVerification(
-                "3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P"));
+        assertThat(outcome).isEqualTo(new IngressOutcome.Handshake(
+                "{\"challenge\":\"3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P\"}"));
         verify(eventRepository, never()).save(any());
         verify(entitlementService, never()).checkEventQuota();
         verify(quotaCounterService, never()).increment();
@@ -692,7 +690,7 @@ class IngressServiceTest {
         IngressOutcome outcome = service.receiveWebhook("validtoken",
                 URL_VERIFICATION.getBytes(StandardCharsets.UTF_8), httpRequest);
 
-        assertThat(outcome).isInstanceOf(IngressOutcome.SlackUrlVerification.class);
+        assertThat(outcome).isInstanceOf(IngressOutcome.Handshake.class);
     }
 
     @Test

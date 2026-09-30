@@ -8,7 +8,7 @@ public sealed interface IngressOutcome {
     record Accepted(IncomingEvent event) implements IngressOutcome {
     }
 
-    /** Slack's {@code url_verification} handshake. Nothing is stored, forwarded or charged. */
-    record SlackUrlVerification(String challenge) implements IngressOutcome {
+    /** Nothing is stored, forwarded or charged. */
+    record Handshake(String json) implements IngressOutcome {
     }
 }
