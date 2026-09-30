@@ -142,6 +142,29 @@ class AlertIncidentIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void anInfoRuleFiringOpensNoIncident() throws Exception {
+        MvcResult created = createRule("{\"name\":\"Traffic note\",\"alertType\":\"FAILURE_RATE\","
+                + "\"severity\":\"INFO\",\"thresholdValue\":10}");
+        UUID ruleId = UUID.fromString(json(created).get("id").asText());
+        AlertRule rule = TenantContext.callAs(organizationId, () -> ruleRepository.findById(ruleId).orElseThrow());
+
+        fire(rule, "Failure rate 12.0%");
+
+        assertThat(incidents()).isEmpty();
+    }
+
+    @Test
+    void anInfoRuleCannotPage() throws Exception {
+        mockMvc.perform(post("/api/v1/projects/" + projectId + "/alerts/rules")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"r\",\"alertType\":\"FAILURE_RATE\",\"severity\":\"INFO\","
+                                + "\"thresholdValue\":10,\"channel\":\"PAGERDUTY\",\"integrationKey\":\""
+                                + ROUTING_KEY + "\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
     private AlertRule pagerDutyRule() throws Exception {
         MvcResult created = createRule("{\"name\":\"Payments failing\",\"alertType\":\"FAILURE_RATE\","
                 + "\"severity\":\"WARNING\",\"thresholdValue\":10,\"channel\":\"PAGERDUTY\","

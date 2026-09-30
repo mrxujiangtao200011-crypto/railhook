@@ -1555,7 +1555,7 @@
       "OPEN": "Open",
       "RESOLVED": "Resolved"
     },
-    "subtitle": "A firing alert rule opens an incident here and resolves it when the condition clears. Track what was done and write down why.",
+    "subtitle": "An alert rule above Info opens an incident here when it fires and resolves it when the condition clears. Track what was done and write down why.",
     "tiles": {
       "allClear": "All clear",
       "critical": "Critical",

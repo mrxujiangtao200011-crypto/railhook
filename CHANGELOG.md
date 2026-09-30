@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - An unknown analytics `period` is refused with `400` instead of falling back to 24h.
-- Every alert rule opens an incident when it fires, not only `CRITICAL` ones. Further firings are added to the open incident's timeline, and the incident is resolved automatically when the evaluator sees the condition clear. The Incidents page shows the rule that opened an incident and whether it was resolved automatically.
+- A `WARNING` alert rule opens an incident when it fires too, not only a `CRITICAL` one; `INFO` rules open none and cannot page. Further firings are added to the open incident's timeline, and the incident is resolved automatically when the evaluator sees the condition clear. The Incidents page shows the rule that opened an incident and whether it was resolved automatically.
 
 ### Fixed
 

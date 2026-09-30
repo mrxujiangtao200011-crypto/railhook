@@ -243,7 +243,8 @@ public class AlertService {
         log.warn("Alert fired: rule='{}', project={}, current={}, threshold={}",
                 rule.getName(), rule.getProjectId(), currentValue, rule.getThresholdValue());
 
-        Incident incident = incidentService.recordAlertFiring(rule, message);
+        Incident incident = rule.getSeverity() == AlertSeverity.INFO ? null
+                : incidentService.recordAlertFiring(rule, message);
 
         // Only after commit: sent mid-transaction, a later failure rolled the alert back after
         // the message went out, and the next evaluation sent it again.
@@ -280,6 +281,9 @@ public class AlertService {
                     rule.getChannel() == AlertChannel.PAGERDUTY
                             ? "A PagerDuty rule needs the routing key of a PagerDuty service"
                             : "An Opsgenie rule needs an Opsgenie API key");
+        }
+        if (onCall && rule.getSeverity() == AlertSeverity.INFO) {
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "An INFO rule cannot page anyone; use WARNING or CRITICAL");
         }
     }
 

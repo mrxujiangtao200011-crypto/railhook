@@ -602,7 +602,11 @@ export default function AlertsPage() {
             <div className="space-y-2">
               <Label htmlFor="alert-channel">{t('alerts.form.channel')}</Label>
               <Select id="alert-channel" value={formChannel} onChange={(e) => setFormChannel(e.target.value as AlertChannel)}>
-                {CHANNEL_VALUES.map((v) => <option key={v} value={v}>{t(`alerts.channels.${v}`)}</option>)}
+                {CHANNEL_VALUES.map((v) => (
+                  <option key={v} value={v} disabled={formSeverity === 'INFO' && (v === 'PAGERDUTY' || v === 'OPSGENIE')}>
+                    {t(`alerts.channels.${v}`)}
+                  </option>
+                ))}
               </Select>
             </div>
             {formChannel === 'WEBHOOK' && (

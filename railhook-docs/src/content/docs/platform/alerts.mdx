@@ -39,7 +39,7 @@ When an evaluation finds the condition no longer holds, the open alert resolves 
 |---|---|---|
 | Window | 5 minutes | How far back the condition looks. Short windows are jumpy on low traffic; long ones are slow on high traffic. Match it to how many deliveries the project gets in that time. |
 | Endpoint | None | Required for `CONSECUTIVE_FAILURES`. The other conditions measure the whole project. |
-| Severity | `WARNING` | `INFO`, `WARNING` or `CRITICAL`. The incident the rule opens gets the same severity, and PagerDuty and Opsgenie get it as the alert's urgency. |
+| Severity | `WARNING` | `INFO`, `WARNING` or `CRITICAL`. `INFO` opens no incident and cannot use PagerDuty or Opsgenie. The incident the rule opens gets the same severity, and PagerDuty and Opsgenie get it as the alert's urgency. |
 | Mute and snooze | Off | Mute a rule indefinitely, or snooze it until a set time. Snooze during planned work instead of deleting the rule. Turning a rule off stops it being evaluated at all. |
 
 ## Channels
@@ -65,7 +65,7 @@ Slack and webhook URLs go through the same SSRF protection as endpoint URLs. Pri
 
 An incident groups what happened into a record with a timeline. You can open one yourself on the project's **Incidents** page and add notes to its timeline.
 
-An alert rule also opens one when it fires, titled with the rule's name. While that incident is not resolved, each further firing of the rule is added to its timeline instead of opening another. When an evaluation finds the condition no longer holds, the incident is resolved and marked **Resolved automatically**, and a PagerDuty or Opsgenie rule closes the page it opened: both use the incident as the dedup key, so the resolve reaches the right alert. The next time the condition holds opens a new incident.
+A `WARNING` or `CRITICAL` alert rule also opens one when it fires, titled with the rule's name; an `INFO` rule only records the alert. While that incident is not resolved, each further firing of the rule is added to its timeline instead of opening another. When an evaluation finds the condition no longer holds, the incident is resolved and marked **Resolved automatically**, and a PagerDuty or Opsgenie rule closes the page it opened: both use the incident as the dedup key, so the resolve reaches the right alert. The next time the condition holds opens a new incident.
 
 Resolving an incident by hand does not close the PagerDuty or Opsgenie alert; resolve that one there.
 
