@@ -108,12 +108,16 @@ public class WorkflowTriggerOutboxService {
 
     private void processRow(WorkflowTriggerOutbox row) {
         try {
-            triggerService.triggerWorkflowsSync(
-                    row.getProjectId(),
-                    row.getEventId(),
-                    row.getEventType(),
-                    row.getEventPayload(),
-                    row.getDepth());
+            if (row.getWorkflowId() != null) {
+                triggerService.triggerScheduledSync(row.getWorkflowId(), row.getScheduledFor());
+            } else {
+                triggerService.triggerWorkflowsSync(
+                        row.getProjectId(),
+                        row.getEventId(),
+                        row.getEventType(),
+                        row.getEventPayload(),
+                        row.getDepth());
+            }
 
             row.setStatus(WorkflowTriggerOutboxStatus.DONE);
             row.setProcessedAt(Instant.now());

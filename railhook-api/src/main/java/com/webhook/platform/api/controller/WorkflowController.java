@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -51,6 +52,19 @@ public class WorkflowController {
         auth.validateProjectAccess(projectId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(workflowService.create(projectId, request));
+    }
+
+    @Operation(operationId = "previewWorkflowSchedule", summary = "Preview workflow schedule",
+            description = "The next three times a 5-field cron expression fires in the given time zone. "
+                    + "Answers 400 with the reason when the schedule is not accepted.")
+    @GetMapping("/schedule-preview")
+    public ResponseEntity<List<Instant>> previewSchedule(
+            @PathVariable("projectId") UUID projectId,
+            @RequestParam("cron") String cron,
+            @RequestParam(value = "timezone", defaultValue = "UTC") String timezone,
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        return ResponseEntity.ok(workflowService.previewSchedule(cron, timezone));
     }
 
     @Operation(operationId = "getWorkflow", summary = "Get workflow",

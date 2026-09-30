@@ -24,11 +24,17 @@ public class WorkflowTriggerOutbox {
     @Column(name = "project_id", nullable = false)
     private UUID projectId;
 
-    @Column(name = "event_id", nullable = false)
+    @Column(name = "event_id")
     private UUID eventId;
 
-    @Column(name = "event_type", nullable = false)
+    @Column(name = "event_type")
     private String eventType;
+
+    @Column(name = "workflow_id")
+    private UUID workflowId;
+
+    @Column(name = "scheduled_for")
+    private Instant scheduledFor;
 
     @Column(name = "event_payload", columnDefinition = "TEXT")
     private String eventPayload;

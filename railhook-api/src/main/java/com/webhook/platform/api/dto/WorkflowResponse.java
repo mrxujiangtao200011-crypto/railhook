@@ -24,6 +24,7 @@ public class WorkflowResponse {
     private Workflow.TriggerType triggerType;
     private Object triggerConfig;
     private Integer version;
+    private Instant nextRunAt;
     private Instant createdAt;
     private Instant updatedAt;
 
