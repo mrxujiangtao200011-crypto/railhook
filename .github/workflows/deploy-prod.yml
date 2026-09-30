@@ -168,6 +168,11 @@ jobs:
         run: |
           set -uo pipefail
           base=https://railhook.io
+          # The UI answers before the API does, and on an empty database the API first creates the schema.
+          for attempt in $(seq 1 60); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${base}/actuator/health")" = 200 ] && break
+            sleep 5
+          done
           failed=0
           check() {
             local path="$1" status="$2" needle="$3" body code
