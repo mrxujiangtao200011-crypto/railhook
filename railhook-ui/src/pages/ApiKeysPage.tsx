@@ -14,6 +14,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ConnectedMcpApps from '../components/ConnectedMcpApps';
 import type { ApiKeyResponse, ApiKeyScope } from '../api/apiKeys.api';
 import { useProject, useApiKeysPaged, useCreateApiKey, useRotateApiKey, useRevokeApiKey } from '../api/queries';
+import { PageBody } from '../components/port/p2/parts';
 import { cn } from '../lib/utils';
 import { sendEventCurl } from '../lib/publicSnippets';
 import { Button } from '../components/ui/button';
@@ -31,7 +32,6 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { usePermissions } from '../auth/usePermissions';
-import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 const SCOPES: ApiKeyScope[] = ['READ_WRITE', 'READ_ONLY'];
 const PAGE_SIZE = 20;
@@ -140,18 +140,18 @@ export default function ApiKeysPage() {
 
   if (project.isError || keysPage.isError || !project.data) {
     return (
-      <SettingsLayout>
+      <PageBody>
         <ErrorState
           error={project.error ?? keysPage.error}
           fallbackKey="apiKeys.toast.loadFailed"
           onRetry={() => { project.refetch(); keysPage.refetch(); }}
         />
-      </SettingsLayout>
+      </PageBody>
     );
   }
 
   return (
-    <SettingsLayout>
+    <PageBody>
       <PageHeader
         eyebrow={project.data.name}
         title={t('apiKeys.title')}
@@ -439,6 +439,6 @@ export default function ApiKeysPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SettingsLayout>
+    </PageBody>
   );
 }

@@ -13,14 +13,13 @@ import { Select } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { showSuccess, showApiError } from '../lib/toast';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../components/ui/sheet';
-import { CodeView } from '../components/port/p2/parts';
+import { CodeView, PageBody } from '../components/port/p2/parts';
 import { cn } from '../lib/utils';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
 import { TablePagination } from '../components/ui/table-pagination';
 import { FilterBar } from './tableParts';
-import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 const ALL_ACTIONS = [
   'CREATE', 'UPDATE', 'DELETE', 'ROTATE_SECRET', 'REVOKE',
@@ -103,7 +102,7 @@ export default function AuditLogPage() {
   const actionLabel = (action: string) => t(`auditLog.actions.${action}`, { defaultValue: action });
 
   return (
-    <SettingsLayout>
+    <PageBody>
       <PageHeader
         eyebrow={data ? t('auditLog.eventCount', { count: data.totalElements }) : undefined}
         title={t('auditLog.title')}
@@ -275,7 +274,7 @@ export default function AuditLogPage() {
           )}
         </SheetContent>
       </Sheet>
-    </SettingsLayout>
+    </PageBody>
   );
 }
 

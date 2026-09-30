@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Trash2, Users, RefreshCw, MailX, Ban, UserCheck, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { PageBody } from '../components/port/p2/parts';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton, { SkeletonTable } from '../components/PageSkeleton';
@@ -27,7 +28,6 @@ import { Select } from '../components/ui/select';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
-import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 /** A suspension is halt, not idle: access was deliberately stopped. */
 function kindOfMemberStatus(status: string): StatusKind {
@@ -151,7 +151,7 @@ export default function MembersPage() {
   );
 
   return (
-    <SettingsLayout>
+    <PageBody>
       <PageHeader
         eyebrow={user?.organization?.name}
         title={t('members.title')}
@@ -429,6 +429,6 @@ export default function MembersPage() {
         loading={removeMember.isPending}
         confirmLabel={t('members.remove')}
       />
-    </SettingsLayout>
+    </PageBody>
   );
 }

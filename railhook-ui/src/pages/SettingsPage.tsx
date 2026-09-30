@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PageBody } from '../components/port/p2/parts';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Check, Loader2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
@@ -21,7 +22,6 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
-import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 const COMMON_TIMEZONES = [
   'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -176,7 +176,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <SettingsLayout>
+    <PageBody>
       <div className="max-w-4xl">
         <PageHeader
           eyebrow={user?.organization?.name}
@@ -405,7 +405,7 @@ export default function SettingsPage() {
           <EraseAccount />
         </div>
       </div>
-    </SettingsLayout>
+    </PageBody>
   );
 }
 

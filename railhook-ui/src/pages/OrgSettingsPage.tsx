@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { PageBody } from '../components/port/p2/parts';
 import { AlertTriangle, ArrowRight, Copy, Download, Loader2 } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
 import { usePermissions } from '../auth/usePermissions';
@@ -19,7 +20,6 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
-import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 export default function OrgSettingsPage() {
   const { t } = useTranslation();
@@ -84,17 +84,17 @@ export default function OrgSettingsPage() {
   // A failed fetch would read as "0 projects, 0 members" in the danger zone.
   if (membersFailed || projectsFailed) {
     return (
-      <SettingsLayout>
+      <PageBody>
         <ErrorState
           error={membersError ?? projectsError}
           onRetry={() => { refetchMembers(); refetchProjects(); }}
         />
-      </SettingsLayout>
+      </PageBody>
     );
   }
 
   return (
-    <SettingsLayout>
+    <PageBody>
       <div className="max-w-4xl">
         <PageHeader
           eyebrow={orgCreatedAt ? t('orgSettings.since', { date: formatDate(orgCreatedAt) }) : undefined}
@@ -205,7 +205,7 @@ export default function OrgSettingsPage() {
           {canManageOrgSettings && <DangerZone orgId={orgId} orgName={orgName} projectCount={projects.length} memberCount={members.length} />}
         </div>
       </div>
-    </SettingsLayout>
+    </PageBody>
   );
 }
 

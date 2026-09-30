@@ -14,12 +14,12 @@ import { ErrorState } from '../components/EmptyState';
 import { FormSection, SaveControl } from './SettingsPage';
 import { billingApi, PlanResponse, ResourceUsage } from '../api/billing.api';
 import { formatDate } from '../lib/date';
+import { PageBody } from '../components/port/p2/parts';
 import { cn } from '../lib/utils';
 import { showSuccess, showApiError } from '../lib/toast';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import EmailSuggestion from '../components/EmailSuggestion';
 import { hasImpossibleTld } from '../lib/emailTypos';
-import SettingsLayout from '../components/port/p2/SettingsLayout';
 
 /** -1 is how the plan catalog spells "no ceiling". It must never reach a reader as "-1". */
 const UNLIMITED = (n: number) => n < 0;
@@ -216,14 +216,14 @@ export default function BillingPage() {
 
   if (billingQuery.isError || !billing) {
     return (
-      <SettingsLayout>
+      <PageBody>
         <ErrorState
           error={billingQuery.error}
           fallbackKey="billing.loadFailed"
           onRetry={() => billingQuery.refetch()}
           retrying={billingQuery.isRefetching}
         />
-      </SettingsLayout>
+      </PageBody>
     );
   }
 
@@ -234,7 +234,7 @@ export default function BillingPage() {
   const statusKind: StatusKind = billing.billingStatus === 'ACTIVE' ? 'ok' : 'halt';
 
   return (
-    <SettingsLayout>
+    <PageBody>
       <div className="max-w-4xl">
         <PageHeader
           eyebrow={usage ? `${formatDate(usage.periodStart)} — ${formatDate(usage.periodEnd)}` : undefined}
@@ -536,6 +536,6 @@ export default function BillingPage() {
         loading={cancelMutation.isPending}
         confirmLabel={t('billing.cancel')}
       />
-    </SettingsLayout>
+    </PageBody>
   );
 }
