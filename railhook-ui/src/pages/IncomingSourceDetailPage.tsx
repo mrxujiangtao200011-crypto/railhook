@@ -41,6 +41,7 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { formatJson, isValidJson } from '../lib/json';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { PageBody } from '../components/port/p2/parts';
 
 const AUTH_TYPES: IncomingAuthType[] = ['NONE', 'BEARER', 'BASIC', 'CUSTOM_HEADER'];
 
@@ -262,13 +263,13 @@ export default function IncomingSourceDetailPage() {
 
   if (failed || !source) {
     return (
-      <div className="p-4 lg:p-6">
+      <PageBody>
         <ErrorState
           error={sourceError ?? destsError}
           fallbackKey="incomingSources.toast.loadFailed"
           onRetry={() => { refetchSource(); refetchDests(); }}
         />
-      </div>
+      </PageBody>
     );
   }
 
@@ -283,7 +284,7 @@ export default function IncomingSourceDetailPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <PageBody>
       <PageHeader
         eyebrow={`${providerLabel(source.providerType, providers, t)} · ${source.slug}`}
         title={source.name}
@@ -291,7 +292,7 @@ export default function IncomingSourceDetailPage() {
         actions={newDestinationButton}
       />
 
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
+      <div className="mb-10 grid gap-x-12 gap-y-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -322,7 +323,7 @@ export default function IncomingSourceDetailPage() {
               ) : (
                 <>
                   <div className="mono-label mb-1.5">{t('incomingSources.howToSend.curlExample')}</div>
-                  <pre className="overflow-x-auto whitespace-pre-wrap break-all border border-rail bg-secondary/40 p-3 font-mono text-[11px] text-muted-foreground">
+                  <pre className="overflow-x-auto whitespace-pre-wrap break-all border border-rail bg-secondary/40 p-3 font-mono text-[12px] text-muted-foreground">
                     {ingressCurl(source, signatureHeaderOf(source, providerHeader))}
                   </pre>
                   {signatureHeaderOf(source, providerHeader) && (
@@ -343,8 +344,8 @@ export default function IncomingSourceDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <dl className="space-y-2.5 text-sm">
-              <div className="flex items-center justify-between gap-4">
+            <dl className="border-t border-rail text-sm">
+              <div className="flex items-center justify-between gap-4 border-b border-rail py-2.5">
                 <dt className="text-muted-foreground">{t('endpoints.status')}</dt>
                 <dd>
                   <StatusBadge
@@ -353,11 +354,11 @@ export default function IncomingSourceDetailPage() {
                   />
                 </dd>
               </div>
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-4 border-b border-rail py-2.5">
                 <dt className="text-muted-foreground">{t('incomingSources.createDialog.verificationMode')}</dt>
                 <dd className="text-xs">{t(`incomingSources.verificationModes.${source.verificationMode}`)}</dd>
               </div>
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-4 border-b border-rail py-2.5">
                 <dt className="text-muted-foreground">{t('incomingSources.createDialog.hmacSecret')}</dt>
                 <dd>
                   <StatusBadge
@@ -369,18 +370,18 @@ export default function IncomingSourceDetailPage() {
                 </dd>
               </div>
               {signatureHeaderOf(source, providerHeader) && (
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-4 border-b border-rail py-2.5">
                   <dt className="text-muted-foreground">{t('incomingSources.createDialog.hmacHeaderName')}</dt>
                   <dd className="font-mono text-xs">{signatureHeaderOf(source, providerHeader)}</dd>
                 </div>
               )}
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-4 border-b border-rail py-2.5">
                 <dt className="text-muted-foreground">{t('incomingSources.rateLimit')}</dt>
                 <dd className="font-mono text-xs">
                   {source.rateLimitPerSecond ? `${source.rateLimitPerSecond}/s` : '—'}
                 </dd>
               </div>
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-4 border-b border-rail py-2.5">
                 <dt className="text-muted-foreground">{t('incomingSources.created')}</dt>
                 <dd className="font-mono text-xs">{formatDateTime(source.createdAt)}</dd>
               </div>
@@ -391,7 +392,7 @@ export default function IncomingSourceDetailPage() {
 
       <div className="mb-3">
         <h3 className="text-[15px] font-medium">{t('incomingDestinations.title')}</h3>
-        <p className="text-sm text-muted-foreground">{t('incomingDestinations.subtitle')}</p>
+        <p className="text-[13px] text-muted-foreground">{t('incomingDestinations.subtitle')}</p>
       </div>
 
       {destinations.length === 0 ? (
@@ -403,8 +404,8 @@ export default function IncomingSourceDetailPage() {
         />
       ) : (
         <>
-          <Card className="overflow-hidden">
-            <Table>
+          <div className="min-w-0">
+            <Table className="text-[13px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('incomingDestinations.createDialog.url')}</TableHead>
@@ -427,14 +428,14 @@ export default function IncomingSourceDetailPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="font-mono text-[10px]">{dest.authType}</Badge>
+                      <Badge variant="outline" className="border-0 px-0 font-mono text-[12px]">{dest.authType}</Badge>
                     </TableCell>
                     <TableCell className="w-[220px]">
                       <AttemptRail
                         attempts={ladderTicks(dest.retryDelays ?? '', dest.maxAttempts)}
                         ariaLabel={t('incomingDestinations.ladderLabel', 'Retry ladder: {{count}} attempts', { count: dest.maxAttempts })}
                       />
-                      <span className="font-mono text-[11px] text-muted-foreground">
+                      <span className="font-mono text-[12px] text-muted-foreground">
                         {t('incomingDestinations.ladderSummary', '{{attempts}} attempts · {{timeout}}s timeout', {
                           attempts: dest.maxAttempts,
                           timeout: dest.timeoutSeconds,
@@ -448,7 +449,7 @@ export default function IncomingSourceDetailPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <span className="font-mono text-[11px] text-muted-foreground">
+                      <span className="font-mono text-[12px] text-muted-foreground">
                         {formatRelativeTime(dest.createdAt)}
                       </span>
                     </TableCell>
@@ -477,7 +478,7 @@ export default function IncomingSourceDetailPage() {
                 ))}
               </TableBody>
             </Table>
-          </Card>
+          </div>
 
           {destPageInfo && (
             <TablePagination
@@ -692,7 +693,7 @@ export default function IncomingSourceDetailPage() {
                     {transformPreview && (
                       <div className="bg-secondary/40 p-3">
                         <div className="mono-label mb-1.5">{t('incomingDestinations.validation.previewOutput')}</div>
-                        <pre className="max-h-[120px] overflow-x-auto whitespace-pre-wrap font-mono text-[11px]">
+                        <pre className="max-h-[120px] overflow-x-auto whitespace-pre-wrap font-mono text-[12px]">
                           {transformPreview}
                         </pre>
                       </div>
@@ -757,6 +758,6 @@ export default function IncomingSourceDetailPage() {
         onConfirm={handleDeleteDest}
         loading={deleteDest.isPending}
       />
-    </div>
+    </PageBody>
   );
 }
