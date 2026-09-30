@@ -41,7 +41,7 @@ public class WebhookDeliveryService {
             Clock clock,
             @Value("${webhook.claim.timeout-seconds:300}") long claimTimeoutSeconds,
             @Value("${webhook.claim.max-targets:500}") int maxEndpoints,
-            @Value("${webhook.claim.per-target:5}") int perEndpoint) {
+            @Value("${webhook.max-concurrent-per-endpoint:5}") int perEndpoint) {
         this.attemptRunner = attemptRunner;
         this.storeFactory = storeFactory;
         this.metrics = metrics;

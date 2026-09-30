@@ -77,8 +77,10 @@ public class ClaimPoller<T> implements SmartLifecycle {
                 for (T item : batch) {
                     executor.submit(() -> attempt.accept(item));
                 }
-                if (batch.size() < free) {
+                if (batch.isEmpty()) {
                     Thread.sleep(idleMillis);
+                } else if (batch.size() < free) {
+                    Thread.sleep(BUSY_MILLIS);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

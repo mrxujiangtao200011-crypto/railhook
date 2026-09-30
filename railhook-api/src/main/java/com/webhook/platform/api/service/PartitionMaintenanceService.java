@@ -34,8 +34,9 @@ public class PartitionMaintenanceService {
     private static final Pattern SAFE_IDENTIFIER =
             Pattern.compile("^[a-z][a-z0-9_]*$");
 
+    // Bounds are UTC instants; without the offset the session's time zone would move them.
     private static final DateTimeFormatter BOUND_FORMAT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss'+00'");
 
     private final JdbcTemplate jdbcTemplate;
     private final MeterRegistry meterRegistry;
@@ -158,7 +159,7 @@ public class PartitionMaintenanceService {
         jdbcTemplate.execute(sql);
     }
 
-    // The bound is compared in SQL because the tables mix TIMESTAMP and TIMESTAMPTZ.
+    // Postgres parses the bound it printed, so its output format never has to be matched here.
     public int dropExpiredPartitions(String table, int retentionDays) {
         requireSafeIdentifier(table);
         List<String> expired = jdbcTemplate.queryForList(

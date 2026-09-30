@@ -47,7 +47,7 @@ A dash means the vendor's pages did not settle the point either way, not that th
 ### What Railhook does not have
 
 - **A young customer portal.** Theming is a brand colour, a logo, light or dark, and the language. No custom CSS, no custom portal domain, no view of the event catalog's schemas.
-- **HTTP delivery only.** No SQS, S3, EventBridge, Pub/Sub, RabbitMQ or Kafka destinations.
+- **HTTP delivery only.** No SQS, S3, EventBridge, Pub/Sub or RabbitMQ destinations.
 - **No SSO (SAML or OIDC) and no SCIM.**
 - **No OpenTelemetry.** Prometheus metrics are thorough; there are no traces.
 - **Three fixed roles and two API key scopes.** No custom roles, no per-resource permissions.
@@ -66,7 +66,7 @@ A dash means the vendor's pages did not settle the point either way, not that th
 
 ## Hookdeck
 
-- **Outpost** is Hookdeck's open-source, Apache-2.0 product for sending events. It delivers to webhooks, Hookdeck Event Gateway, Amazon EventBridge, AWS SQS, AWS S3, GCP Pub/Sub, RabbitMQ and Kafka, and includes a user portal and OpenTelemetry traces, metrics and logs. ([hookdeck/outpost](https://github.com/hookdeck/outpost))
+- **Outpost** is Hookdeck's open-source, Apache-2.0 product for sending events. It delivers to webhooks, Hookdeck Event Gateway, Amazon EventBridge, AWS SQS, AWS S3, GCP Pub/Sub and RabbitMQ, and includes a user portal and OpenTelemetry traces, metrics and logs. ([hookdeck/outpost](https://github.com/hookdeck/outpost))
 - **Event Gateway** receives webhooks at a source URL and routes them through connections to destinations, with filters, transformations, deduplication and retries. ([Hookdeck docs](https://hookdeck.com/docs/sources))
 
 **Choose Hookdeck** if your customers' receivers are queues or cloud event buses rather than HTTP services. Railhook cannot deliver there.
