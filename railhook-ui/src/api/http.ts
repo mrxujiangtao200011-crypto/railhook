@@ -170,6 +170,12 @@ class HttpClient {
     return response.data;
   }
 
+  async getFile(url: string): Promise<{ blob: Blob; filename: string | undefined }> {
+    const response = await this.client.get(url, { responseType: 'blob', timeout: EXPORT_TIMEOUT_MS });
+    const disposition = String(response.headers['content-disposition'] ?? '');
+    return { blob: response.data, filename: /filename="([^"]+)"/.exec(disposition)?.[1] };
+  }
+
   async post<T>(url: string, data?: unknown, headers?: Record<string, string>): Promise<T> {
     const response = await this.client.post<T>(url, data, { headers });
     return response.data;

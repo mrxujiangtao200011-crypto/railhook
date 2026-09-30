@@ -131,7 +131,9 @@
     "windowMinutes_other": "{{count}} minutes"
   },
   "analytics": {
+    "apply": "Apply",
     "avgLatency": "Avg Latency",
+    "custom": "Custom",
     "deliveriesPerSec": "deliveries/sec",
     "endpointPerformance": "Endpoint Performance",
     "endpointPerformanceDesc": "Health status and metrics",
@@ -150,7 +152,13 @@
     "eventTypes": "Event Types",
     "eventTypesDesc": "Distribution by type",
     "eventTypesSeries": "Events",
+    "export": {
+      "csv": "Export CSV",
+      "failed": "Couldn't export analytics",
+      "hint": "The CSV has one row per hour or day of the selected range, then one row per endpoint."
+    },
     "failed": "Failed",
+    "from": "From",
     "latencyPercentiles": "Latency Percentiles",
     "latencyPercentilesDesc": "Response time distribution",
     "latencySeries": "Latency",
@@ -183,7 +191,8 @@
       "failedHint": "{{percent}}% of all deliveries",
       "latencyHint": "p95 {{p95}} · p99 {{p99}}",
       "successRateHint": "{{delivered}} of {{total}} delivered"
-    }
+    },
+    "to": "To"
   },
   "apiKeys": {
     "activeKey": "Active",

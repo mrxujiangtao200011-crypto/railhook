@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Analytics takes a custom `from`/`to` range of up to 90 days besides the 24h, 7d and 30d presets, and `GET /api/v1/dashboard/projects/{projectId}/analytics/export` returns the same numbers as CSV: one row per hour or day, then one row per endpoint. The analytics page has a range picker and an Export CSV button.
+
+### Changed
+
+- An unknown analytics `period` is refused with `400` instead of falling back to 24h.
+
+### Fixed
+
+- Analytics hourly and daily buckets are cut in UTC. They followed the database session's time zone while still being labelled UTC.
+
 ## [3.3.1] - 2026-09-30
 
 ### Added

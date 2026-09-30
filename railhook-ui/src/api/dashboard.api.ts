@@ -1,4 +1,6 @@
 import { http } from './http';
+import { withJsonErrorBody } from './blobErrorBody';
+import { rangeQuery, type AnalyticsRange } from '../lib/analyticsRange';
 
 export interface DashboardStats {
   deliveryStats: DeliveryStats;
@@ -109,9 +111,12 @@ export const dashboardApi = {
     return http.get<DashboardStats>(`/api/v1/dashboard/projects/${projectId}`);
   },
 
-  getAnalytics: (projectId: string, period: string = '24h'): Promise<AnalyticsData> => {
-    return http.get<AnalyticsData>(`/api/v1/dashboard/projects/${projectId}/analytics?period=${period}`);
+  getAnalytics: (projectId: string, range: AnalyticsRange): Promise<AnalyticsData> => {
+    return http.get<AnalyticsData>(`/api/v1/dashboard/projects/${projectId}/analytics?${rangeQuery(range)}`);
   },
+
+  exportAnalyticsCsv: (projectId: string, range: AnalyticsRange) =>
+    withJsonErrorBody(http.getFile(`/api/v1/dashboard/projects/${projectId}/analytics/export?${rangeQuery(range)}`)),
 
   getOnboardingStatus: (projectId: string): Promise<OnboardingStatus> => {
     return http.get<OnboardingStatus>(`/api/v1/dashboard/projects/${projectId}/onboarding`);

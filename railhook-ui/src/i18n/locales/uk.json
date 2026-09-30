@@ -131,7 +131,9 @@
     "windowMinutes_other": "{{count}} хвилин"
   },
   "analytics": {
+    "apply": "Застосувати",
     "avgLatency": "Сер. затримка",
+    "custom": "Свій",
     "deliveriesPerSec": "доставок/с",
     "endpointPerformance": "Продуктивність ендпоінтів",
     "endpointPerformanceDesc": "Стан і метрики",
@@ -150,7 +152,13 @@
     "eventTypes": "Типи подій",
     "eventTypesDesc": "Розподіл за типом",
     "eventTypesSeries": "Події",
+    "export": {
+      "csv": "Експорт CSV",
+      "failed": "Не вдалося експортувати аналітику",
+      "hint": "CSV містить рядок на кожну годину чи день обраного діапазону, далі рядок на кожен ендпоінт."
+    },
     "failed": "Невдалі",
+    "from": "Від",
     "latencyPercentiles": "Перцентилі затримки",
     "latencyPercentilesDesc": "Розподіл часу відповіді",
     "latencySeries": "Затримка",
@@ -183,7 +191,8 @@
       "failedHint": "{{percent}}% усіх доставок",
       "latencyHint": "p95 {{p95}} · p99 {{p99}}",
       "successRateHint": "Доставлено {{delivered}} із {{total}}"
-    }
+    },
+    "to": "До"
   },
   "apiKeys": {
     "activeKey": "Активний",
