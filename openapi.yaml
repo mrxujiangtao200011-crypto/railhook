@@ -2186,13 +2186,13 @@ paths:
               type: string
       responses:
         "200":
-          description: "Slack url_verification handshake on a SLACK source, answered\
-            \ once its signature is verified. The challenge is echoed and nothing\
-            \ is stored or forwarded."
+          description: "A provider's URL-ownership handshake, such as Slack's url_verification,\
+            \ answered in the provider's own format once its signature is verified.\
+            \ Nothing is stored or forwarded."
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SlackUrlVerificationResponse"
+                type: object
         "202":
           description: Webhook accepted for processing
           content:
@@ -7448,6 +7448,26 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
       - bearerAuth: []
+  /api/v1/incoming-providers:
+    get:
+      tags:
+      - Incoming Sources
+      summary: List incoming providers
+      description: "Providers whose signatures an incoming source verifies in PROVIDER\
+        \ mode. GENERIC is not listed: it is verified with HMAC_GENERIC."
+      operationId: listIncomingProviders
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IncomingProviderResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/deliveries:
     get:
       tags:
@@ -9236,19 +9256,7 @@ components:
           pattern: "^[a-z0-9][a-z0-9-]*$"
         providerType:
           type: string
-          description: Provider type
-          enum:
-          - GENERIC
-          - GITHUB
-          - GITLAB
-          - STRIPE
-          - SHOPIFY
-          - SLACK
-          - TWILIO
-          - SQUARE
-          - ADYEN
-          - SENDGRID
-          - HUBSPOT
+          description: "GENERIC, or the id of a provider listed by GET /api/v1/incoming-providers"
           example: GITHUB
         status:
           type: string
@@ -9304,18 +9312,6 @@ components:
           type: string
         providerType:
           type: string
-          enum:
-          - GENERIC
-          - GITHUB
-          - GITLAB
-          - STRIPE
-          - SHOPIFY
-          - SLACK
-          - TWILIO
-          - SQUARE
-          - ADYEN
-          - SENDGRID
-          - HUBSPOT
         status:
           type: string
           enum:
@@ -9861,17 +9857,6 @@ components:
           - ACTIVE
           - PENDING_VERIFICATION
           - DISABLED
-    SlackUrlVerificationResponse:
-      type: object
-      description: "Answer to Slack's url_verification handshake: the challenge Slack\
-        \ sent, echoed back"
-      properties:
-        challenge:
-          type: string
-          description: The challenge from the verified url_verification request
-          example: 3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P
-      required:
-      - challenge
     IngressResponse:
       type: object
       description: Response from incoming webhook ingress endpoint
@@ -11413,6 +11398,8 @@ components:
           format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
         paged:
           type: boolean
         pageNumber:
@@ -11421,8 +11408,6 @@ components:
         pageSize:
           type: integer
           format: int32
-        unpaged:
-          type: boolean
     SortObject:
       type: object
       properties:
@@ -12903,6 +12888,24 @@ components:
         expiresAt:
           type: string
           format: date-time
+    IncomingProviderResponse:
+      type: object
+      description: A provider whose webhooks Railhook verifies natively
+      properties:
+        id:
+          type: string
+          description: The value to send as an incoming source's providerType
+          example: STRIPE
+        displayName:
+          type: string
+          example: Stripe
+        signatureHeader:
+          type: string
+          description: Null when the provider signs inside the body
+          example: Stripe-Signature
+      required:
+      - displayName
+      - id
     DeliveryResponse:
       type: object
       properties:

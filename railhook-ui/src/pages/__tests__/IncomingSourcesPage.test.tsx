@@ -6,7 +6,9 @@ import type { IncomingSourceResponse, PageResponse, ProjectResponse } from '../.
 
 vi.mock('../../api/projects.api', () => ({ projectsApi: { get: vi.fn(), list: vi.fn() } }));
 vi.mock('../../api/incomingSources.api', () => ({
-  incomingSourcesApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  incomingSourcesApi: {
+    list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), providers: vi.fn(),
+  },
 }));
 
 import IncomingSourcesPage from '../IncomingSourcesPage';
@@ -46,6 +48,7 @@ describe('IncomingSourcesPage — clearing a field on edit', () => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(incomingSourcesApi.list).mockResolvedValue(page([SOURCE]));
     vi.mocked(incomingSourcesApi.update).mockResolvedValue(SOURCE);
+    vi.mocked(incomingSourcesApi.providers).mockResolvedValue([]);
   });
 
   it.each([
@@ -67,5 +70,22 @@ describe('IncomingSourcesPage — clearing a field on edit', () => {
 
     expect(await screen.findByText(/cannot be removed/i)).toBeInTheDocument();
     expect(incomingSourcesApi.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('IncomingSourcesPage — providers come from the API', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(incomingSourcesApi.list).mockResolvedValue(page([{ ...SOURCE, providerType: 'PADDLE' }]));
+    vi.mocked(incomingSourcesApi.providers).mockResolvedValue([
+      { id: 'PADDLE', displayName: 'Paddle', signatureHeader: 'Paddle-Signature' },
+    ]);
+  });
+
+  it('offers a provider the UI has never heard of', async () => {
+    await openEdit();
+
+    await waitFor(() => expect(screen.getByLabelText(/provider type/i)).toHaveTextContent('Paddle'));
   });
 });

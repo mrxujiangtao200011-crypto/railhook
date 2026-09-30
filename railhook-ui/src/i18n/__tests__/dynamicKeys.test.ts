@@ -34,7 +34,6 @@ const ENUM_BACKED: Array<[namespace: string, schema: string, property: string, u
   // A second set of labels over the same enum, so it drifts separately.
   ['dashboard.inFlight.status', 'DeliveryResponse', 'status'],
   ['analytics.endpointStatus', 'EndpointPerformance', 'status'],
-  ['incomingSources.providerNames', 'IncomingSourceResponse', 'providerType'],
 ];
 
 function labelsUnder(locale: object, namespace: string): Record<string, unknown> {

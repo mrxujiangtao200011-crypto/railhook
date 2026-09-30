@@ -6,16 +6,17 @@ import {
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatRelativeTime } from '../lib/date';
+import { GENERIC_PROVIDER, providerLabel } from '../lib/providerLabel';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import {
-  useProject, useIncomingSources, useCreateIncomingSource, useUpdateIncomingSource,
+  useProject, useIncomingProviders, useIncomingSources, useCreateIncomingSource, useUpdateIncomingSource,
   useDeleteIncomingSource,
 } from '../api/queries';
 import type {
-  IncomingSourceResponse, IncomingSourceRequest, ProviderType, VerificationMode,
+  IncomingSourceResponse, IncomingSourceRequest, VerificationMode,
 } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -33,15 +34,7 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-const PROVIDER_TYPES: ProviderType[] = [
-  'GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO', 'SQUARE', 'ADYEN', 'SENDGRID', 'HUBSPOT',
-];
 const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDER'];
-
-/** Every provider but GENERIC: the API refuses PROVIDER mode with GENERIC. */
-const VERIFIABLE_PROVIDERS: ProviderType[] = [
-  'STRIPE', 'GITHUB', 'GITLAB', 'SLACK', 'SHOPIFY', 'TWILIO', 'SQUARE', 'ADYEN', 'SENDGRID', 'HUBSPOT',
-];
 
 export default function IncomingSourcesPage() {
   const { t } = useTranslation();
@@ -57,6 +50,11 @@ export default function IncomingSourcesPage() {
     data: pageInfo, isLoading: sourcesLoading, isError, error, refetch,
   } = useIncomingSources(projectId, currentPage, pageSize);
 
+  const { data: providers } = useIncomingProviders();
+  // PROVIDER mode refuses GENERIC, so it is only offered for the other modes.
+  const verifiableProviders = (providers ?? []).map((p) => p.id);
+  const providerIds = [GENERIC_PROVIDER, ...verifiableProviders];
+
   const createSource = useCreateIncomingSource(projectId!);
   const updateSource = useUpdateIncomingSource(projectId!);
   const deleteSource = useDeleteIncomingSource(projectId!);
@@ -68,7 +66,7 @@ export default function IncomingSourcesPage() {
   const [editSource, setEditSource] = useState<IncomingSourceResponse | null>(null);
   const [formName, setFormName] = useState('');
   const [formSlug, setFormSlug] = useState('');
-  const [formProvider, setFormProvider] = useState<ProviderType>('GENERIC');
+  const [formProvider, setFormProvider] = useState<string>(GENERIC_PROVIDER);
   const [formVerification, setFormVerification] = useState<VerificationMode>('NONE');
   const [formHmacSecret, setFormHmacSecret] = useState('');
   const [formHmacHeader, setFormHmacHeader] = useState('');
@@ -336,11 +334,11 @@ export default function IncomingSourcesPage() {
                   <Label htmlFor="src-provider">{t('incomingSources.createDialog.provider')}</Label>
                   <Select
                     id="src-provider" value={formProvider}
-                    onChange={(e) => setFormProvider(e.target.value as ProviderType)} disabled={saving}
+                    onChange={(e) => setFormProvider(e.target.value)} disabled={saving}
                   >
-                    {(formVerification === 'PROVIDER' ? VERIFIABLE_PROVIDERS : PROVIDER_TYPES)
+                    {(formVerification === 'PROVIDER' ? verifiableProviders : providerIds)
                       .map((p) => (
-                        <option key={p} value={p}>{t(`incomingSources.providerNames.${p}`)}</option>
+                        <option key={p} value={p}>{providerLabel(p, providers, t)}</option>
                       ))}
                   </Select>
                   {formVerification === 'PROVIDER' && (
@@ -356,8 +354,8 @@ export default function IncomingSourcesPage() {
                     onChange={(e) => {
                       const next = e.target.value as VerificationMode;
                       setFormVerification(next);
-                      if (next === 'PROVIDER' && !VERIFIABLE_PROVIDERS.includes(formProvider)) {
-                        setFormProvider('STRIPE');
+                      if (next === 'PROVIDER' && !verifiableProviders.includes(formProvider)) {
+                        setFormProvider(verifiableProviders[0] ?? GENERIC_PROVIDER);
                       }
                     }}
                     disabled={saving}

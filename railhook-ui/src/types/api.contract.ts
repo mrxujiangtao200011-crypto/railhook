@@ -47,6 +47,7 @@ export type McpConsentRequestResponseConforms = Assert<Conforms<'McpConsentReque
 export type McpConsentApproveRequestConforms = Assert<Conforms<'McpConsentApproveRequest', Mirror.McpConsentApproveRequest>>;
 export type McpConsentDecisionResponseConforms = Assert<Conforms<'McpConsentDecisionResponse', Mirror.McpConsentDecisionResponse>>;
 export type McpGrantResponseConforms = Assert<Conforms<'McpGrantResponse', Mirror.McpGrantResponse>>;
+export type IncomingProviderResponseConforms = Assert<Conforms<'IncomingProviderResponse', Mirror.IncomingProviderResponse>>;
 export type IncomingSourceRequestConforms = Assert<Conforms<'IncomingSourceRequest', Mirror.IncomingSourceRequest>>;
 export type IncomingSourceResponseConforms = Assert<Conforms<'IncomingSourceResponse', Mirror.IncomingSourceResponse>>;
 export type IncomingDestinationRequestConforms = Assert<Conforms<'IncomingDestinationRequest', Mirror.IncomingDestinationRequest>>;

@@ -1792,19 +1792,7 @@
     "noSources": "No incoming sources yet",
     "noSourcesDesc": "A source gives Stripe, GitHub or any other provider a URL to send webhooks to.",
     "provider": "Provider",
-    "providerNames": {
-      "GENERIC": "Generic",
-      "GITHUB": "GitHub",
-      "GITLAB": "GitLab",
-      "STRIPE": "Stripe",
-      "SHOPIFY": "Shopify",
-      "SLACK": "Slack",
-      "TWILIO": "Twilio",
-      "SQUARE": "Square",
-      "ADYEN": "Adyen",
-      "SENDGRID": "SendGrid",
-      "HUBSPOT": "HubSpot"
-    },
+    "genericProvider": "Generic",
     "rateLimit": "Rate Limit",
     "security": {
       "noVerificationDesc": "Without verification, anyone who knows the ingress URL can send events. Turn on HMAC or provider verification.",
