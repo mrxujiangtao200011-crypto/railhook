@@ -21,7 +21,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ArrowLeft, Save, ToggleLeft, ToggleRight, Loader2, Play, History, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, BarChart3, Activity } from 'lucide-react';
-import type { WorkflowExecutionResponse } from '../api/workflows.api';
+import type { TriggerType, WorkflowExecutionResponse } from '../api/workflows.api';
 import { workflowsApi } from '../api/workflows.api';
 import { Button } from '../components/ui/button';
 import PageSkeleton from '../components/PageSkeleton';
@@ -81,6 +81,9 @@ function WorkflowBuilderInner() {
         setNodes((def.nodes as Partial<Node>[]).map((node, index) => ({
           ...node,
           position: node.position ?? { x: 80 + index * 260, y: 160 },
+          data: node.type === 'webhookTrigger'
+            ? { ...node.data, ...workflow.triggerConfig, triggerType: workflow.triggerType }
+            : node.data,
         }) as Node));
       }
       if (def.edges && Array.isArray(def.edges)) {
@@ -204,8 +207,7 @@ function WorkflowBuilderInner() {
         name: workflow!.name,
         description: workflow!.description || undefined,
         definition: { nodes: nodes as unknown as import('../api/workflows.api').WorkflowNode[], edges: edges as unknown as import('../api/workflows.api').WorkflowEdge[] },
-        triggerType: workflow!.triggerType,
-        triggerConfig: extractTriggerConfig(),
+        ...extractTrigger(),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workflow', projectId, workflowId] });
@@ -243,14 +245,17 @@ function WorkflowBuilderInner() {
     refetchInterval: showHistory ? 5000 : false,
   });
 
-  const extractTriggerConfig = useCallback((): Record<string, unknown> => {
-    const triggerNode = nodes.find((n) => n.type === 'webhookTrigger');
-    if (triggerNode?.data) {
-      const d = triggerNode.data as Record<string, unknown>;
-      return { eventTypePattern: d.eventTypePattern || '*' };
-    }
-    return {};
-  }, [nodes]);
+  const extractTrigger = useCallback((): { triggerType: TriggerType; triggerConfig: Record<string, unknown> } => {
+    const d = nodes.find((n) => n.type === 'webhookTrigger')?.data as Record<string, unknown> | undefined;
+    if (!d) return { triggerType: workflow!.triggerType, triggerConfig: {} };
+    const triggerType = (d.triggerType as TriggerType) || 'WEBHOOK_EVENT';
+    return {
+      triggerType,
+      triggerConfig: triggerType === 'SCHEDULE'
+        ? { cron: d.cron || '', timezone: d.timezone || 'UTC' }
+        : { eventTypePattern: d.eventTypePattern || '*' },
+    };
+  }, [nodes, workflow]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -574,6 +579,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
         {statusIcon}
         <span className="font-medium">{t(`workflows.execStatus.${exec.status}`)}</span>
         <span className="font-mono text-muted-foreground">{exec.startedAt ? formatDateTime(exec.startedAt) : ''}</span>
+        {exec.scheduledFor && <span className="text-muted-foreground">{t('workflows.builder.scheduledRun')}</span>}
         {exec.durationMs != null && <span className="font-mono text-muted-foreground">{exec.durationMs}ms</span>}
         {exec.errorMessage && <span className="min-w-0 flex-1 truncate text-halt">{exec.errorMessage}</span>}
         {expanded ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}

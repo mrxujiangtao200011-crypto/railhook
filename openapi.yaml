@@ -6166,6 +6166,45 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/workflows/schedule-preview:
+    get:
+      tags:
+      - Workflows
+      summary: Preview workflow schedule
+      description: The next three times a 5-field cron expression fires in the given
+        time zone. Answers 400 with the reason when the schedule is not accepted.
+      operationId: previewWorkflowSchedule
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cron
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: timezone
+        in: query
+        required: false
+        schema:
+          type: string
+          default: UTC
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: date-time
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/usage:
     get:
       tags:
@@ -8695,6 +8734,9 @@ components:
         version:
           type: integer
           format: int32
+        nextRunAt:
+          type: string
+          format: date-time
         createdAt:
           type: string
           format: date-time
@@ -10076,6 +10118,9 @@ components:
         triggerEventId:
           type: string
           format: uuid
+        scheduledFor:
+          type: string
+          format: date-time
         status:
           type: string
           enum:

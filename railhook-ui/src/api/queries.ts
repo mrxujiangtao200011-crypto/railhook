@@ -162,6 +162,10 @@ export const queryKeys = {
         versionDiff: (projectId: string, id: string, left: number, right: number) =>
             ['transformations', projectId, id, 'versions', 'diff', left, right] as const,
     },
+    workflows: {
+        schedulePreview: (projectId: string, cron: string, timezone: string) =>
+            ['workflows', projectId, 'schedule-preview', cron, timezone] as const,
+    },
     rules: {
         list: (projectId: string) => ['rules', projectId] as const,
         detail: (projectId: string, id: string) => ['rules', projectId, id] as const,

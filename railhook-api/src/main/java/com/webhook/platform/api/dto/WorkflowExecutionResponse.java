@@ -20,6 +20,7 @@ public class WorkflowExecutionResponse {
     private UUID id;
     private UUID workflowId;
     private UUID triggerEventId;
+    private Instant scheduledFor;
     private ExecutionStatus status;
     private Object triggerData;
     private Instant startedAt;

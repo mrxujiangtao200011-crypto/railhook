@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Analytics takes a custom `from`/`to` range of up to 90 days besides the 24h, 7d and 30d presets, and `GET /api/v1/dashboard/projects/{projectId}/analytics/export` returns the same numbers as CSV: one row per hour or day, then one row per endpoint. The analytics page has a range picker and an Export CSV button.
 - `PAGERDUTY` and `OPSGENIE` alert channels. A rule triggers a PagerDuty event or creates an Opsgenie alert when it fires, and resolves or closes it when the condition clears. The routing key or API key is stored encrypted, never returned, and included in key rotation (`alertRulesRotated` in the rotation response).
+- Workflows with the `SCHEDULE` trigger now run. `triggerConfig` takes a 5-field `cron` and an IANA `timezone` (default `UTC`), both checked on save. After downtime a missed schedule runs once, not once per missed tick, and a tick runs once even with several API instances. The workflow response has `nextRunAt`, a run has `scheduledFor`, and `GET /api/v1/projects/{projectId}/workflows/schedule-preview` returns the next three run times. The editor sets the schedule on the trigger node.
 
 ### Changed
 

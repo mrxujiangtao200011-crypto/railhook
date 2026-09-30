@@ -93,4 +93,17 @@ class WorkflowServiceTest {
                 .isInstanceOf(NotFoundException.class);
         verify(workflowRepository, never()).save(any());
     }
+
+    @Test
+    void create_refusesAScheduleThatWouldFireEverySecond() {
+        WorkflowRequest request = WorkflowRequest.builder()
+                .name("wf")
+                .triggerType(Workflow.TriggerType.SCHEDULE)
+                .triggerConfig(Map.of("cron", "* * * * * *"))
+                .build();
+
+        assertThatThrownBy(() -> service.create(ownProject, request))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(workflowRepository, never()).save(any());
+    }
 }

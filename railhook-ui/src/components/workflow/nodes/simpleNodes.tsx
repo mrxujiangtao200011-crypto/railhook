@@ -37,7 +37,8 @@ function simpleNode({ type, role, icon, subtitle, hasInput }: SimpleNodeConfig) 
 
 export const TriggerNode = simpleNode({
   type: 'webhookTrigger', role: 'trigger', icon: '⚡', hasInput: false,
-  subtitle: (d, t) => (d.eventTypePattern ? String(d.eventTypePattern) : t('workflows.nodeStatus.allEvents')),
+  subtitle: (d, t) => (d.triggerType === 'SCHEDULE' ? String(d.cron || '')
+    : d.eventTypePattern ? String(d.eventTypePattern) : t('workflows.nodeStatus.allEvents')),
 });
 
 export const FilterNode = simpleNode({

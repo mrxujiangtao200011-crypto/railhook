@@ -16,6 +16,7 @@ vi.mock('../../api/workflows.api', () => ({
     trigger: vi.fn(),
     listExecutions: vi.fn(),
     getExecution: vi.fn(),
+    previewSchedule: vi.fn(),
   },
 }));
 vi.mock('../../api/endpoints.api', () => ({
@@ -138,5 +139,36 @@ describe('WorkflowBuilderPage', () => {
     await screen.findByRole('button', { name: /^enabled$/i });
     expect(screen.getByText(/unsaved/i)).toBeInTheDocument();
     expect(screen.queryByText('Reshape')).not.toBeInTheDocument();
+  });
+
+  it('saves a schedule picked on the trigger node and previews its next runs', async () => {
+    vi.mocked(workflowsApi.get).mockResolvedValue({
+      ...WORKFLOW,
+      definition: {
+        nodes: [{ id: 'start', type: 'webhookTrigger', position: { x: 0, y: 0 }, data: { label: 'Start' } }],
+        edges: [],
+      } as unknown as WorkflowResponse['definition'],
+    });
+    vi.mocked(workflowsApi.previewSchedule).mockResolvedValue([
+      '2026-10-01T06:00:00Z', '2026-10-02T06:00:00Z', '2026-10-05T06:00:00Z',
+    ]);
+    vi.mocked(workflowsApi.update).mockResolvedValue(WORKFLOW);
+    renderBuilder();
+
+    fireEvent.click(await screen.findByText('Start'));
+    await userEvent.selectOptions(screen.getByLabelText('Trigger'), 'SCHEDULE');
+    await userEvent.type(screen.getByLabelText(/cron expression/i), '0 9 * * 1-5');
+    await userEvent.type(screen.getByLabelText('Time zone'), 'Europe/Kyiv');
+
+    await waitFor(() => expect(workflowsApi.previewSchedule)
+      .toHaveBeenCalledWith(TEST_PROJECT_ID, '0 9 * * 1-5', 'Europe/Kyiv'));
+    expect(await screen.findAllByRole('listitem')).toHaveLength(3);
+
+    await userEvent.click(screen.getByRole('button', { name: /^save/i }));
+    await waitFor(() => expect(workflowsApi.update).toHaveBeenCalledWith(TEST_PROJECT_ID, 'workflow-1',
+      expect.objectContaining({
+        triggerType: 'SCHEDULE',
+        triggerConfig: { cron: '0 9 * * 1-5', timezone: 'Europe/Kyiv' },
+      })));
   });
 });

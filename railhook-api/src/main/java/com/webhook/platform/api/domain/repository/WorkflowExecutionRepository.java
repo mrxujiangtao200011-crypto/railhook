@@ -30,6 +30,8 @@ public interface WorkflowExecutionRepository extends JpaRepository<WorkflowExecu
 
     boolean existsByWorkflowIdAndTriggerEventId(UUID workflowId, UUID triggerEventId);
 
+    boolean existsByWorkflowIdAndScheduledFor(UUID workflowId, Instant scheduledFor);
+
     @Query("SELECT e FROM WorkflowExecution e WHERE e.status = 'WAITING' AND e.resumeAt <= :now "
             + "ORDER BY e.resumeAt ASC")
     List<WorkflowExecution> findDueForResume(@Param("now") Instant now, Pageable pageable);
