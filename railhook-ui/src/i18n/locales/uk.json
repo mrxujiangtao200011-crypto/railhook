@@ -860,7 +860,36 @@
       "dlq": "Полишені в DLQ",
       "failed": "Невдалі, повторюються",
       "incidents": "Відкриті інциденти",
-      "title": "Потрібна людина"
+      "title": "Потрібна людина",
+      "count": "{{count}} питання потребують уваги",
+      "count_one": "{{count}} питання потребує уваги",
+      "count_few": "{{count}} питання потребують уваги",
+      "count_many": "{{count}} питань потребують уваги",
+      "count_other": "{{count}} питання потребують уваги",
+      "dlqItem": "У недоставлених повідомленнях: {{count}}",
+      "dlqItem_one": "У недоставлених повідомленнях: {{count}}",
+      "dlqItem_few": "У недоставлених повідомленнях: {{count}}",
+      "dlqItem_many": "У недоставлених повідомленнях: {{count}}",
+      "dlqItem_other": "У недоставлених повідомленнях: {{count}}",
+      "incidentsItem": "Відкритих інцидентів: {{count}}",
+      "incidentsItem_one": "Відкритих інцидентів: {{count}}",
+      "incidentsItem_few": "Відкритих інцидентів: {{count}}",
+      "incidentsItem_many": "Відкритих інцидентів: {{count}}",
+      "incidentsItem_other": "Відкритих інцидентів: {{count}}",
+      "failedItem": "Доставок у повторних спробах: {{count}}",
+      "failedItem_one": "Доставок у повторних спробах: {{count}}",
+      "failedItem_few": "Доставок у повторних спробах: {{count}}",
+      "failedItem_many": "Доставок у повторних спробах: {{count}}",
+      "failedItem_other": "Доставок у повторних спробах: {{count}}",
+      "alertsItem": "Активних сповіщень: {{count}}",
+      "alertsItem_one": "Активних сповіщень: {{count}}",
+      "alertsItem_few": "Активних сповіщень: {{count}}",
+      "alertsItem_many": "Активних сповіщень: {{count}}",
+      "alertsItem_other": "Активних сповіщень: {{count}}",
+      "endpointItem": "{{url}} доставив лише {{rate}}% за останні 7 днів",
+      "review": "Переглянути",
+      "showMore": "Показати ще {{count}}",
+      "showLess": "Згорнути"
     },
     "endpointHealth": {
       "empty": "Немає налаштованих ендпоінтів",
@@ -922,7 +951,8 @@
       "dlqBadge": "У DLQ",
       "inFlight": "У процесі",
       "inFlightHint": "Ще чекають на спробу",
-      "window": "Останні 7 днів"
+      "window": "Останні 7 днів",
+      "latencyP95": "Затримка p95"
     },
     "toast": {
       "loadFailed": "Не вдалося завантажити дані панелі"
@@ -1134,7 +1164,8 @@
       "replayed": "Доставку поставлено в чергу на відтворення"
     },
     "totalItems": "Усього елементів",
-    "unknownError": "Невідома помилка"
+    "unknownError": "Невідома помилка",
+    "statsLine": "Очікують: {{total}} · за останні 24 години: {{day}} · за 7 днів: {{week}}"
   },
   "emailChange": {
     "cancelPending": "Скасувати зміну",
@@ -1669,7 +1700,8 @@
       "eventId": "ID події",
       "failedAt": "Час невдачі",
       "lastError": "Остання помилка",
-      "source": "Джерело"
+      "source": "Джерело",
+      "lastResponse": "Остання відповідь"
     },
     "ladderExhausted": "Розклад повторів вичерпано після {{count}} спроб",
     "ladderExhausted_few": "Розклад повторів вичерпано після {{count}} спроб",
@@ -1705,7 +1737,8 @@
       "retryFailed": "Не вдалося повторити пересилання"
     },
     "totalItems": "Усього елементів",
-    "unknownError": "Невідома помилка"
+    "unknownError": "Невідома помилка",
+    "statsLine": "Очікують: {{total}} · за останні 24 години: {{day}} · за 7 днів: {{week}}"
   },
   "incomingEvents": {
     "columns": {
@@ -2947,7 +2980,14 @@
     "title": "Механізм правил",
     "toggleFailed": "Не вдалося перемкнути правило",
     "updated": "Правило оновлено",
-    "updatedAt": "Оновлено"
+    "updatedAt": "Оновлено",
+    "summary": "Увімкнено {{active}} з {{total}} правил · перевірок: {{executions}} · збігів: {{rate}}. Правила виконуються згори донизу.",
+    "columns": {
+      "rule": "Правило",
+      "when": "Коли",
+      "then": "Тоді",
+      "state": "Стан"
+    }
   },
   "schemas": {
     "addFirstType": "Додати перший тип події",

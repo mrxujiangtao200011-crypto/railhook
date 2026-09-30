@@ -860,7 +860,36 @@
       "dlq": "Abandoned in the DLQ",
       "failed": "Failed, retrying",
       "incidents": "Open incidents",
-      "title": "Needs a human"
+      "title": "Needs a human",
+      "count": "{{count}} things need attention",
+      "count_one": "{{count}} thing needs attention",
+      "count_few": "{{count}} things need attention",
+      "count_many": "{{count}} things need attention",
+      "count_other": "{{count}} things need attention",
+      "dlqItem": "{{count}} deliveries are in Failed Messages",
+      "dlqItem_one": "{{count}} delivery is in Failed Messages",
+      "dlqItem_few": "{{count}} deliveries are in Failed Messages",
+      "dlqItem_many": "{{count}} deliveries are in Failed Messages",
+      "dlqItem_other": "{{count}} deliveries are in Failed Messages",
+      "incidentsItem": "{{count}} incidents are open",
+      "incidentsItem_one": "{{count}} incident is open",
+      "incidentsItem_few": "{{count}} incidents are open",
+      "incidentsItem_many": "{{count}} incidents are open",
+      "incidentsItem_other": "{{count}} incidents are open",
+      "failedItem": "{{count}} deliveries are retrying",
+      "failedItem_one": "{{count}} delivery is retrying",
+      "failedItem_few": "{{count}} deliveries are retrying",
+      "failedItem_many": "{{count}} deliveries are retrying",
+      "failedItem_other": "{{count}} deliveries are retrying",
+      "alertsItem": "{{count}} alerts are firing",
+      "alertsItem_one": "{{count}} alert is firing",
+      "alertsItem_few": "{{count}} alerts are firing",
+      "alertsItem_many": "{{count}} alerts are firing",
+      "alertsItem_other": "{{count}} alerts are firing",
+      "endpointItem": "{{url}} delivered only {{rate}}% in the last 7 days",
+      "review": "Review",
+      "showMore": "Show {{count}} more",
+      "showLess": "Show fewer"
     },
     "endpointHealth": {
       "empty": "No endpoints configured",
@@ -922,7 +951,8 @@
       "dlqBadge": "In the DLQ",
       "inFlight": "In flight",
       "inFlightHint": "Still owed an attempt",
-      "window": "Last 7 days"
+      "window": "Last 7 days",
+      "latencyP95": "Latency p95"
     },
     "toast": {
       "loadFailed": "Failed to load dashboard data"
@@ -1134,7 +1164,8 @@
       "replayed": "Delivery queued for replay"
     },
     "totalItems": "Total Items",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "statsLine": "{{total}} waiting · {{day}} in the last 24 hours · {{week}} in the last 7 days"
   },
   "emailChange": {
     "cancelPending": "Cancel change",
@@ -1669,7 +1700,8 @@
       "eventId": "Event ID",
       "failedAt": "Failed At",
       "lastError": "Last Error",
-      "source": "Source"
+      "source": "Source",
+      "lastResponse": "Last response"
     },
     "ladderExhausted": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_few": "Retry ladder exhausted after {{count}} attempts",
@@ -1705,7 +1737,8 @@
       "retryFailed": "Failed to retry forward"
     },
     "totalItems": "Total Items",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "statsLine": "{{total}} waiting · {{day}} in the last 24 hours · {{week}} in the last 7 days"
   },
   "incomingEvents": {
     "columns": {
@@ -2947,7 +2980,14 @@
     "title": "Rules Engine",
     "toggleFailed": "Failed to toggle rule",
     "updated": "Rule updated successfully",
-    "updatedAt": "Updated"
+    "updatedAt": "Updated",
+    "summary": "{{active}} of {{total}} rules on · {{executions}} evaluations · {{rate}} matched. Rules run top to bottom.",
+    "columns": {
+      "rule": "Rule",
+      "when": "When",
+      "then": "Then",
+      "state": "State"
+    }
   },
   "schemas": {
     "addFirstType": "Add the first event type",
