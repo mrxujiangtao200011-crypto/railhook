@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-09-30
+
+### Changed
+
+- The README shows how to run Railhook locally in two commands and on a server in one.
+- The production deploy waits for the API to report healthy before it checks pages, so a deploy onto an empty database no longer fails its checks while the schema is created.
+- Dependency updates: UI patch group, Node and MCP SDK dev dependencies, `brace-expansion` 1.1.21, GitHub Actions.
+
 ## [3.2.0] - 2026-09-30
 
 ### Changed
