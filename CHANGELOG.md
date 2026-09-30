@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-09-30
+
 ### Changed
 
 - The 87 migrations are replaced by one `V001__schema.sql` that creates the current schema. It drops what only history needed: the outbox trigger function, the `_legacy` partitions, and four indexes other indexes already cover.
