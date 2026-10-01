@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.3] - 2026-10-01
+
+### Security
+
+- The audit log no longer keeps credentials sent in a request. It stored each request body as sent, so an endpoint's signing secret, a PagerDuty routing key or an Opsgenie API key was kept there in plain text. Any field named like a secret, password, token or key is now written as `[redacted]`.
+
 ## [3.5.2] - 2026-10-01
 
 ### Removed
