@@ -15,7 +15,7 @@ use Railhook\Api\PortalSessions;
 
 class Railhook
 {
-    private const SDK_VERSION = '3.5.1';
+    private const SDK_VERSION = '3.5.2';
 
     private string $apiKey;
     private string $baseUrl;
