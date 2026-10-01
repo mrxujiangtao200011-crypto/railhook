@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { PageBody } from '../components/port/p2/parts';
 import { AlertTriangle, ArrowRight, Copy, Download, Loader2 } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
 import { usePermissions } from '../auth/usePermissions';
@@ -11,7 +12,7 @@ import { formatDate } from '../lib/date';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import { ErrorState } from '../components/EmptyState';
-import PermissionGate, { ROLES, RoleCard } from '../components/PermissionGate';
+import PermissionGate, { ROLES } from '../components/PermissionGate';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import ConfigExportImport from '../components/ConfigExportImport';
 import { FormSection, SaveControl } from './SettingsPage';
@@ -83,17 +84,17 @@ export default function OrgSettingsPage() {
   // A failed fetch would read as "0 projects, 0 members" in the danger zone.
   if (membersFailed || projectsFailed) {
     return (
-      <div className="p-4 lg:p-6">
+      <PageBody>
         <ErrorState
           error={membersError ?? projectsError}
           onRetry={() => { refetchMembers(); refetchProjects(); }}
         />
-      </div>
+      </PageBody>
     );
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <PageBody>
       <div className="max-w-4xl">
         <PageHeader
           eyebrow={orgCreatedAt ? t('orgSettings.since', { date: formatDate(orgCreatedAt) }) : undefined}
@@ -153,11 +154,17 @@ export default function OrgSettingsPage() {
             title={t('orgSettings.access')}
             description={t('orgSettings.accessDesc')}
           >
-            <div className="grid gap-3 sm:grid-cols-3">
+            <dl className="border-t border-rail">
               {ROLES.map((role) => (
-                <RoleCard key={role} role={role} count={members.filter((m) => m.role === role).length} />
+                <div key={role} className="border-b border-rail py-2.5">
+                  <dt className="flex items-baseline justify-between gap-3 text-[13px]">
+                    <span>{t(`roles.${role}.name`)}</span>
+                    <span className="tabular-nums text-muted-foreground">{members.filter((m) => m.role === role).length}</span>
+                  </dt>
+                  <dd className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{t(`roles.${role}.summary`)}</dd>
+                </div>
               ))}
-            </div>
+            </dl>
             <Link
               to="/admin/members"
               className="inline-flex items-center gap-1.5 text-sm link-ink"
@@ -198,7 +205,7 @@ export default function OrgSettingsPage() {
           {canManageOrgSettings && <DangerZone orgId={orgId} orgName={orgName} projectCount={projects.length} memberCount={members.length} />}
         </div>
       </div>
-    </div>
+    </PageBody>
   );
 }
 

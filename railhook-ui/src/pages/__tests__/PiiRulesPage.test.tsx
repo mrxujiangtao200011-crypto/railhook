@@ -55,7 +55,7 @@ function renderPii() {
 
 function rowFor(patternName: string): HTMLElement {
   const name = screen.getByText(patternName);
-  const row = name.closest('li');
+  const row = name.closest('tr');
   expect(row, `no row rendered for ${patternName}`).not.toBeNull();
   return row as HTMLElement;
 }

@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contactDomain } from '../lib/runtimeConfig';
 import { useTranslation } from 'react-i18next';
 import { Check, ExternalLink, Loader2, Minus, ShieldCheck } from 'lucide-react';
-import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -15,6 +14,7 @@ import { ErrorState } from '../components/EmptyState';
 import { FormSection, SaveControl } from './SettingsPage';
 import { billingApi, PlanResponse, ResourceUsage } from '../api/billing.api';
 import { formatDate } from '../lib/date';
+import { PageBody } from '../components/port/p2/parts';
 import { cn } from '../lib/utils';
 import { showSuccess, showApiError } from '../lib/toast';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
@@ -84,7 +84,7 @@ function UsageMeter({ label, usage }: { label: string; usage: ResourceUsage }) {
             />
           </div>
           <div className="mt-1.5 flex items-center gap-2">
-            <span className="font-mono text-[11px] text-muted-foreground">{t('billing.used', { percent })}</span>
+            <span className="font-mono text-[12px] text-muted-foreground">{t('billing.used', { percent })}</span>
             {kind !== 'ok' && (
               <StatusBadge
                 kind={kind}
@@ -216,14 +216,14 @@ export default function BillingPage() {
 
   if (billingQuery.isError || !billing) {
     return (
-      <div className="p-4 lg:p-6">
+      <PageBody>
         <ErrorState
           error={billingQuery.error}
           fallbackKey="billing.loadFailed"
           onRetry={() => billingQuery.refetch()}
           retrying={billingQuery.isRefetching}
         />
-      </div>
+      </PageBody>
     );
   }
 
@@ -234,7 +234,7 @@ export default function BillingPage() {
   const statusKind: StatusKind = billing.billingStatus === 'ACTIVE' ? 'ok' : 'halt';
 
   return (
-    <div className="p-4 lg:p-6">
+    <PageBody>
       <div className="max-w-4xl">
         <PageHeader
           eyebrow={usage ? `${formatDate(usage.periodStart)} — ${formatDate(usage.periodEnd)}` : undefined}
@@ -244,11 +244,11 @@ export default function BillingPage() {
 
         <div className="space-y-8">
           <section>
-            <Card>
-              <CardContent className="p-5">
+            <div className="border-t border-rail pt-5">
+              <div>
                 <div className="flex flex-wrap items-start justify-between gap-5">
                   <div className="min-w-0">
-                    <p className="mono-label">{t('billing.currentPlan')}</p>
+                    <p className="text-[12px] text-muted-foreground">{t('billing.currentPlan')}</p>
                     <div className="mt-1 flex flex-wrap items-baseline gap-3">
                       <h3 className="text-title">{plan?.displayName}</h3>
                       {isSelfHosted ? (
@@ -291,8 +291,8 @@ export default function BillingPage() {
                     })}
                   </ul>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </section>
 
           {usage && (
@@ -340,7 +340,7 @@ export default function BillingPage() {
                 ))}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
                 {plans.map((p) => {
                   const isCurrent = plan?.name === p.name;
                   const shown = annual ? p.priceYearlyCents : p.priceMonthlyCents;
@@ -351,8 +351,8 @@ export default function BillingPage() {
                     <div
                       key={p.id}
                       className={cn(
-                        'border p-4',
-                        isCurrent ? 'border-primary bg-secondary' : 'border-rail bg-card'
+                        'border-t-2 pt-3',
+                        isCurrent ? 'border-foreground' : 'border-rail'
                       )}
                     >
                       <div className="flex items-baseline justify-between gap-2">
@@ -475,8 +475,7 @@ export default function BillingPage() {
                   {t('billing.invoicesEmpty')}
                 </p>
               ) : (
-                <Card className="overflow-hidden">
-                  <Table>
+                  <Table className="text-[13px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t('billing.invoiceDate')}</TableHead>
@@ -520,7 +519,6 @@ export default function BillingPage() {
                       ))}
                     </TableBody>
                   </Table>
-                </Card>
               )}
             </FormSection>
           )}
@@ -538,6 +536,6 @@ export default function BillingPage() {
         loading={cancelMutation.isPending}
         confirmLabel={t('billing.cancel')}
       />
-    </div>
+    </PageBody>
   );
 }

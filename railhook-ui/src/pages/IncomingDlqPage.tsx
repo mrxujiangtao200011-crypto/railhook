@@ -3,10 +3,9 @@ import { useParams } from 'react-router-dom';
 import { RotateCcw, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
-import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import PageSkeleton from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
-import StatusBadge from '../components/StatusBadge';
 import {
   useProject, useIncomingDlq, useIncomingDlqStats,
   useIncomingDlqRetry, useIncomingDlqBulkRetry, useIncomingDlqPurge,
@@ -19,16 +18,9 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { railFromCounts } from './attemptRailData';
-import { AttemptCell, CopyId, SelectBox, SelectionBar, TimeCell } from './tableParts';
-
-function Metric({ label, value, halt }: { label: string; value: number; halt?: boolean }) {
-  return (
-    <div className="border border-rail bg-card px-4 py-3">
-      <p className="mono-label">{label}</p>
-      <p className={`mt-1 font-mono text-2xl ${halt ? 'text-halt' : 'text-foreground'}`}>{value}</p>
-    </div>
-  );
-}
+import { AttemptCell, CopyId, SelectBox, SelectionBar } from './tableParts';
+import { formatDateTime, formatRelativeTime } from '../lib/date';
+import { Dot } from '../components/port/p1/kit';
 
 /** Retry re-forwards to the one failed Destination; a Time Machine replay fans out to all of them. */
 export default function IncomingDlqPage() {
@@ -115,7 +107,6 @@ export default function IncomingDlqPage() {
   if (loading) {
     return (
       <PageSkeleton maxWidth="max-w-none">
-        <SkeletonCards count={3} height="h-20" cols="grid-cols-3" />
         <div className="h-[300px] animate-pulse bg-muted" />
       </PageSkeleton>
     );
@@ -123,16 +114,15 @@ export default function IncomingDlqPage() {
 
   if (isError) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="p-4 lg:p-8">
         <ErrorState error={projectError ?? dlqError} fallbackKey="incomingDlq.toast.loadFailed" onRetry={retry} />
       </div>
     );
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
       <PageHeader
-        eyebrow={t('nav.incoming')}
         title={t('incomingDlq.pageTitle')}
         description={<Trans i18nKey="incomingDlq.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={
@@ -146,12 +136,11 @@ export default function IncomingDlqPage() {
         }
       />
 
-      {stats && (
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Metric label={t('incomingDlq.totalItems')} value={stats.totalItems} halt />
-          <Metric label={t('incomingDlq.last24h')} value={stats.last24Hours} />
-          <Metric label={t('incomingDlq.last7d')} value={stats.last7Days} />
-        </div>
+      {stats && stats.totalItems > 0 && (
+        <p className="mb-6 flex items-center gap-2.5 text-sm">
+          <Dot tone="halt" />
+          {t('incomingDlq.statsLine', { total: stats.totalItems, day: stats.last24Hours, week: stats.last7Days })}
+        </p>
       )}
 
       {items.length === 0 ? (
@@ -169,9 +158,8 @@ export default function IncomingDlqPage() {
             </SelectionBar>
           </PermissionGate>
 
-          <div className="overflow-hidden border border-rail bg-card">
-            <Table>
-              <TableHeader>
+          <Table className="text-[13px]">
+              <TableHeader className="border-t border-rail">
                 <TableRow>
                   {canManageDlq && (
                     <TableHead className="w-10">
@@ -183,13 +171,12 @@ export default function IncomingDlqPage() {
                       />
                     </TableHead>
                   )}
-                  <TableHead>{t('deliveries.columns.status')}</TableHead>
-                  <TableHead>{t('incomingDlq.columns.source')}</TableHead>
-                  <TableHead>{t('incomingDlq.columns.destination')}</TableHead>
-                  <TableHead>{t('incomingDlq.columns.attempts')}</TableHead>
-                  <TableHead className="hidden lg:table-cell">{t('incomingDlq.columns.lastError')}</TableHead>
-                  <TableHead>{t('incomingDlq.columns.failedAt')}</TableHead>
-                  <TableHead>{t('incomingDlq.columns.eventId')}</TableHead>
+                  <TableHead className="px-2">{t('incomingDlq.columns.source')}</TableHead>
+                  <TableHead className="px-2">{t('incomingDlq.columns.destination')}</TableHead>
+                  <TableHead className="px-2">{t('incomingDlq.columns.lastResponse')}</TableHead>
+                  <TableHead className="px-2">{t('incomingDlq.columns.attempts')}</TableHead>
+                  <TableHead className="px-2">{t('incomingDlq.columns.failedAt')}</TableHead>
+                  <TableHead className="px-2">{t('incomingDlq.columns.eventId')}</TableHead>
                   {canManageDlq && <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
                 </TableRow>
               </TableHeader>
@@ -213,21 +200,22 @@ export default function IncomingDlqPage() {
                           />
                         </TableCell>
                       )}
-                      <TableCell>
-                        <span className="flex flex-col items-start gap-1">
-                          <StatusBadge kind="halt" label={t('incomingDlq.abandoned')} />
-                          <span className="text-[11px] text-muted-foreground">
-                            {t('incomingDlq.ladderExhausted', { count: attemptCount })}
-                          </span>
-                        </span>
+                      <TableCell className="px-2 py-2.5">
+                        <span className="block text-[13px]">{item.sourceName || '—'}</span>
+                        <span className="text-[11px] text-muted-foreground">{t('incomingDlq.ladderExhausted', { count: attemptCount })}</span>
                       </TableCell>
-                      <TableCell><code className="font-mono text-[13px]">{item.sourceName || '—'}</code></TableCell>
-                      <TableCell>
-                        <span className="block max-w-[200px] truncate font-mono text-[13px]" title={item.destinationUrl}>
+                      <TableCell className="px-2 py-2.5">
+                        <span className="block max-w-[240px] truncate font-mono text-[12px] text-muted-foreground" title={item.destinationUrl}>
                           {item.destinationUrl || '—'}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-2 py-2.5">
+                        <span className="block max-w-[260px] truncate font-mono text-[12px] text-halt" title={item.lastError ?? undefined}>
+                          {item.responseCode != null && <span className="mr-2">{item.responseCode}</span>}
+                          {item.lastError || (item.responseCode == null ? t('incomingDlq.unknownError') : '')}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-2 py-2.5">
                         <AttemptCell
                           rail={rail.attempts}
                           maxAttempts={rail.maxAttempts}
@@ -235,13 +223,14 @@ export default function IncomingDlqPage() {
                           ladderLength={ladderLength}
                         />
                       </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <span className="block max-w-[220px] truncate text-[13px] text-halt" title={item.lastError ?? undefined}>
-                          {item.lastError || t('incomingDlq.unknownError')}
-                        </span>
+                      <TableCell className="whitespace-nowrap px-2 py-2.5">
+                        {(item.failedAt ?? item.createdAt) && (
+                          <span className="font-mono text-[12px] text-muted-foreground" title={formatDateTime(item.failedAt ?? item.createdAt ?? '')}>
+                            {formatRelativeTime(item.failedAt ?? item.createdAt ?? '')}
+                          </span>
+                        )}
                       </TableCell>
-                      <TableCell><TimeCell value={item.failedAt ?? item.createdAt ?? ''} /></TableCell>
-                      <TableCell><CopyId value={item.incomingEventId} /></TableCell>
+                      <TableCell className="px-2 py-2.5"><CopyId value={item.incomingEventId} /></TableCell>
                       {canManageDlq && (
                         <TableCell>
                           <Button
@@ -260,8 +249,7 @@ export default function IncomingDlqPage() {
                   );
                 })}
               </TableBody>
-            </Table>
-          </div>
+          </Table>
 
           <TablePagination
             page={page}

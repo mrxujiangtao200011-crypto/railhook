@@ -1,15 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, CircleDashed, Clock, XCircle, Ban } from 'lucide-react';
-import { Badge } from './ui/badge';
+import { cn } from '../lib/utils';
 
 export type StatusKind = 'ok' | 'retry' | 'halt' | 'idle';
-
-const ICON = {
-  ok: CheckCircle2,
-  retry: Clock,
-  halt: XCircle,
-  idle: CircleDashed,
-} as const;
 
 /** Backend InvoiceStatus is upper case; comparing to 'paid' once painted every paid invoice grey. */
 export function kindOfInvoiceStatus(status: string): StatusKind {
@@ -51,12 +43,29 @@ export default function StatusBadge({
   label: string;
   icon?: boolean;
 }) {
-  const Icon = ICON[kind];
   return (
-    <Badge variant={kind}>
-      {icon && <Icon className="h-3 w-3 flex-shrink-0" aria-hidden />}
+    <span
+      data-kind={kind}
+      className={cn(
+        'inline-flex items-center gap-2 whitespace-nowrap text-[13px]',
+        kind === 'retry' && 'text-retry',
+        kind === 'halt' && 'text-halt',
+      )}
+    >
+      {icon && (
+        <span
+          aria-hidden
+          className={cn(
+            'h-2 w-2 flex-shrink-0 rounded-full',
+            kind === 'ok' && 'bg-ok',
+            kind === 'retry' && 'bg-retry',
+            kind === 'halt' && 'bg-halt',
+            kind === 'idle' && 'bg-idle',
+          )}
+        />
+      )}
       {label}
-    </Badge>
+    </span>
   );
 }
 
@@ -68,22 +77,6 @@ export function EnabledBadge({
   autoDisabled?: boolean;
 }) {
   const { t } = useTranslation();
-  if (!enabled && autoDisabled) {
-    return (
-      <Badge variant="halt">
-        <XCircle className="h-3 w-3" aria-hidden />
-        {t('endpoints.autoDisabled')}
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant={enabled ? 'ok' : 'idle'}>
-      {enabled ? (
-        <CheckCircle2 className="h-3 w-3" aria-hidden />
-      ) : (
-        <Ban className="h-3 w-3" aria-hidden />
-      )}
-      {t(enabled ? 'common.enabled' : 'common.disabled')}
-    </Badge>
-  );
+  if (!enabled && autoDisabled) return <StatusBadge kind="halt" label={t('endpoints.autoDisabled')} />;
+  return <StatusBadge kind={enabled ? 'ok' : 'idle'} label={t(enabled ? 'common.enabled' : 'common.disabled')} />;
 }

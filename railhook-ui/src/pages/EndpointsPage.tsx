@@ -13,7 +13,7 @@ import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge, { EnabledBadge, type StatusKind } from '../components/StatusBadge';
 import { endpointsApi, type EndpointTestResponse } from '../api/endpoints.api';
 import {
-  useProject, useEndpointsPaged, useCreateEndpoint, useDeleteEndpoint, useUpdateEndpoint,
+  useAnalytics, useProject, useEndpointsPaged, useCreateEndpoint, useDeleteEndpoint, useUpdateEndpoint,
   useEnableEndpoint,
   useRotateSecret, useVerifyEndpoint, useSkipVerification,
 } from '../api/queries';
@@ -22,7 +22,6 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -42,6 +41,8 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import ConfirmDialog from '../components/ConfirmDialog';
+import EndpointDetailSheet from './EndpointDetailSheet';
+import { cn } from '../lib/utils';
 
 function generateSecret(): string {
   const array = new Uint8Array(32);
@@ -95,6 +96,9 @@ export default function EndpointsPage() {
     data: pageInfo, isLoading: endpointsLoading, isError: endpointsIsError,
     error: endpointsError, refetch: refetchEndpoints,
   } = useEndpointsPaged(projectId, currentPage, pageSize);
+  const { data: analytics } = useAnalytics(projectId, { period: '24h' });
+  const performanceOf = (id: string) => analytics?.endpointPerformance?.find((p) => p.endpointId === id);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const endpoints = pageInfo?.content ?? [];
   const [localEndpointOverrides, setLocalEndpointOverrides] = useState<Record<string, EndpointResponse>>({});
@@ -274,7 +278,13 @@ export default function EndpointsPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
+      <EndpointDetailSheet
+        projectId={projectId}
+        endpoint={displayEndpoints.find((e) => e.id === detailId) ?? null}
+        performance={detailId ? performanceOf(detailId) : undefined}
+        onClose={() => setDetailId(null)}
+      />
       <PageHeader
         eyebrow={project?.name}
         title={t('endpoints.title')}
@@ -298,24 +308,28 @@ export default function EndpointsPage() {
         />
       ) : (
         <>
-          <Card className="overflow-hidden">
-            <Table>
+          <div className="min-w-0">
+            <Table className="text-[13px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('endpoints.url')}</TableHead>
                   <TableHead>{t('endpoints.verification')}</TableHead>
                   <TableHead>{t('endpoints.status')}</TableHead>
-                  <TableHead>{t('subscriptions.created')}</TableHead>
+                  <TableHead className="text-right">{t('endpoints.detail.health24h')}</TableHead>
+                  <TableHead className="hidden xl:table-cell">{t('subscriptions.created')}</TableHead>
                   <TableHead className="w-[160px] text-right">
                     <span className="sr-only">{t('common.actions')}</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayEndpoints.map((endpoint) => (
-                  <TableRow key={endpoint.id}>
+                {displayEndpoints.map((endpoint) => {
+                  const performance = performanceOf(endpoint.id);
+                  const failing = Boolean(endpoint.autoDisabledAt) || (endpoint.enabled && (endpoint.consecutiveFailures ?? 0) > 0);
+                  return (
+                  <TableRow key={endpoint.id} className={cn('cursor-pointer', failing && 'bg-halt-soft/40')} onClick={() => setDetailId(endpoint.id)}>
                     <TableCell className="max-w-[320px]">
-                      <div className="truncate font-mono text-[13px]" title={endpoint.url}>{endpoint.url}</div>
+                      <div className="truncate font-mono text-[12px]" title={endpoint.url}>{endpoint.url}</div>
                       <div className="flex items-center gap-2">
                         {endpoint.description && (
                           <span className="truncate text-xs text-muted-foreground">{endpoint.description}</span>
@@ -330,7 +344,7 @@ export default function EndpointsPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge
                           kind={verificationKind(endpoint.verificationStatus)}
@@ -366,20 +380,42 @@ export default function EndpointsPage() {
                         enabled={endpoint.enabled}
                         autoDisabled={Boolean(endpoint.autoDisabledAt)}
                       />
-                      {endpoint.autoDisabledAt && (
-                        <p className="mt-1 text-[11px] leading-snug text-halt">
-                          {t('endpoints.autoDisabledSince', {
-                            since: formatRelativeTime(endpoint.failingSince ?? endpoint.autoDisabledAt),
+                      {endpoint.autoDisabledAt ? (
+                        <>
+                          <p className="mt-1 max-w-[18rem] text-[12px] leading-snug text-halt">
+                            {t('endpoints.autoDisabledSince', {
+                              since: formatRelativeTime(endpoint.failingSince ?? endpoint.autoDisabledAt),
+                            })}
+                          </p>
+                          {endpoint.autoDisabledReason && (
+                            <p className="mt-0.5 max-w-[18rem] font-mono text-[11px] leading-snug text-muted-foreground">{endpoint.autoDisabledReason}</p>
+                          )}
+                        </>
+                      ) : endpoint.enabled && (endpoint.consecutiveFailures ?? 0) > 0 && (
+                        <p className="mt-1 text-[12px] leading-snug text-halt">
+                          {t('endpoints.detail.failingInARow', {
+                            count: endpoint.consecutiveFailures,
+                            since: endpoint.failingSince ? formatRelativeTime(endpoint.failingSince) : '—',
                           })}
                         </p>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-[11px] text-muted-foreground">
+                    <TableCell className="text-right">
+                      {performance && performance.totalDeliveries > 0 ? (
+                        <span className="block">
+                          <span className={cn('tabular-nums', performance.status === 'FAILING' ? 'text-halt' : performance.status === 'DEGRADED' && 'text-retry')}>
+                            {performance.successRate.toFixed(1)}%
+                          </span>
+                          <span className="block font-mono text-[11px] text-muted-foreground">p95 {Math.round(performance.p95LatencyMs)} ms</span>
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell">
+                      <span className="text-[12px] text-muted-foreground">
                         {formatDate(endpoint.createdAt)}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         {canManageEndpoints && (
                           <>
@@ -429,10 +465,11 @@ export default function EndpointsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
-          </Card>
+          </div>
 
           {pageInfo && (
             <TablePagination

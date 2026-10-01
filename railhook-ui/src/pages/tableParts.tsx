@@ -214,4 +214,4 @@ export function AttemptCell({
 }
 
 /** SortableTableHead renders a bare <th>, so it needs TableHead's style by hand. */
-export const SORTABLE_HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';
+export const SORTABLE_HEAD_CLASS = 'h-9 text-[12px] font-normal';

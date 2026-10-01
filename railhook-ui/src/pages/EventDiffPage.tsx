@@ -132,7 +132,7 @@ function EventPicker({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate font-mono text-[13px] font-medium">{ev.eventType}</span>
-                      <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground">
+                      <span className="flex-shrink-0 font-mono text-[12px] text-muted-foreground">
                         {formatRelativeTime(ev.createdAt)}
                       </span>
                     </div>
@@ -275,7 +275,7 @@ export default function EventDiffPage() {
           totalElements={totalElements}
         />
 
-        <div className="flex items-center gap-3 border border-rail p-3">
+        <div className="flex items-center gap-3 border-t border-rail pt-3">
           <Switch id="ed-sanitize" checked={sanitize} onCheckedChange={setSanitize} />
           <div>
             <Label htmlFor="ed-sanitize" className="cursor-pointer text-[13px]">{t('eventDiff.sanitizePii')}</Label>
@@ -335,7 +335,7 @@ export default function EventDiffPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
       <PageHeader title={t('eventDiff.title')} description={t('eventDiff.subtitle')} />
       <Workbench input={input} result={result} />
     </div>

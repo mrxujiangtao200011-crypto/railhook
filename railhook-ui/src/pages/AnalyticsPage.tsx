@@ -13,12 +13,12 @@ import PageHeader from '../components/PageHeader';
 import { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { Button } from '../components/ui/button';
-import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { cn } from '../lib/utils';
+import { Ledger, LedgerRow, Segmented } from '../components/port/p1/kit';
 import {
-  BarRankChart, ChartCard, OutcomeChart, STATUS_TEXT, StatTile, TrendChart,
+  BarRankChart, ChartCard, OutcomeChart, STATUS_TEXT, TrendChart,
   formatCompact, formatMs, formatRate, kindOfEndpointStatus, kindOfSuccessRate, outcomeLegend,
   share, type RankDatum,
 } from '../components/charts';
@@ -116,65 +116,43 @@ export default function AnalyticsPage() {
     failed: t('analytics.outcome.failed'),
   };
 
+  const presetValue = customActive ? 'custom' : ('period' in range ? range.period : 'custom');
   const picker = (
-    <div className="mb-4 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <div
-          role="group"
-          aria-label={t('analytics.periodLabel')}
-          className="inline-flex border border-rail bg-card p-0.5"
-        >
-          {PRESETS.map((p) => {
-            const active = !customActive && 'period' in range && range.period === p;
-            return (
-              <button
-                key={p}
-                type="button"
-                onClick={() => { setEditingCustom(false); setRange({ period: p }); }}
-                aria-pressed={active}
-                className={cn(
-                  'px-3 py-1.5 font-mono text-xs transition-colors',
-                  active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {t(`analytics.periods.${p}`)}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setEditingCustom(true)}
-            aria-pressed={customActive}
-            className={cn(
-              'px-3 py-1.5 font-mono text-xs transition-colors',
-              customActive
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {t('analytics.custom')}
-          </button>
-        </div>
+    <div className="mb-8 space-y-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Segmented
+          label={t('analytics.periodLabel')}
+          value={presetValue}
+          onChange={(v) => {
+            if (v === 'custom') { setEditingCustom(true); return; }
+            setEditingCustom(false);
+            setRange({ period: v as (typeof PRESETS)[number] });
+          }}
+          options={[
+            ...PRESETS.map((p) => ({ value: p as string, label: t(`analytics.periods.${p}`) })),
+            { value: 'custom', label: t('analytics.custom') },
+          ]}
+        />
         {editingCustom && (
-          <>
+          <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
             <Input
               type="datetime-local"
               aria-label={t('analytics.from')}
               value={draftFrom}
               onChange={(e) => setDraftFrom(e.target.value)}
-              className="w-auto"
+              className="w-auto font-mono text-[13px] max-sm:w-full"
             />
             <Input
               type="datetime-local"
               aria-label={t('analytics.to')}
               value={draftTo}
               onChange={(e) => setDraftTo(e.target.value)}
-              className="w-auto"
+              className="w-auto font-mono text-[13px] max-sm:w-full"
             />
             <Button size="sm" disabled={!draftRange} onClick={() => draftRange && setRange(draftRange)}>
               {t('analytics.apply')}
             </Button>
-          </>
+          </div>
         )}
       </div>
       <p className="text-xs text-muted-foreground">{t('analytics.export.hint')}</p>
@@ -197,15 +175,14 @@ export default function AnalyticsPage() {
   if (isLoading) {
     return (
       <PageSkeleton maxWidth="max-w-none">
-        <SkeletonCards count={4} height="h-[104px]" cols="grid-cols-2 lg:grid-cols-4" />
-        <SkeletonCards count={2} height="h-[300px]" cols="lg:grid-cols-2" />
+        <SkeletonCards count={2} height="h-[300px]" cols="grid-cols-1" />
       </PageSkeleton>
     );
   }
 
   if (isError || !analytics) {
     return (
-      <div className="p-4 lg:p-6">
+      <div className="p-4 lg:p-8">
         <PageHeader eyebrow={period} description={t('analytics.subtitle')} />
         {picker}
         <ErrorState error={error} fallbackKey="analytics.loadFailed" onRetry={() => refetch()} />
@@ -216,7 +193,7 @@ export default function AnalyticsPage() {
   const hasDeliveries = overview.totalDeliveries > 0;
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
       <PageHeader
         eyebrow={period}
         description={t('analytics.subtitle')}
@@ -225,43 +202,45 @@ export default function AnalyticsPage() {
 
       {picker}
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatTile
-            label={t('analytics.successRate')}
-            value={hasDeliveries ? `${formatRate(overview.successRate)}%` : '—'}
-            hint={t('analytics.tiles.successRateHint', {
+      <dl className="mb-10 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-y border-rail py-3 text-sm">
+        <div className="flex items-baseline gap-2">
+          <dt className="text-muted-foreground">{t('analytics.successRate')}</dt>
+          <dd className={cn('tabular-nums', hasDeliveries && STATUS_TEXT[kindOfSuccessRate(overview.successRate, true)])}>
+            {hasDeliveries ? `${formatRate(overview.successRate)}%` : '—'}
+          </dd>
+          <dd className="text-[12px] text-muted-foreground">
+            {t('analytics.tiles.successRateHint', {
               delivered: formatCompact(overview.successfulDeliveries),
               total: formatCompact(overview.totalDeliveries),
             })}
-          />
-          <StatTile
-            label={t('analytics.avgLatency')}
-            value={hasDeliveries ? formatMs(overview.avgLatencyMs) : '—'}
-            hint={t('analytics.tiles.latencyHint', {
-              p95: formatMs(overview.p95LatencyMs),
-              p99: formatMs(overview.p99LatencyMs),
-            })}
-          />
-          <StatTile
-            label={t('analytics.throughput')}
-            value={overview.deliveriesPerSecond.toFixed(2)}
-            hint={t('analytics.deliveriesPerSec')}
-          />
-          <StatTile
-            label={t('analytics.failed')}
-            value={formatCompact(overview.failedDeliveries)}
-            hint={t('analytics.tiles.failedHint', {
-              percent: formatRate(share(overview.failedDeliveries, overview.totalDeliveries)),
-            })}
-            badge={overview.failedDeliveries > 0 ? <StatusBadge kind="retry" label={t('analytics.tiles.failedBadge')} icon={false} /> : undefined}
-          />
+          </dd>
         </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="text-muted-foreground">{t('analytics.failed')}</dt>
+          <dd className={cn('tabular-nums', overview.failedDeliveries > 0 && 'text-halt')}>
+            {formatCompact(overview.failedDeliveries)}
+            {hasDeliveries && <span className="ml-1.5 text-[12px] text-muted-foreground">{formatRate(share(overview.failedDeliveries, overview.totalDeliveries))}%</span>}
+          </dd>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="text-muted-foreground">{t('analytics.avgLatency')}</dt>
+          <dd className="font-mono text-[13px]">{hasDeliveries ? formatMs(overview.avgLatencyMs) : '—'}</dd>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="text-muted-foreground">p95</dt>
+          <dd className="font-mono text-[13px]">{hasDeliveries ? formatMs(overview.p95LatencyMs) : '—'}</dd>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="text-muted-foreground">{t('analytics.throughput')}</dt>
+          <dd className="font-mono text-[13px]">{overview.deliveriesPerSecond.toFixed(2)}</dd>
+          <dd className="text-[12px] text-muted-foreground">{t('analytics.deliveriesPerSec')}</dd>
+        </div>
+      </dl>
 
+      <div className="space-y-12">
         <ChartCard
           title={t('analytics.outcome.title')}
           description={t('analytics.outcome.desc')}
-          eyebrow={period}
           legend={outcomeLegend(outcomeLabels)}
           bodyClass="h-[300px]"
           isRefetching={isFetching}
@@ -276,12 +255,11 @@ export default function AnalyticsPage() {
           />
         </ChartCard>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-x-12 gap-y-12 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <ChartCard
             title={t('analytics.responseLatency')}
             description={t('analytics.responseLatencyDesc')}
-            eyebrow={period}
-            bodyClass="h-[260px]"
+            bodyClass="h-[240px]"
             isRefetching={isFetching}
             isEmpty={latencySeries.length === 0}
             emptyLabel={t('analytics.noLatencyData')}
@@ -296,102 +274,86 @@ export default function AnalyticsPage() {
             />
           </ChartCard>
 
-          <ChartCard
-            title={t('analytics.eventTypes')}
-            description={t('analytics.eventTypesDesc')}
-            eyebrow={period}
-            bodyClass="h-[260px]"
-            isRefetching={isFetching}
-            isEmpty={eventTypeRows.length === 0}
-            emptyLabel={t('analytics.noEventsRecorded')}
-          >
-            <BarRankChart
-              data={eventTypeRows}
-              seriesLabel={t('analytics.eventTypesSeries')}
-              categoryWidth={148}
-            />
-          </ChartCard>
+          <section className="min-w-0 border-t border-rail pt-4">
+            <h3 className="text-sm font-medium leading-tight">{t('analytics.latencyPercentiles')}</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('analytics.latencyPercentilesDesc')}</p>
+            {hasDeliveries ? (
+              <Ledger className="mt-4">
+                {percentileRows.map((row) => (
+                  <LedgerRow key={row.key} label={<span className="font-mono text-[12px]">{row.label}</span>}>
+                    <span className="font-mono text-[13px]">{formatMs(row.value)}</span>
+                  </LedgerRow>
+                ))}
+                <LedgerRow label={<span className="font-mono text-[12px]">max</span>}>
+                  <span className="font-mono text-[13px]">{formatMs(percentiles.max ?? 0)}</span>
+                </LedgerRow>
+              </Ledger>
+            ) : (
+              <p className="mt-4 text-[13px] text-muted-foreground">{t('analytics.noLatencyPercentiles')}</p>
+            )}
+          </section>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <ChartCard
-            title={t('analytics.latencyPercentiles')}
-            description={t('analytics.latencyPercentilesDesc')}
-            eyebrow={period}
-            bodyClass="h-[166px]"
-            isRefetching={isFetching}
-            isEmpty={!hasDeliveries}
-            emptyLabel={t('analytics.noLatencyPercentiles')}
-          >
-            <BarRankChart
-              data={percentileRows}
-              seriesLabel={t('analytics.latencySeries')}
-              formatValue={formatMs}
-              ordinal
-              categoryWidth={44}
-            />
-          </ChartCard>
+        <ChartCard
+          title={t('analytics.eventTypes')}
+          description={t('analytics.eventTypesDesc')}
+          bodyClass="h-[260px]"
+          isRefetching={isFetching}
+          isEmpty={eventTypeRows.length === 0}
+          emptyLabel={t('analytics.noEventsRecorded')}
+        >
+          <BarRankChart
+            data={eventTypeRows}
+            seriesLabel={t('analytics.eventTypesSeries')}
+            categoryWidth={148}
+          />
+        </ChartCard>
 
-          <Card className="overflow-hidden lg:col-span-2">
-            <div className="px-5 pb-3 pt-5">
-              <div className="mono-label mb-1">{period}</div>
-              <h3 className="text-sm font-medium leading-tight">{t('analytics.endpointPerformance')}</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">{t('analytics.endpointPerformanceDesc')}</p>
-            </div>
-            {endpointPerformance.length === 0 ? (
-              <p className="px-5 pb-8 pt-4 text-center text-sm text-muted-foreground">
-                {t('analytics.noEndpointData')}
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('analytics.epColumns.endpoint')}</TableHead>
-                    <TableHead className="w-[120px]">{t('analytics.epColumns.status')}</TableHead>
-                    <TableHead className="w-[110px] text-right">{t('analytics.epColumns.deliveries')}</TableHead>
-                    <TableHead className="w-[100px] text-right">{t('analytics.epColumns.success')}</TableHead>
-                    <TableHead className="w-[100px] text-right">{t('analytics.epColumns.latency')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {endpointPerformance.map((ep) => (
-                    <TableRow key={ep.endpointId}>
-                      <TableCell className="max-w-0">
+        <section className="min-w-0 border-t border-rail pt-4">
+          <h3 className="text-sm font-medium leading-tight">{t('analytics.endpointPerformance')}</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('analytics.endpointPerformanceDesc')}</p>
+          {endpointPerformance.length === 0 ? (
+            <p className="py-6 text-sm text-muted-foreground">{t('analytics.noEndpointData')}</p>
+          ) : (
+            <Table className="mt-3 text-[13px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="px-2">{t('analytics.epColumns.endpoint')}</TableHead>
+                  <TableHead className="w-[130px] px-2">{t('analytics.epColumns.status')}</TableHead>
+                  <TableHead className="w-[110px] px-2 text-right">{t('analytics.epColumns.deliveries')}</TableHead>
+                  <TableHead className="w-[100px] px-2 text-right">{t('analytics.epColumns.success')}</TableHead>
+                  <TableHead className="w-[100px] px-2 text-right">{t('analytics.epColumns.latency')}</TableHead>
+                  <TableHead className="w-[90px] px-2 text-right">p95</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {endpointPerformance.map((ep) => {
+                  const rateKind = kindOfSuccessRate(ep.successRate, ep.enabled);
+                  return (
+                    <TableRow key={ep.endpointId} className={cn(ep.status === 'FAILING' && 'bg-halt-soft/40')}>
+                      <TableCell className="px-2 sm:max-w-0">
                         <Link
                           to={`/admin/projects/${projectId}/deliveries?endpointId=${ep.endpointId}`}
-                          className="block truncate font-mono text-xs hover:underline"
+                          className="block truncate font-mono text-[12px] hover:underline max-sm:whitespace-normal max-sm:break-all"
+                          title={ep.url}
                         >
                           {ep.url}
                         </Link>
                       </TableCell>
-                      <TableCell>
-                        <StatusBadge
-                          kind={kindOfEndpointStatus(ep.status)}
-                          label={t(`analytics.endpointStatus.${ep.status}`)}
-                          icon={false}
-                        />
+                      <TableCell className="px-2">
+                        <StatusBadge kind={kindOfEndpointStatus(ep.status)} label={t(`analytics.endpointStatus.${ep.status}`)} />
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs tabular-nums">
-                        {formatCompact(ep.totalDeliveries)}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          'text-right font-mono text-xs tabular-nums',
-                          STATUS_TEXT[kindOfSuccessRate(ep.successRate, ep.enabled)]
-                        )}
-                      >
-                        {formatRate(ep.successRate)}%
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
-                        {formatMs(ep.avgLatencyMs)}
-                      </TableCell>
+                      <TableCell className="px-2 text-right tabular-nums">{formatCompact(ep.totalDeliveries)}</TableCell>
+                      <TableCell className={cn('px-2 text-right tabular-nums', STATUS_TEXT[rateKind])}>{formatRate(ep.successRate)}%</TableCell>
+                      <TableCell className="px-2 text-right font-mono text-[12px] text-muted-foreground">{formatMs(ep.avgLatencyMs)}</TableCell>
+                      <TableCell className="px-2 text-right font-mono text-[12px] text-muted-foreground">{formatMs(ep.p95LatencyMs)}</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Card>
-        </div>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </section>
       </div>
     </div>
   );

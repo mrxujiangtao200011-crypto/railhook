@@ -12,12 +12,12 @@ export default function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cn('flex flex-wrap items-start justify-between gap-4 pb-5', className)}>
+    <div className={cn('flex flex-wrap items-end justify-between gap-x-6 gap-y-4 pb-6', className)}>
       <div className="min-w-0">
-        {eyebrow && <div className={cn('mono-label', title ? 'mb-1.5' : 'mb-1')}>{eyebrow}</div>}
-        {title && <h2 className="text-title">{title}</h2>}
+        {eyebrow && <div className={cn('text-[13px] text-muted-foreground', title ? 'mb-1' : 'mb-0.5')}>{eyebrow}</div>}
+        {title && <h2 className="break-words text-[22px] font-normal leading-tight tracking-[-0.015em]">{title}</h2>}
         {description && (
-          <p className={cn('max-w-2xl text-sm text-muted-foreground', title && 'mt-1')}>{description}</p>
+          <p className={cn('max-w-2xl text-[13px] text-muted-foreground', title && 'mt-1.5')}>{description}</p>
         )}
       </div>
       {actions && <div className="flex flex-shrink-0 flex-wrap items-center gap-2 max-sm:w-full">{actions}</div>}

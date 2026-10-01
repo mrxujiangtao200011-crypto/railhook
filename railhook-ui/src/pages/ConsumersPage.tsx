@@ -22,7 +22,6 @@ import { usePermissions } from '../auth/usePermissions';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Card } from '../components/ui/card';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
@@ -33,6 +32,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
 import { TablePagination } from '../components/ui/table-pagination';
+import { PageBody } from '../components/port/p2/parts';
+import { cn } from '../lib/utils';
 
 const ORIGIN_PATTERN =
   /^(https:\/\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|http:\/\/(?:localhost|127\.0\.0\.1))(?::[0-9]{1,5})?$/;
@@ -151,7 +152,7 @@ export default function ConsumersPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <PageBody>
       <PageHeader
         eyebrow={project.data?.name}
         title={t('consumers.title')}
@@ -175,8 +176,7 @@ export default function ConsumersPage() {
         />
       ) : (
         <>
-          <Card className="overflow-hidden">
-            <Table>
+          <Table className="text-[13px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('consumers.name')}</TableHead>
@@ -191,14 +191,18 @@ export default function ConsumersPage() {
               <TableBody>
                 {list.map((consumer) => (
                   <TableRow key={consumer.id}>
-                    <TableCell className="font-medium">{consumer.name}</TableCell>
-                    <TableCell className="font-mono text-[13px]">{consumer.externalId}</TableCell>
+                    <TableCell className="max-w-[16rem] truncate" title={consumer.name}>{consumer.name}</TableCell>
+                    <TableCell className="max-w-[14rem] truncate font-mono text-[12px]" title={consumer.externalId}>{consumer.externalId}</TableCell>
                     <TableCell>
-                      <Button variant="link" className="h-auto p-0 font-mono text-[13px]" onClick={() => setEndpointsOf(consumer)}>
+                      <button
+                        type="button"
+                        className={cn('underline decoration-rail underline-offset-4 hover:decoration-foreground max-sm:min-h-[44px]', consumer.endpointCount === 0 && 'text-retry')}
+                        onClick={() => setEndpointsOf(consumer)}
+                      >
                         {t('consumers.endpointCount', { count: consumer.endpointCount })}
-                      </Button>
+                      </button>
                     </TableCell>
-                    <TableCell className="font-mono text-[11px] text-muted-foreground">{formatDate(consumer.createdAt)}</TableCell>
+                    <TableCell className="font-mono text-[12px] text-muted-foreground">{formatDate(consumer.createdAt)}</TableCell>
                     <TableCell>
                       {canManageEndpoints && (
                         <div className="flex items-center justify-end gap-1">
@@ -231,7 +235,6 @@ export default function ConsumersPage() {
                 ))}
               </TableBody>
             </Table>
-          </Card>
           {consumers.data && (
             <TablePagination
               page={page}
@@ -310,16 +313,16 @@ export default function ConsumersPage() {
             ) : (consumerEndpoints.data ?? []).length === 0 ? (
               <EmptyState icon={Webhook} title={t('consumers.endpointsSheet.empty')} />
             ) : (
-              <ul className="space-y-2">
+              <ul className="border-t border-rail">
                 {(consumerEndpoints.data ?? []).map((endpoint) => (
-                  <li key={endpoint.id} className="flex items-center justify-between gap-3 border border-rail p-3">
+                  <li key={endpoint.id} className={cn('flex items-center justify-between gap-3 border-b border-rail py-3', endpoint.autoDisabledAt && 'bg-halt-soft/40')}>
                     <div className="min-w-0">
-                      <div className="truncate font-mono text-[13px]" title={endpoint.url}>{endpoint.url}</div>
+                      <div className="truncate font-mono text-[12px]" title={endpoint.url}>{endpoint.url}</div>
                       {endpoint.description && (
                         <div className="truncate text-xs text-muted-foreground">{endpoint.description}</div>
                       )}
                     </div>
-                    <EnabledBadge enabled={endpoint.enabled} />
+                    <EnabledBadge enabled={endpoint.enabled} autoDisabled={Boolean(endpoint.autoDisabledAt)} />
                   </li>
                 ))}
               </ul>
@@ -377,6 +380,6 @@ export default function ConsumersPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </PageBody>
   );
 }

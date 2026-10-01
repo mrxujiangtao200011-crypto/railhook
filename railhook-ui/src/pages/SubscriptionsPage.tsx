@@ -16,9 +16,7 @@ import {
   useDeleteSubscription, queryKeys,
 } from '../api/queries';
 import { Button } from '../components/ui/button';
-import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Badge } from '../components/ui/badge';
 import { Select } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -31,6 +29,8 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { PageBody } from '../components/port/p2/parts';
+import { cn } from '../lib/utils';
 
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
@@ -169,6 +169,13 @@ export default function SubscriptionsPage() {
     return true;
   });
 
+  const grouped = [...filtered.reduce((map, sub) => {
+    const list = map.get(sub.eventType) ?? [];
+    list.push(sub);
+    map.set(sub.eventType, list);
+    return map;
+  }, new Map<string, typeof filtered>()).entries()].sort(([a], [b]) => a.localeCompare(b));
+
   if (loading) {
     return (
       <PageSkeleton maxWidth="max-w-7xl">
@@ -188,7 +195,7 @@ export default function SubscriptionsPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <PageBody>
       <PageHeader
         eyebrow={project?.name}
         title={t('subscriptions.title')}
@@ -217,41 +224,31 @@ export default function SubscriptionsPage() {
         </div>
       ) : (
         <>
-          <Card className="mb-4">
-            <CardContent className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="eventTypeFilter" className="text-xs">{t('subscriptions.eventType')}</Label>
-                <Input
-                  id="eventTypeFilter"
-                  className="font-mono text-sm"
-                  placeholder={t('subscriptions.filterEventType')}
-                  value={eventTypeFilter}
-                  onChange={(e) => setEventTypeFilter(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="endpointFilter" className="text-xs">{t('subscriptions.endpoint')}</Label>
-                <Select id="endpointFilter" value={endpointFilter} onChange={(e) => setEndpointFilter(e.target.value)}>
-                  <option value="">{t('subscriptions.allEndpoints')}</option>
-                  {endpoints.map((endpoint) => (
-                    <option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>
-                  ))}
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="statusFilter" className="text-xs">{t('subscriptions.status')}</Label>
-                <Select id="statusFilter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                  <option value="">{t('subscriptions.allStatuses')}</option>
-                  <option value="enabled">{t('common.enabled')}</option>
-                  <option value="disabled">{t('common.disabled')}</option>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <Input
+              id="eventTypeFilter"
+              aria-label={t('subscriptions.eventType')}
+              className="h-9 w-full font-mono text-sm sm:w-64 max-sm:h-11"
+              placeholder={t('subscriptions.filterEventType')}
+              value={eventTypeFilter}
+              onChange={(e) => setEventTypeFilter(e.target.value)}
+            />
+            <Select id="endpointFilter" aria-label={t('subscriptions.endpoint')} className="h-9 w-full text-[13px] sm:w-64 max-sm:h-11" value={endpointFilter} onChange={(e) => setEndpointFilter(e.target.value)}>
+              <option value="">{t('subscriptions.allEndpoints')}</option>
+              {endpoints.map((endpoint) => (
+                <option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>
+              ))}
+            </Select>
+            <Select id="statusFilter" aria-label={t('subscriptions.status')} className="h-9 w-full text-[13px] sm:w-40 max-sm:h-11" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">{t('subscriptions.allStatuses')}</option>
+              <option value="enabled">{t('common.enabled')}</option>
+              <option value="disabled">{t('common.disabled')}</option>
+            </Select>
+          </div>
 
           {selectedIds.size > 0 && canManageSubscriptions && (
-            <Card className="mb-4 border-primary/40">
-              <CardContent className="flex flex-wrap items-center gap-3 p-3">
+            <div className="sticky top-0 z-10 mb-3 border-y border-rail bg-secondary">
+              <div className="flex flex-wrap items-center gap-3 px-3 py-2">
                 <span className="text-sm font-medium">
                   {t('subscriptions.bulk.selected', { count: selectedIds.size })}
                 </span>
@@ -278,8 +275,8 @@ export default function SubscriptionsPage() {
                     {t('common.cancel')}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
 
           {filtered.length === 0 ? (
@@ -297,8 +294,7 @@ export default function SubscriptionsPage() {
               }
             />
           ) : (
-            <Card className="overflow-hidden">
-              <Table>
+            <Table className="text-[13px]">
                 <TableHeader>
                   <TableRow>
                     {canManageSubscriptions && (
@@ -327,10 +323,19 @@ export default function SubscriptionsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((subscription) => {
+                  {grouped.flatMap(([eventType, group]) => [
+                    <TableRow key={`group-${eventType}`} className="hover:bg-transparent">
+                      <TableCell colSpan={canManageSubscriptions ? 7 : 5} className="bg-secondary/50 px-3 py-2">
+                        <span className="font-mono text-[12px]">{eventType}</span>
+                        <span className="ml-2 text-[12px] text-muted-foreground">{t('subscriptions.groupCount', { count: group.length })}</span>
+                      </TableCell>
+                    </TableRow>,
+                    ...group.map((subscription) => {
                     const schema = schemaByName.get(subscription.eventType);
+                    const endpoint = endpoints.find((e) => e.id === subscription.endpointId);
+                    const broken = Boolean(endpoint?.autoDisabledAt || (endpoint && !endpoint.enabled));
                     return (
-                      <TableRow key={subscription.id} data-state={selectedIds.has(subscription.id) ? 'selected' : undefined}>
+                      <TableRow key={subscription.id} data-state={selectedIds.has(subscription.id) ? 'selected' : undefined} className={cn(broken && subscription.enabled && 'bg-halt-soft/40')}>
                         {canManageSubscriptions && (
                           <TableCell>
                             <input
@@ -344,16 +349,21 @@ export default function SubscriptionsPage() {
                         )}
                         <TableCell>
                           <div className="flex items-center gap-1.5">
-                            <code className="font-mono text-[13px]">{subscription.eventType}</code>
+                            <code className="font-mono text-[12px] text-muted-foreground">{subscription.eventType}</code>
                             {schema?.latestVersion != null && (
-                              <Badge variant="outline" className="font-mono text-[10px]">v{schema.latestVersion}</Badge>
+                              <span className="font-mono text-[11px] text-muted-foreground">v{schema.latestVersion}</span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell className="max-w-[260px]">
-                          <span className="block truncate font-mono text-[13px]" title={endpointUrl(subscription.endpointId)}>
+                          <span className="block truncate font-mono text-[12px]" title={endpointUrl(subscription.endpointId)}>
                             {endpointUrl(subscription.endpointId)}
                           </span>
+                          {broken && (
+                            <span className="block text-[12px] text-halt">
+                              {endpoint?.autoDisabledAt ? t('endpoints.autoDisabled') : t('common.disabled')}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -363,9 +373,9 @@ export default function SubscriptionsPage() {
                               disabled={!canManageSubscriptions}
                               aria-label={t('connections.toggleSubscription', 'Enable {{eventType}}', { eventType: subscription.eventType })}
                             />
-                            <Badge variant={subscription.enabled ? 'ok' : 'idle'}>
+                            <span className={cn('text-[13px]', !subscription.enabled && 'text-muted-foreground')}>
                               {subscription.enabled ? t('common.on') : t('common.off')}
-                            </Badge>
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -377,12 +387,12 @@ export default function SubscriptionsPage() {
                               aria-label={t('subscriptions.toggleOrdering', 'Keep {{eventType}} in sequence', { eventType: subscription.eventType })}
                             />
                             {subscription.orderingEnabled && (
-                              <Badge variant="outline" className="font-mono text-[10px]">{t('subscriptions.fifo')}</Badge>
+                              <span className="text-[12px] text-muted-foreground">{t('subscriptions.fifo')}</span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-mono text-[11px] text-muted-foreground">
+                          <span className="font-mono text-[12px] text-muted-foreground">
                             {formatDate(subscription.createdAt)}
                           </span>
                         </TableCell>
@@ -409,10 +419,10 @@ export default function SubscriptionsPage() {
                         )}
                       </TableRow>
                     );
-                  })}
+                  }),
+                  ])}
                 </TableBody>
               </Table>
-            </Card>
           )}
         </>
       )}
@@ -470,6 +480,6 @@ export default function SubscriptionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageBody>
   );
 }

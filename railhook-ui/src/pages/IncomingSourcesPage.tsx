@@ -21,7 +21,6 @@ import type {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { TablePagination } from '../components/ui/table-pagination';
@@ -33,6 +32,8 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { PageBody } from '../components/port/p2/parts';
+import { cn } from '../lib/utils';
 
 const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDER'];
 
@@ -176,7 +177,7 @@ export default function IncomingSourcesPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <PageBody>
       <PageHeader
         eyebrow={project?.name}
         title={t('incomingSources.title')}
@@ -196,8 +197,8 @@ export default function IncomingSourcesPage() {
         />
       ) : (
         <>
-          <Card className="overflow-hidden">
-            <Table>
+          <div className="min-w-0">
+            <Table className="text-[13px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('incomingSources.columnSource', 'Source')}</TableHead>
@@ -212,7 +213,7 @@ export default function IncomingSourcesPage() {
               </TableHeader>
               <TableBody>
                 {sources.map((source) => (
-                  <TableRow key={source.id}>
+                  <TableRow key={source.id} className={cn(source.verificationMode === 'HMAC_GENERIC' && !source.hmacSecretConfigured && 'bg-retry-soft/40')}>
                     <TableCell>
                       <button
                         type="button"
@@ -222,8 +223,8 @@ export default function IncomingSourcesPage() {
                         {source.name}
                       </button>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] text-muted-foreground">{source.slug}</span>
-                        <Badge variant="outline" className="font-mono text-[10px]">{source.providerType}</Badge>
+                        <span className="font-mono text-[12px] text-muted-foreground">{source.slug}</span>
+                        <Badge variant="outline" className="border-0 px-0 font-mono text-[12px]">{source.providerType}</Badge>
                       </div>
                     </TableCell>
                     <TableCell className="max-w-[280px]">
@@ -256,7 +257,7 @@ export default function IncomingSourcesPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <span className="font-mono text-[11px] text-muted-foreground">
+                      <span className="font-mono text-[12px] text-muted-foreground">
                         {formatRelativeTime(source.createdAt)}
                       </span>
                     </TableCell>
@@ -285,7 +286,7 @@ export default function IncomingSourcesPage() {
                 ))}
               </TableBody>
             </Table>
-          </Card>
+          </div>
 
           {pageInfo && (
             <TablePagination
@@ -444,6 +445,6 @@ export default function IncomingSourcesPage() {
         onConfirm={handleDelete}
         loading={deleteSource.isPending}
       />
-    </div>
+    </PageBody>
   );
 }

@@ -3,8 +3,8 @@ import { useParams } from 'react-router-dom';
 import { History, Play, Square, Loader2, RefreshCw } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
-import { fromLocalDatetime, toLocalDatetime } from '../lib/date';
-import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import { formatDateTime, formatRelativeTime, fromLocalDatetime, toLocalDatetime } from '../lib/date';
+import PageSkeleton from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import StatusBadge, { type StatusKind } from '../components/StatusBadge';
@@ -23,8 +23,9 @@ import {
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
-import { FilterBar, FilterField, TimeCell } from './tableParts';
+import { FilterBar, FilterField } from './tableParts';
 import Callout from '../components/Callout';
+import { Ledger, LedgerRow, Segmented } from '../components/port/p1/kit';
 
 const QUICK_RANGES = ['1h', '6h', '24h', '7d', 'custom'] as const;
 
@@ -160,7 +161,6 @@ export default function ReplayPage() {
   if (projectQuery.isLoading && !project) {
     return (
       <PageSkeleton maxWidth="max-w-none">
-        <SkeletonCards count={3} height="h-20" cols="grid-cols-3" />
         <div className="h-[300px] animate-pulse bg-muted" />
       </PageSkeleton>
     );
@@ -169,99 +169,90 @@ export default function ReplayPage() {
   const canStart = !!estimate && estimate.totalEvents > 0 && !estimate.warning;
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
       <PageHeader
-        eyebrow={t('nav.outgoing')}
+        title={t('nav.replay')}
         description={<Trans i18nKey="replay.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
       />
 
       <PermissionGate allowed={canReplayDeliveries}>
-        <section className="mb-8 border border-rail bg-card p-4">
-          <h3 className="mono-label mb-3">{t('replay.selection')}</h3>
+        <section className="mb-12 grid gap-x-12 gap-y-8 border-t border-rail pt-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="min-w-0">
+            <h3 className="mb-3 text-[15px] font-medium">{t('replay.selection')}</h3>
+            <Segmented
+              label={t('replay.selection')}
+              value={selectedRange}
+              onChange={handleQuickRange}
+              options={QUICK_RANGES.map((key) => ({ value: key, label: t(`replay.quickRanges.${key}`) }))}
+            />
 
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {QUICK_RANGES.map((key) => (
-              <Button
-                key={key}
-                variant={selectedRange === key ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleQuickRange(key)}
-              >
-                {t(`replay.quickRanges.${key}`)}
-              </Button>
-            ))}
+            <FilterBar className="mb-0 mt-4">
+              <FilterField id="replay-from" label={t('replay.filters.fromDate')} className="min-w-[13rem]">
+                <Input
+                  id="replay-from"
+                  type="datetime-local"
+                  className="font-mono text-[13px]"
+                  value={fromDate}
+                  onChange={(e) => { setFromDate(e.target.value); setSelectedRange('custom'); setEstimate(null); }}
+                />
+              </FilterField>
+              <FilterField id="replay-to" label={t('replay.filters.toDate')} className="min-w-[13rem]">
+                <Input
+                  id="replay-to"
+                  type="datetime-local"
+                  className="font-mono text-[13px]"
+                  value={toDate}
+                  onChange={(e) => { setToDate(e.target.value); setSelectedRange('custom'); setEstimate(null); }}
+                />
+              </FilterField>
+              <FilterField id="replay-event-type" label={t('replay.filters.eventType')}>
+                <Input
+                  id="replay-event-type"
+                  placeholder={t('replay.filters.eventTypePlaceholder')}
+                  className="font-mono text-[13px]"
+                  value={eventType}
+                  onChange={(e) => { setEventType(e.target.value); setEstimate(null); }}
+                />
+              </FilterField>
+              <FilterField id="replay-endpoint" label={t('replay.filters.endpoint')} className="min-w-[14rem]">
+                <Select id="replay-endpoint" value={endpointId} onChange={(e) => { setEndpointId(e.target.value); setEstimate(null); }}>
+                  <option value="">{t('replay.filters.allEndpoints')}</option>
+                  {endpoints.map(ep => (<option key={ep.id} value={ep.id}>{ep.url}</option>))}
+                </Select>
+              </FilterField>
+            </FilterBar>
           </div>
 
-          <FilterBar className="mb-0">
-            <FilterField id="replay-from" label={t('replay.filters.fromDate')} className="min-w-[13rem]">
-              <Input
-                id="replay-from"
-                type="datetime-local"
-                value={fromDate}
-                onChange={(e) => { setFromDate(e.target.value); setSelectedRange('custom'); setEstimate(null); }}
-              />
-            </FilterField>
-            <FilterField id="replay-to" label={t('replay.filters.toDate')} className="min-w-[13rem]">
-              <Input
-                id="replay-to"
-                type="datetime-local"
-                value={toDate}
-                onChange={(e) => { setToDate(e.target.value); setSelectedRange('custom'); setEstimate(null); }}
-              />
-            </FilterField>
-            <FilterField id="replay-event-type" label={t('replay.filters.eventType')}>
-              <Input
-                id="replay-event-type"
-                placeholder={t('replay.filters.eventTypePlaceholder')}
-                value={eventType}
-                onChange={(e) => { setEventType(e.target.value); setEstimate(null); }}
-              />
-            </FilterField>
-            <FilterField id="replay-endpoint" label={t('replay.filters.endpoint')} className="min-w-[14rem]">
-              <Select id="replay-endpoint" value={endpointId} onChange={(e) => { setEndpointId(e.target.value); setEstimate(null); }}>
-                <option value="">{t('replay.filters.allEndpoints')}</option>
-                {endpoints.map(ep => (<option key={ep.id} value={ep.id}>{ep.url}</option>))}
-              </Select>
-            </FilterField>
-          </FilterBar>
+          <aside className="min-w-0 lg:border-l lg:border-rail lg:pl-8">
+            {estimate ? (
+              <Ledger>
+                <LedgerRow label={t('replay.estimate_result.totalEvents')}>{estimate.totalEvents.toLocaleString()}</LedgerRow>
+                <LedgerRow label={t('replay.estimate_result.estimatedDeliveries')}>{estimate.estimatedDeliveries.toLocaleString()}</LedgerRow>
+                <LedgerRow label={t('replay.estimate_result.activeSubscriptions')}>{estimate.activeSubscriptions.toLocaleString()}</LedgerRow>
+              </Ledger>
+            ) : (
+              <p className="text-[13px] text-muted-foreground">{t('replay.estimateFirst')}</p>
+            )}
 
-          {estimate && (
-            <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {[
-                { label: t('replay.estimate_result.totalEvents'), value: estimate.totalEvents },
-                { label: t('replay.estimate_result.estimatedDeliveries'), value: estimate.estimatedDeliveries },
-                { label: t('replay.estimate_result.activeSubscriptions'), value: estimate.activeSubscriptions },
-              ].map((metric) => (
-                <div key={metric.label} className="border border-rail px-4 py-3">
-                  <dt className="mono-label">{metric.label}</dt>
-                  <dd className="mt-1 font-mono text-2xl">{metric.value.toLocaleString()}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
+            {estimate?.warning && (
+              <Callout className="mt-3">{estimate.warning}</Callout>
+            )}
 
-          {estimate?.warning && (
-            <Callout className="mt-3">{estimate.warning}</Callout>
-          )}
-
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
-            <Button variant="outline" onClick={handleEstimate} disabled={estimating || !fromDate || !toDate}>
-              {estimating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {estimating ? t('replay.estimating') : t('replay.estimate')}
-            </Button>
-            <VerificationGate>
-              <Button onClick={() => setShowConfirm(true)} disabled={!canStart}>
-                <Play className="h-3.5 w-3.5" />
-                {estimate
-                  ? t('replay.replayCount', { count: estimate.estimatedDeliveries })
-                  : t('replay.startReplay')}
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button variant="outline" onClick={handleEstimate} disabled={estimating || !fromDate || !toDate}>
+                {estimating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {estimating ? t('replay.estimating') : t('replay.estimate')}
               </Button>
-            </VerificationGate>
-          </div>
-
-          {!estimate && (
-            <p className="mt-2 text-right text-xs text-muted-foreground">{t('replay.estimateFirst')}</p>
-          )}
+              <VerificationGate>
+                <Button onClick={() => setShowConfirm(true)} disabled={!canStart}>
+                  <Play className="h-3.5 w-3.5" />
+                  {estimate
+                    ? t('replay.replayCount', { count: estimate.estimatedDeliveries })
+                    : t('replay.startReplay')}
+                </Button>
+              </VerificationGate>
+            </div>
+          </aside>
         </section>
       </PermissionGate>
 
@@ -285,9 +276,9 @@ export default function ReplayPage() {
           docsLink="outgoing/replay"
         />
       ) : (
-        <div className="animate-fade-in overflow-hidden border border-rail bg-card">
-          <Table>
-            <TableHeader>
+        <div className="animate-fade-in">
+          <Table className="text-[13px]">
+            <TableHeader className="border-t border-rail">
               <TableRow>
                 <TableHead>{t('deliveries.columns.status')}</TableHead>
                 <TableHead>{t('replay.session.timeRange')}</TableHead>
@@ -329,9 +320,9 @@ export default function ReplayPage() {
                     </TableCell>
                     <TableCell>
                       <span className="flex flex-col gap-1">
-                        <span className="h-1.5 w-24 overflow-hidden bg-secondary">
+                        <span className="h-1 w-28 overflow-hidden bg-secondary">
                           <span
-                            className={`block h-full ${session.status === 'COMPLETED' ? 'bg-ok' : 'bg-primary'}`}
+                            className={`block h-full ${session.status === 'COMPLETED' ? 'bg-ok' : session.status === 'FAILED' ? 'bg-halt' : 'bg-foreground/60'}`}
                             style={{ width: `${Math.min(session.progressPercent ?? 0, 100)}%` }}
                           />
                         </span>
@@ -349,7 +340,9 @@ export default function ReplayPage() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell><TimeCell value={session.createdAt} /></TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <span className="font-mono text-[12px] text-muted-foreground" title={formatDateTime(session.createdAt)}>{formatRelativeTime(session.createdAt)}</span>
+                    </TableCell>
                     <TableCell>
                       {running && canReplayDeliveries && (
                         <Button variant="outline" size="sm" onClick={() => handleCancel(session.id)}>

@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  AlertTriangle, ArrowRight, ArrowUpRight, BarChart3, Bell, Flame, Radio, Send, Webhook,
-} from 'lucide-react';
+import { BarChart3, Radio, Webhook } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   useAnalytics, useDashboardStats, useDeliveries, useOpenIncidentCount,
@@ -14,19 +12,16 @@ import { formatDateTime, formatDateTimeShort, formatRelativeTime, formatTime } f
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
-import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
 import AttemptRail from '../components/AttemptRail';
 import { railFromCounts } from './attemptRailData';
 import GettingStarted from '../components/GettingStarted';
 import FirstProjectCard from '../components/FirstProjectCard';
 import { cn } from '../lib/utils';
-import { Card } from '../components/ui/card';
 import { Select } from '../components/ui/select';
 import { Button } from '../components/ui/button';
 import {
-  ChartCard, OutcomeChart, STATUS_FILL, STATUS_TEXT, ShareBar, StatTile, coerceDeliveryStats,
-  formatCompact, formatRate, kindOfSuccessRate, outcomeLegend, share, verdictOfDeliveryStats,
-  type ShareSegment,
+  ChartCard, OutcomeChart, STATUS_FILL, STATUS_TEXT, coerceDeliveryStats,
+  formatCompact, formatRate, kindOfSuccessRate, outcomeLegend, verdictOfDeliveryStats,
 } from '../components/charts';
 import type { StatusKind } from '../components/StatusBadge';
 
@@ -38,48 +33,27 @@ const DASHBOARD_PERIOD = '7d' as const;
 function SkeletonDashboard() {
   return (
     <PageSkeleton maxWidth="max-w-none">
-      <SkeletonCards count={2} height="h-[292px]" cols="lg:grid-cols-2" />
-      <SkeletonCards count={4} height="h-[104px]" cols="grid-cols-2 lg:grid-cols-4" />
+      <SkeletonCards count={2} height="h-[240px]" cols="xl:grid-cols-[minmax(0,1fr)_20rem]" />
     </PageSkeleton>
   );
 }
 
-function AttentionRow({
-  to, icon: Icon, label, count, kind,
-}: {
-  to: string;
-  icon: React.ElementType;
-  label: string;
-  count: number;
-  kind: StatusKind;
-}) {
-  const quiet = count === 0;
+function LedgerRow({ label, to, children }: { label: string; to?: string; children: React.ReactNode }) {
   return (
-    <Link
-      to={to}
-      className="group flex items-center justify-between gap-3 px-2 py-2.5 transition-colors hover:bg-secondary/60"
-    >
-      <span className="flex min-w-0 items-center gap-2.5">
-        <Icon
-          className={cn('h-4 w-4 flex-shrink-0', quiet ? 'text-muted-foreground/50' : STATUS_TEXT[kind])}
-          aria-hidden
-        />
-        <span className={quiet ? 'truncate text-sm text-muted-foreground' : 'truncate text-sm'}>{label}</span>
-      </span>
-      <span className="flex flex-shrink-0 items-center gap-1.5">
-        <span
-          className={cn(
-            'font-mono text-sm tabular-nums',
-            quiet ? 'text-muted-foreground' : cn('font-medium', STATUS_TEXT[kind])
-          )}
-        >
-          {formatCompact(count)}
-        </span>
-        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-hover:text-foreground" aria-hidden />
-      </span>
-    </Link>
+    <div className="flex items-baseline justify-between gap-4 border-b border-rail py-2.5 text-sm">
+      <dt className="flex-shrink-0 text-muted-foreground">
+        {to ? <Link to={to} className="underline decoration-transparent underline-offset-4 hover:text-foreground hover:decoration-foreground">{label}</Link> : label}
+      </dt>
+      <dd className="min-w-0 text-right tabular-nums">{children}</dd>
+    </div>
   );
 }
+
+function formatLatency(ms: number) {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(ms >= 10_000 ? 0 : 1)} s` : `${Math.round(ms)} ms`;
+}
+
+interface AttentionItem { key: string; kind: StatusKind; label: string; to: string }
 
 export default function DashboardPage() {
   const { t } = useTranslation();
@@ -134,25 +108,32 @@ export default function DashboardPage() {
     })),
     [analytics]
   );
-  const totalSpark = useMemo(() => series.map((p) => p.success + p.failed), [series]);
 
   const outcomeLabels = {
     success: t('dashboard.outcome.delivered'),
     failed: t('dashboard.outcome.failed'),
   };
 
-  const shareSegments: ShareSegment[] = [
-    { key: 'delivered', label: t('dashboard.share.delivered'), value: stats.successfulDeliveries, token: 'ok' },
-    { key: 'inFlight', label: t('dashboard.share.inFlight'), value: stats.pendingDeliveries, token: 'idle' },
-    { key: 'failed', label: t('dashboard.share.failed'), value: stats.failedDeliveries, token: 'retry' },
-    { key: 'abandoned', label: t('dashboard.share.abandoned'), value: stats.dlqDeliveries, token: 'halt' },
-  ];
-
   const alertCount = unresolvedAlerts?.count ?? 0;
   const incidentCount = openIncidents?.count ?? 0;
-  const attentionTotal = stats.dlqDeliveries + stats.failedDeliveries + alertCount + incidentCount;
 
   const inFlight = inFlightPage?.content ?? [];
+  const [showAll, setShowAll] = useState(false);
+
+  const base = `/admin/projects/${selectedProjectId}`;
+  const attention: AttentionItem[] = [];
+  if (stats.dlqDeliveries > 0) attention.push({ key: 'dlq', kind: 'halt', label: t('dashboard.attention.dlqItem', { count: stats.dlqDeliveries }), to: `${base}/dlq` });
+  if (incidentCount > 0) attention.push({ key: 'incidents', kind: 'halt', label: t('dashboard.attention.incidentsItem', { count: incidentCount }), to: `${base}/incidents` });
+  for (const endpoint of endpointHealth.filter((e) => e.enabled && e.totalDeliveries >= 10 && e.successRate < 90).slice(0, 2)) {
+    attention.push({
+      key: endpoint.id,
+      kind: 'halt',
+      label: t('dashboard.attention.endpointItem', { url: endpoint.url.replace(/^https?:\/\//, ''), rate: formatRate(endpoint.successRate) }),
+      to: `${base}/endpoints`,
+    });
+  }
+  if (stats.failedDeliveries > 0) attention.push({ key: 'failed', kind: 'retry', label: t('dashboard.attention.failedItem', { count: stats.failedDeliveries }), to: `${base}/deliveries?status=FAILED` });
+  if (alertCount > 0) attention.push({ key: 'alerts', kind: 'retry', label: t('dashboard.attention.alertsItem', { count: alertCount }), to: `${base}/alerts` });
 
   if (projectsLoading) return <SkeletonDashboard />;
 
@@ -169,7 +150,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-8">
       <PageHeader
         eyebrow={selectedProject?.name}
         title={t('dashboard.headline')}
@@ -203,233 +184,162 @@ export default function DashboardPage() {
       {!selectedProject ? (
         <FirstProjectCard />
       ) : (
-        <div className="animate-fade-in space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="flex flex-col justify-between p-5">
-              <div>
-                <div className="mono-label">{t('dashboard.verdict.label')}</div>
-                {statsLoading ? (
-                  <div className="mt-3 h-12 w-32 animate-pulse bg-muted" aria-hidden />
-                ) : (
-                  <p
-                    data-testid="delivery-health-figure"
-                    className="mt-2 text-[3rem] font-medium leading-none tracking-tight"
-                  >
-                    {stats.totalDeliveries > 0 ? `${formatRate(stats.successRate)}%` : '—'}
+        <div className="animate-fade-in">
+          <div className="grid gap-x-16 gap-y-10 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 space-y-10">
+              {statsLoading ? (
+                <div className="space-y-3" aria-hidden>
+                  <div className="h-6 w-64 animate-pulse bg-muted" />
+                  <div className="h-4 w-96 max-w-full animate-pulse bg-muted" />
+                </div>
+              ) : attention.length === 0 ? (
+                <section>
+                  <p className="flex items-center gap-2.5 text-[15px]">
+                    <span aria-hidden className={cn('h-2 w-2 rounded-full', STATUS_FILL[verdict])} />
+                    {t(`dashboard.verdict.${verdict}`)}
                   </p>
-                )}
-                <div className="mt-4">
-                  <StatusBadge kind={verdict} label={t(`dashboard.verdict.${verdict}`)} />
-                </div>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  {stats.totalDeliveries > 0
-                    ? t('dashboard.verdict.detail', {
-                        delivered: formatCompact(stats.successfulDeliveries),
-                        total: formatCompact(stats.totalDeliveries),
-                      })
-                    : t('dashboard.verdict.idleDetail')}
-                </p>
-              </div>
-              <div className="mt-5 border-t border-rail pt-4">
-                <ShareBar segments={shareSegments} total={Math.max(stats.totalDeliveries, 1)} />
-              </div>
-            </Card>
-
-            <ChartCard
-              className="lg:col-span-2"
-              title={t('dashboard.outcome.title')}
-              description={t('dashboard.outcome.desc')}
-              eyebrow={DASHBOARD_PERIOD}
-              legend={outcomeLegend(outcomeLabels)}
-              bodyClass="h-[292px]"
-              isLoading={analyticsLoading}
-              error={analyticsIsError ? analyticsError : undefined}
-              onRetry={() => refetchAnalytics()}
-              isRefetching={analyticsFetching && !analyticsLoading}
-              isEmpty={series.length === 0}
-              emptyLabel={t('dashboard.outcome.empty')}
-            >
-              <OutcomeChart
-                data={series}
-                labels={outcomeLabels}
-                formatTick={formatTime}
-                formatStamp={formatDateTimeShort}
-              />
-            </ChartCard>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatTile
-              label={t('dashboard.stats.deliveries')}
-              value={formatCompact(stats.totalDeliveries)}
-              hint={t('dashboard.stats.window')}
-              spark={totalSpark}
-              to={`/admin/projects/${selectedProjectId}/deliveries`}
-            />
-            <StatTile
-              label={t('dashboard.stats.delivered')}
-              value={formatCompact(stats.successfulDeliveries)}
-              hint={t('dashboard.stats.deliveredHint', { percent: formatRate(share(stats.successfulDeliveries, stats.totalDeliveries)) })}
-              to={`/admin/projects/${selectedProjectId}/deliveries?status=SUCCESS`}
-            />
-            <StatTile
-              label={t('dashboard.stats.inFlight')}
-              value={formatCompact(stats.pendingDeliveries)}
-              hint={t('dashboard.stats.inFlightHint')}
-              to={`/admin/projects/${selectedProjectId}/deliveries?status=PENDING`}
-            />
-            <StatTile
-              label={t('dashboard.stats.abandoned')}
-              value={formatCompact(stats.dlqDeliveries)}
-              hint={t('dashboard.stats.abandonedHint')}
-              badge={stats.dlqDeliveries > 0 ? <StatusBadge kind="halt" label={t('dashboard.stats.dlqBadge')} icon={false} /> : undefined}
-              to={`/admin/projects/${selectedProjectId}/dlq`}
-            />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="p-5">
-              <div className="mb-1 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.attention.title')}</h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.attention.desc')}</p>
-                </div>
-                {attentionTotal === 0 && <StatusBadge kind="ok" label={t('dashboard.attention.clearBadge')} />}
-              </div>
-              <div className="mt-3 divide-y divide-rail">
-                <AttentionRow
-                  to={`/admin/projects/${selectedProjectId}/dlq`}
-                  icon={AlertTriangle}
-                  label={t('dashboard.attention.dlq')}
-                  count={stats.dlqDeliveries}
-                  kind="halt"
-                />
-                <AttentionRow
-                  to={`/admin/projects/${selectedProjectId}/deliveries?status=FAILED`}
-                  icon={Send}
-                  label={t('dashboard.attention.failed')}
-                  count={stats.failedDeliveries}
-                  kind="retry"
-                />
-                <AttentionRow
-                  to={`/admin/projects/${selectedProjectId}/alerts`}
-                  icon={Bell}
-                  label={t('dashboard.attention.alerts')}
-                  count={alertCount}
-                  kind="retry"
-                />
-                <AttentionRow
-                  to={`/admin/projects/${selectedProjectId}/incidents`}
-                  icon={Flame}
-                  label={t('dashboard.attention.incidents')}
-                  count={incidentCount}
-                  kind="halt"
-                />
-              </div>
-            </Card>
-
-            <Card className="p-5">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.inFlight.title')}</h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.inFlight.desc')}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => navigate(`/admin/projects/${selectedProjectId}/deliveries?status=PENDING`)}
-                >
-                  {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
-                </Button>
-              </div>
-              {inFlight.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">{t('dashboard.inFlight.empty')}</p>
+                  <p className="mt-1 pl-[18px] text-[13px] text-muted-foreground">
+                    {stats.totalDeliveries > 0
+                      ? t('dashboard.verdict.detail', { delivered: formatCompact(stats.successfulDeliveries), total: formatCompact(stats.totalDeliveries) })
+                      : t('dashboard.verdict.idleDetail')}
+                  </p>
+                </section>
               ) : (
-                <ul className="space-y-3">
-                  {inFlight.map((delivery) => {
-                    const rail = railFromCounts(delivery.attemptCount, delivery.maxAttempts, delivery.status);
-                    return (
-                      <li key={delivery.id} className="flex items-center justify-between gap-4">
-                        <span className="min-w-0">
-                          <span className="block truncate font-mono text-xs text-foreground">{delivery.id}</span>
-                          <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                            {formatRelativeTime(delivery.createdAt)}
+                <section aria-labelledby="dashboard-attention">
+                  <h3 id="dashboard-attention" className="text-[22px] font-normal leading-tight tracking-[-0.015em]">
+                    {t('dashboard.attention.count', { count: attention.length })}
+                  </h3>
+                  <ul className="mt-4 border-t border-rail">
+                    {(showAll ? attention : attention.slice(0, 3)).map((item) => (
+                      <li key={item.key} className="flex items-start gap-3 border-b border-rail py-3">
+                        <span aria-hidden className={cn('mt-[7px] h-2 w-2 flex-shrink-0 rounded-full', STATUS_FILL[item.kind])} />
+                        <p className="min-w-0 flex-1 break-words text-[15px] leading-snug">{item.label}</p>
+                        <Link to={item.to} className="-my-1.5 flex min-h-[44px] flex-shrink-0 items-center px-1 text-[13px] underline decoration-rail underline-offset-4 hover:decoration-foreground">
+                          {t('dashboard.attention.review')}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  {attention.length > 3 && (
+                    <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-1 min-h-[44px] text-[13px] text-muted-foreground hover:text-foreground">
+                      {showAll ? t('dashboard.attention.showLess') : t('dashboard.attention.showMore', { count: attention.length - 3 })}
+                    </button>
+                  )}
+                </section>
+              )}
+
+              <ChartCard
+                title={t('dashboard.outcome.title')}
+                description={t('dashboard.outcome.desc')}
+                legend={outcomeLegend(outcomeLabels)}
+                bodyClass="h-[240px]"
+                isLoading={analyticsLoading}
+                error={analyticsIsError ? analyticsError : undefined}
+                onRetry={() => refetchAnalytics()}
+                isRefetching={analyticsFetching && !analyticsLoading}
+                isEmpty={series.length === 0}
+                emptyLabel={t('dashboard.outcome.empty')}
+              >
+                <OutcomeChart
+                  data={series}
+                  labels={outcomeLabels}
+                  formatTick={formatTime}
+                  formatStamp={formatDateTimeShort}
+                />
+              </ChartCard>
+            </div>
+
+            <div className="min-w-0 space-y-10 max-xl:max-w-xl">
+              <section aria-label={t('dashboard.stats.window')}>
+                <h3 className="mb-2 text-[13px] text-muted-foreground">{t('dashboard.stats.window')}</h3>
+                <dl className="border-t border-rail">
+                  <LedgerRow label={t('dashboard.verdict.label')}>
+                    <span data-testid="delivery-health-figure" className={cn(stats.totalDeliveries > 0 && STATUS_TEXT[verdict])}>
+                      {stats.totalDeliveries > 0 ? `${formatRate(stats.successRate)}%` : '—'}
+                    </span>
+                  </LedgerRow>
+                  <LedgerRow label={t('dashboard.stats.deliveries')} to={`/admin/projects/${selectedProjectId}/deliveries`}>
+                    {formatCompact(stats.totalDeliveries)}
+                  </LedgerRow>
+                  <LedgerRow label={t('dashboard.stats.inFlight')} to={`/admin/projects/${selectedProjectId}/deliveries?status=PENDING`}>
+                    {formatCompact(stats.pendingDeliveries)}
+                  </LedgerRow>
+                  <LedgerRow label={t('dashboard.attention.failed')} to={`/admin/projects/${selectedProjectId}/deliveries?status=FAILED`}>
+                    <span className={cn(stats.failedDeliveries > 0 && 'text-retry')}>{formatCompact(stats.failedDeliveries)}</span>
+                  </LedgerRow>
+                  <LedgerRow label={t('dashboard.stats.dlq')} to={`/admin/projects/${selectedProjectId}/dlq`}>
+                    <span className={cn(stats.dlqDeliveries > 0 && 'text-halt')}>{formatCompact(stats.dlqDeliveries)}</span>
+                  </LedgerRow>
+                  {analytics?.overview && analytics.overview.totalDeliveries > 0 && (
+                    <LedgerRow label={t('dashboard.stats.latencyP95')}>
+                      <span className="font-mono text-[13px]">{formatLatency(analytics.overview.p95LatencyMs)}</span>
+                    </LedgerRow>
+                  )}
+                </dl>
+              </section>
+
+              <section>
+                <div className="mb-2 flex items-baseline justify-between gap-3">
+                  <h3 className="text-[13px] text-muted-foreground">{t('dashboard.inFlight.title')}</h3>
+                  {inFlight.length > 0 && (
+                    <Link to={`/admin/projects/${selectedProjectId}/deliveries?status=PENDING`} className="text-[13px] underline decoration-rail underline-offset-4 hover:decoration-foreground">
+                      {t('common.viewAll')}
+                    </Link>
+                  )}
+                </div>
+                {inFlight.length === 0 ? (
+                  <p className="border-t border-rail py-4 text-[13px] text-muted-foreground">{t('dashboard.inFlight.empty')}</p>
+                ) : (
+                  <ul className="border-t border-rail">
+                    {inFlight.map((delivery) => {
+                      const rail = railFromCounts(delivery.attemptCount, delivery.maxAttempts, delivery.status);
+                      return (
+                        <li key={delivery.id} className="flex items-center justify-between gap-3 border-b border-rail py-2.5">
+                          <span className="min-w-0">
+                            <span className="block truncate font-mono text-[12px]">{delivery.eventType ?? delivery.id}</span>
+                            <span className="block text-[12px] text-muted-foreground">{formatRelativeTime(delivery.createdAt)}</span>
                           </span>
-                        </span>
-                        <span className="flex flex-shrink-0 items-center gap-3">
                           <AttemptRail
                             attempts={rail.attempts}
                             maxAttempts={rail.maxAttempts}
-                            ariaLabel={t('dashboard.inFlight.rail', {
-                              count: delivery.attemptCount,
-                              total: delivery.maxAttempts,
-                            })}
+                            ariaLabel={t('dashboard.inFlight.rail', { count: delivery.attemptCount, total: delivery.maxAttempts })}
                           />
-                          <StatusBadge
-                            kind={kindOfDeliveryStatus(delivery.status)}
-                            label={t(`dashboard.inFlight.status.${delivery.status}`)}
-                            icon={false}
-                          />
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Card>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="p-5">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.endpointHealth.title')}</h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.endpointHealth.subtitle')}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => navigate(`/admin/projects/${selectedProjectId}/endpoints`)}
-                >
-                  {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
-                </Button>
+          <div className="mt-14 grid gap-x-16 gap-y-12 lg:grid-cols-2">
+            <section className="min-w-0">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h3 className="text-[15px] font-medium">{t('dashboard.endpointHealth.title')}</h3>
+                <Link to={`/admin/projects/${selectedProjectId}/endpoints`} className="text-[13px] underline decoration-rail underline-offset-4 hover:decoration-foreground">{t('common.viewAll')}</Link>
               </div>
               {statsLoading ? (
                 <SkeletonCards count={3} height="h-12" cols="grid-cols-1" />
               ) : endpointHealth.length === 0 ? (
-                <EmptyState
-                  icon={Webhook}
-                  title={t('dashboard.endpointHealth.empty')}
-                  description={t('dashboard.endpointHealth.emptyDesc')}
-                  className="flex flex-col items-center justify-center py-8"
-                />
+                <EmptyState icon={Webhook} title={t('dashboard.endpointHealth.empty')} description={t('dashboard.endpointHealth.emptyDesc')} />
               ) : (
-                <ul className="space-y-3">
-                  {endpointHealth.slice(0, 5).map((endpoint) => {
+                <ul className="border-t border-rail">
+                  {[...endpointHealth].sort((a, b) => b.totalDeliveries - a.totalDeliveries).slice(0, 5).map((endpoint) => {
                     const kind = kindOfSuccessRate(endpoint.successRate, endpoint.enabled);
                     return (
-                      <li key={endpoint.id}>
-                        <Link
-                          to={`/admin/projects/${selectedProjectId}/endpoints`}
-                          className="group block px-2 py-1.5 transition-colors hover:bg-secondary/60"
-                        >
+                      <li key={endpoint.id} className="border-b border-rail">
+                        <Link to={`/admin/projects/${selectedProjectId}/endpoints`} className="block py-3 hover:bg-secondary/40">
                           <span className="flex items-baseline justify-between gap-3">
-                            <span className="truncate font-mono text-xs text-foreground">{endpoint.url}</span>
-                            <span className={cn('flex-shrink-0 font-mono text-xs tabular-nums', STATUS_TEXT[kind])}>
-                              {formatRate(endpoint.successRate)}%
-                            </span>
+                            <span className="min-w-0 truncate font-mono text-[12px]" title={endpoint.url}>{endpoint.url.replace(/^https?:\/\//, '')}</span>
+                            <span className={cn('flex-shrink-0 text-[13px] tabular-nums', STATUS_TEXT[kind])}>{formatRate(endpoint.successRate)}%</span>
                           </span>
-                          <span className="mt-1.5 flex items-center gap-2">
-                            <span className="relative h-1 flex-1 overflow-hidden bg-muted">
-                              <span
-                                className={cn('absolute inset-y-0 left-0', STATUS_FILL[kind])}
-                                style={{ width: `${Math.min(Math.max(endpoint.successRate, 0), 100)}%` }}
-                              />
+                          <span className="mt-2 flex items-center gap-3">
+                            <span className="relative h-[3px] flex-1 overflow-hidden bg-secondary">
+                              <span className={cn('absolute inset-y-0 left-0', STATUS_FILL[kind])} style={{ width: `${Math.min(Math.max(endpoint.successRate, 0), 100)}%` }} />
                             </span>
-                            <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground">
-                              {formatCompact(endpoint.totalDeliveries)}
+                            <span className="flex-shrink-0 text-[12px] tabular-nums text-muted-foreground">
+                              {t('dashboard.recentEvents.deliveryCount', { count: endpoint.totalDeliveries })}
                             </span>
                           </span>
                         </Link>
@@ -438,55 +348,31 @@ export default function DashboardPage() {
                   })}
                 </ul>
               )}
-            </Card>
+            </section>
 
-            <Card className="p-5">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.recentEvents.title')}</h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.recentEvents.subtitle')}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => navigate(`/admin/projects/${selectedProjectId}/events`)}
-                >
-                  {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
-                </Button>
+            <section className="min-w-0">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h3 className="text-[15px] font-medium">{t('dashboard.recentEvents.title')}</h3>
+                <Link to={`/admin/projects/${selectedProjectId}/events`} className="text-[13px] underline decoration-rail underline-offset-4 hover:decoration-foreground">{t('common.viewAll')}</Link>
               </div>
               {statsLoading ? (
                 <SkeletonCards count={3} height="h-12" cols="grid-cols-1" />
               ) : recentEvents.length === 0 ? (
-                <EmptyState
-                  icon={Radio}
-                  title={t('dashboard.recentEvents.empty')}
-                  description={t('dashboard.recentEvents.emptyDesc')}
-                  className="flex flex-col items-center justify-center py-8"
-                />
+                <EmptyState icon={Radio} title={t('dashboard.recentEvents.empty')} description={t('dashboard.recentEvents.emptyDesc')} />
               ) : (
-                <ul className="space-y-1">
-                  {recentEvents.slice(0, 5).map((event) => (
-                    <li key={event.id}>
-                      <Link
-                        to={`/admin/projects/${selectedProjectId}/events`}
-                        className="flex items-center justify-between gap-3 px-2 py-2 transition-colors hover:bg-secondary/60"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-mono text-xs text-foreground">{event.type}</span>
-                          <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                            {formatDateTime(event.createdAt)}
-                          </span>
-                        </span>
-                        <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground">
-                          {t('dashboard.recentEvents.deliveryCount', { count: event.deliveryCount })}
-                        </span>
+                <ul className="border-t border-rail">
+                  {recentEvents.slice(0, 6).map((event) => (
+                    <li key={event.id} className="border-b border-rail">
+                      <Link to={`/admin/projects/${selectedProjectId}/events/${event.id}`} className="flex min-h-[44px] items-center gap-3 py-2 hover:bg-secondary/40">
+                        <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{event.type}</span>
+                        <span className="text-[12px] text-muted-foreground max-sm:hidden">{t('dashboard.recentEvents.deliveryCount', { count: event.deliveryCount })}</span>
+                        <span className="w-24 text-right text-[12px] text-muted-foreground" title={formatDateTime(event.createdAt)}>{formatRelativeTime(event.createdAt)}</span>
                       </Link>
                     </li>
                   ))}
                 </ul>
               )}
-            </Card>
+            </section>
           </div>
         </div>
       )}

@@ -420,7 +420,7 @@ export default function TransformStudioPage() {
                   type="button"
                   onClick={() => setSource(hint.expr)}
                   title={t(hint.descKey)}
-                  className="border border-rail bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                  className="border border-rail bg-muted/40 px-2 py-1 font-mono text-[12px] text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {hint.expr}
                 </button>
@@ -622,7 +622,7 @@ export default function TransformStudioPage() {
                     onClick={() => handleLoadEvent(event.payload, event.eventType)}
                     className="flex w-full items-center justify-between gap-2 border border-rail bg-card px-2.5 py-2 text-left transition-colors hover:border-primary/40"
                   >
-                    <span className="truncate font-mono text-[11px]">{event.eventType}</span>
+                    <span className="truncate font-mono text-[12px]">{event.eventType}</span>
                     <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
                       {new Date(event.createdAt).toLocaleString()}
                     </span>
@@ -669,7 +669,7 @@ export default function TransformStudioPage() {
             {mode === 'dryRun' && dryRunResult?.endpointUrl && (
               <div className="flex items-center gap-2 border border-rail bg-muted/30 px-3 py-2">
                 <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span className="truncate font-mono text-[11px]">{dryRunResult.endpointUrl}</span>
+                <span className="truncate font-mono text-[12px]">{dryRunResult.endpointUrl}</span>
               </div>
             )}
             <JsonEditor
@@ -683,7 +683,7 @@ export default function TransformStudioPage() {
               <OutputBlock label={mode === 'dryRun' ? t('transform.dryRunHeaders') : t('transform.outputHeaders')}>
                 <dl className="divide-y divide-rail">
                   {Object.entries(outputHeaders).map(([name, value]) => (
-                    <div key={name} className="flex gap-3 px-2.5 py-1.5 font-mono text-[11px]">
+                    <div key={name} className="flex gap-3 px-2.5 py-1.5 font-mono text-[12px]">
                       <dt className="shrink-0 text-muted-foreground">{name}</dt>
                       <dd className="min-w-0 flex-1 truncate text-right">{value}</dd>
                     </div>
@@ -706,7 +706,7 @@ export default function TransformStudioPage() {
                   </Button>
                 }
               >
-                <pre className="overflow-x-auto px-2.5 py-2 font-mono text-[11px]">{dryRunResult.signature}</pre>
+                <pre className="overflow-x-auto px-2.5 py-2 font-mono text-[12px]">{dryRunResult.signature}</pre>
               </OutputBlock>
             )}
           </>
@@ -746,7 +746,7 @@ export default function TransformStudioPage() {
             </div>
             <ul className="divide-y divide-rail border-t border-rail">
               {errors.map((error, index) => (
-                <li key={index} className="px-2.5 py-2 font-mono text-[11px] leading-relaxed text-foreground">
+                <li key={index} className="px-2.5 py-2 font-mono text-[12px] leading-relaxed text-foreground">
                   {error}
                 </li>
               ))}
@@ -763,7 +763,7 @@ export default function TransformStudioPage() {
         ) : (
           consoleLines.length > 0 && (
             <div className="overflow-hidden border border-rail">
-              <ul className="divide-y divide-rail font-mono text-[11px]">
+              <ul className="divide-y divide-rail font-mono text-[12px]">
                 {consoleLines.map((line, index) => (
                   <li key={index} className="flex gap-2 px-2.5 py-1.5">
                     <span
@@ -794,7 +794,7 @@ export default function TransformStudioPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-8">
       <PageHeader
         title={t('transform.title')}
         description={t('transform.subtitle')}

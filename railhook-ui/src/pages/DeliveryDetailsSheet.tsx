@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info, ExternalLink, Timer, TrendingUp, TrendingDown, GitCompare, Flame, Plus } from 'lucide-react';
+import { X as CloseIcon } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime, formatRelativeFuture } from '../lib/date';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +43,7 @@ interface DeliveryDetailsSheetProps {
   open: boolean;
   onClose: () => void;
   onRefresh: () => void;
+  variant?: 'sheet' | 'pane';
 }
 
 export default function DeliveryDetailsSheet({
@@ -49,6 +51,7 @@ export default function DeliveryDetailsSheet({
   open,
   onClose,
   onRefresh,
+  variant = 'sheet',
 }: DeliveryDetailsSheetProps) {
   const { t } = useTranslation();
   const params = useParams<{ projectId: string }>();
@@ -208,15 +211,15 @@ export default function DeliveryDetailsSheet({
 
     const classification = classifyError(lastFailed);
     const severityConfig = {
-      error: { border: 'border-halt/30', bg: 'bg-halt-soft', icon: XCircle, iconColor: 'text-halt' },
-      warning: { border: 'border-retry/30', bg: 'bg-retry-soft', icon: AlertTriangle, iconColor: 'text-retry' },
-      info: { border: 'border-rail', bg: 'bg-secondary/50', icon: Info, iconColor: 'text-muted-foreground' },
+      error: { border: 'border-l-halt', bg: '', icon: XCircle, iconColor: 'text-halt' },
+      warning: { border: 'border-l-retry', bg: '', icon: AlertTriangle, iconColor: 'text-retry' },
+      info: { border: 'border-l-rail', bg: '', icon: Info, iconColor: 'text-muted-foreground' },
     }[classification.severity];
 
     const SeverityIcon = severityConfig.icon;
 
     return (
-      <Card className={`${severityConfig.border} ${severityConfig.bg}`}>
+      <Card className={`border-l-2 border-t-0 pl-4 ${severityConfig.border}`}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <SeverityIcon className={`h-4 w-4 ${severityConfig.iconColor}`} />
@@ -225,13 +228,13 @@ export default function DeliveryDetailsSheet({
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <span className="text-xs font-medium text-muted-foreground">
               {t('deliveryDetails.diagnosis.category')}
             </span>
             <p className="text-sm font-medium mt-0.5">{t(classification.labelKey)}</p>
           </div>
           <div>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Lightbulb className="h-3 w-3" />
               {t('deliveryDetails.diagnosis.suggestedFix')}
             </span>
@@ -248,31 +251,22 @@ export default function DeliveryDetailsSheet({
     );
   };
 
-  return (
+  const detailBody = (
     <>
-      <Sheet open={open} onOpenChange={onClose}>
-        <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
-          <SheetHeader>
-            <SheetTitle>{t('deliveryDetails.title')}</SheetTitle>
-            <SheetDescription>
-              {t('deliveryDetails.description')}
-            </SheetDescription>
-          </SheetHeader>
-
           {loading ? (
             <div className="mt-6"><SkeletonRows count={4} height="h-20" /></div>
           ) : delivery ? (
             <div className="space-y-6 mt-6">
               {delivery.status === 'PROCESSING' && (
-                <div className="flex items-center gap-3 border border-retry/30 bg-retry-soft p-3">
-                  <Loader2 className="h-4 w-4 animate-spin text-retry" aria-hidden />
-                  <span className="text-sm font-medium text-retry">{t('deliveries.statusExplain.PROCESSING')}</span>
+                <div className="flex items-center gap-2.5 text-sm text-retry">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  <span>{t('deliveries.statusExplain.PROCESSING')}</span>
                 </div>
               )}
               {delivery.status === 'PENDING' && (
-                <div className="flex items-center gap-3 border border-retry/30 bg-retry-soft p-3">
-                  <Clock className="h-4 w-4 text-retry" aria-hidden />
-                  <span className="text-sm font-medium text-retry">
+                <div className="flex items-center gap-2.5 text-sm text-retry">
+                  <Clock className="h-3.5 w-3.5" aria-hidden />
+                  <span>
                     {delivery.attemptCount > 0 && delivery.nextRetryAt
                       ? t('deliveries.statusExplain.PENDING_RETRY', { time: formatRelativeFuture(delivery.nextRetryAt) })
                       : t('deliveries.statusExplain.PENDING_NEW')}
@@ -280,15 +274,15 @@ export default function DeliveryDetailsSheet({
                 </div>
               )}
               {delivery.status === 'SUCCESS' && (
-                <div className="flex items-center gap-3 border border-ok/30 bg-ok-soft p-3">
-                  <CheckCircle2 className="h-4 w-4 text-ok" aria-hidden />
-                  <span className="text-sm font-medium text-ok">{t('deliveries.statusExplain.SUCCESS')}</span>
+                <div className="flex items-center gap-2.5 text-sm text-ok">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                  <span>{t('deliveries.statusExplain.SUCCESS')}</span>
                 </div>
               )}
               {(delivery.status === 'FAILED' || delivery.status === 'DLQ') && (
-                <div className="flex items-center gap-3 border border-halt/30 bg-halt-soft p-3">
-                  <XCircle className="h-4 w-4 text-halt" aria-hidden />
-                  <span className="text-sm font-medium text-halt">
+                <div className="flex items-center gap-2.5 text-sm text-halt">
+                  <XCircle className="h-3.5 w-3.5" aria-hidden />
+                  <span>
                     {delivery.status === 'DLQ'
                       ? t('deliveries.statusExplain.DLQ', { count: delivery.attemptCount })
                       : t('deliveries.statusExplain.FAILED')}
@@ -298,7 +292,7 @@ export default function DeliveryDetailsSheet({
 
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('deliveryDetails.trace')}</CardTitle>
+                  <CardTitle className="text-[13px] font-normal text-muted-foreground">{t('deliveryDetails.trace')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {(() => {
@@ -371,7 +365,7 @@ export default function DeliveryDetailsSheet({
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('deliveryDetails.statusAndProgress')}</CardTitle>
+                    <CardTitle className="text-[13px] font-normal text-muted-foreground">{t('deliveryDetails.statusAndProgress')}</CardTitle>
                     {getStatusBadge(delivery.status)}
                   </div>
                 </CardHeader>
@@ -439,7 +433,7 @@ export default function DeliveryDetailsSheet({
                 return (
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                      <CardTitle className="text-[13px] font-normal text-muted-foreground flex items-center gap-2">
                         <Timer className="h-3.5 w-3.5" />
                         {t('deliveryDetails.latencyTrend')}
                       </CardTitle>
@@ -477,7 +471,7 @@ export default function DeliveryDetailsSheet({
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{t('deliveryDetails.deliveryAttempts')}</CardTitle>
+                    <CardTitle>{t('deliveryDetails.deliveryAttempts')}</CardTitle>
                     {attempts.length >= 2 && (
                       <Button
                         variant={compareMode ? 'default' : 'outline'}
@@ -784,17 +778,46 @@ export default function DeliveryDetailsSheet({
               fallbackKey="deliveryDetails.toast.loadFailed"
               onRetry={() => loadDelivery()}
               retrying={loading}
-              className="flex flex-col items-center justify-center py-16"
             />
           ) : (
             <EmptyState
               icon={Info}
               title={t('deliveryDetails.noData')}
-              className="flex flex-col items-center justify-center py-16"
             />
           )}
-        </SheetContent>
-      </Sheet>
+    </>
+  );
+
+  return (
+    <>
+      {variant === 'pane' ? (
+        open && (
+          <aside aria-label={t('deliveryDetails.title')} className="min-w-0">
+            <div className="flex items-start justify-between gap-3 border-b border-rail pb-3">
+              <div className="min-w-0">
+                <h2 className="text-[15px] font-medium">{t('deliveryDetails.title')}</h2>
+                {delivery && <p className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">{delivery.eventType ?? delivery.id}</p>}
+              </div>
+              <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label={t('common.close')} title={t('common.close')} className="-mr-2 text-muted-foreground">
+                <CloseIcon className="h-4 w-4" />
+              </Button>
+            </div>
+            {detailBody}
+          </aside>
+        )
+      ) : (
+        <Sheet open={open} onOpenChange={onClose}>
+          <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+            <SheetHeader>
+              <SheetTitle>{t('deliveryDetails.title')}</SheetTitle>
+              <SheetDescription>
+                {t('deliveryDetails.description')}
+              </SheetDescription>
+            </SheetHeader>
+            {detailBody}
+          </SheetContent>
+        </Sheet>
+      )}
 
       <AlertDialog open={showReplayDialog} onOpenChange={setShowReplayDialog}>
         <AlertDialogContent>
