@@ -39,7 +39,7 @@ public class EmailService {
     }
 
     /** E.g. {@code w***8@gmail.con}: enough to match a bounce, not enough to harvest the address. */
-    static String maskRecipient(String address) {
+    public static String maskRecipient(String address) {
         if (address == null || address.isBlank()) {
             return "(none)";
         }

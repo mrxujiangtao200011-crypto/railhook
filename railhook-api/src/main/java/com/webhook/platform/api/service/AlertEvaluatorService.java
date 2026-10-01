@@ -2,18 +2,17 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.enums.IncidentStatus;
-import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
-import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
-import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.IncidentRepository;
+import com.webhook.platform.api.service.alert.condition.AlertCondition;
+import com.webhook.platform.api.service.alert.condition.AlertCondition.Breach;
+import com.webhook.platform.api.service.alert.condition.AlertConditionRegistry;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,14 +33,11 @@ public class AlertEvaluatorService {
 
     private final AlertRuleRepository ruleRepository;
     private final AlertEventRepository eventRepository;
-    private final DeliveryRepository deliveryRepository;
-    private final DeliveryAttemptRepository attemptRepository;
     private final IncidentRepository incidentRepository;
     private final AlertService alertService;
+    private final AlertConditionRegistry conditions;
 
     private static final Duration RESOLVED_ALERT_RETENTION = Duration.ofDays(90);
-
-    private record Breach(double currentValue, String message) {}
 
     @SystemTenant("alert rules belong to every organization; each is evaluated inside its own")
     @Scheduled(cron = "${app.alerts.evaluation-cron:0 * * * * *}")
@@ -114,83 +110,10 @@ public class AlertEvaluatorService {
     }
 
     private Optional<Breach> assess(AlertRule rule) {
-        if (rule.getThresholdValue() == null) {
-            return Optional.empty();
-        }
-        double threshold = rule.getThresholdValue();
+        AlertCondition condition = conditions.find(rule.getAlertType()).orElseThrow(() ->
+                new IllegalStateException("no alert condition is installed for type " + rule.getAlertType()));
+        int minutes = rule.getWindowMinutes() == null ? 5 : rule.getWindowMinutes();
         Instant now = Instant.now();
-        Instant from = now.minus(Duration.ofMinutes(
-                rule.getWindowMinutes() == null ? 5 : rule.getWindowMinutes()));
-
-        return switch (rule.getAlertType()) {
-            case FAILURE_RATE -> assessFailureRate(rule, threshold, from, now);
-            case DLQ_THRESHOLD -> assessDlq(rule, threshold, from);
-            case CONSECUTIVE_FAILURES -> assessConsecutiveFailures(rule, threshold);
-            case LATENCY_THRESHOLD -> assessLatency(rule, threshold, from, now);
-        };
-    }
-
-    private Optional<Breach> assessFailureRate(AlertRule rule, double threshold, Instant from, Instant to) {
-        long total = deliveryRepository.countByProjectIdAndCreatedAtBetween(rule.getProjectId(), from, to);
-        // No traffic is not a 100% failure rate.
-        if (total == 0) {
-            return Optional.empty();
-        }
-        long failed = deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
-                rule.getProjectId(), DeliveryStatus.FAILED, from, to)
-                + deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
-                rule.getProjectId(), DeliveryStatus.DLQ, from, to);
-        double rate = (failed * 100.0) / total;
-        if (rate < threshold) {
-            return Optional.empty();
-        }
-        return Optional.of(new Breach(rate, String.format(
-                "Failure rate %.1f%% over the last %d minutes (%d of %d deliveries failed), threshold %.1f%%",
-                rate, minutes(rule), failed, total, threshold)));
-    }
-
-    private Optional<Breach> assessDlq(AlertRule rule, double threshold, Instant from) {
-        long parked = deliveryRepository.countDlqByProjectIdSince(rule.getProjectId(), from);
-        if (parked < threshold) {
-            return Optional.empty();
-        }
-        return Optional.of(new Breach(parked, String.format(
-                "%d deliveries reached the DLQ in the last %d minutes, threshold %.0f",
-                parked, minutes(rule), threshold)));
-    }
-
-    private Optional<Breach> assessConsecutiveFailures(AlertRule rule, double threshold) {
-        if (rule.getEndpointId() == null) {
-            return Optional.empty();
-        }
-        int needed = (int) Math.ceil(threshold);
-        if (needed <= 0) {
-            return Optional.empty();
-        }
-        List<DeliveryStatus> recent = deliveryRepository.findRecentOutcomesByEndpointId(
-                rule.getEndpointId(), PageRequest.of(0, needed));
-        // A new endpoint whose first delivery failed is not "3 consecutive failures".
-        if (recent.size() < needed || recent.stream().anyMatch(s -> s == DeliveryStatus.SUCCESS)) {
-            return Optional.empty();
-        }
-        return Optional.of(new Breach(recent.size(), String.format(
-                "The last %d deliveries to this endpoint all failed, threshold %d",
-                recent.size(), needed)));
-    }
-
-    private Optional<Breach> assessLatency(AlertRule rule, double threshold, Instant from, Instant to) {
-        // p95, not the mean: the fast majority hides a slow tail in a mean.
-        Long p95 = attemptRepository.findLatencyPercentileByProjectId(
-                rule.getOrganizationId(), rule.getProjectId(), from, to, 0.95);
-        if (p95 == null || p95 < threshold) {
-            return Optional.empty();
-        }
-        return Optional.of(new Breach(p95, String.format(
-                "p95 latency %d ms over the last %d minutes, threshold %.0f ms",
-                p95, minutes(rule), threshold)));
-    }
-
-    private int minutes(AlertRule rule) {
-        return rule.getWindowMinutes() == null ? 5 : rule.getWindowMinutes();
+        return condition.assess(rule, new AlertCondition.Window(now.minus(Duration.ofMinutes(minutes)), now, minutes));
     }
 }

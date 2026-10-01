@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
+import com.webhook.platform.api.service.alert.channel.AlertChannelConfigs;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -22,6 +23,8 @@ import com.webhook.platform.common.security.SecretEncryption;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -255,16 +258,11 @@ public class EncryptionKeyRotationService {
             if (batch.isEmpty()) break;
 
             for (AlertRule rule : batch) {
-                if (rule.getIntegrationKeyEncrypted() == null || rule.getEncryptionKeyVersion() == targetVersion) {
+                if (rule.getChannelConfigEncrypted().isEmpty() || rule.getEncryptionKeyVersion() == targetVersion) {
                     continue;
                 }
                 try {
-                    transactionTemplate.executeWithoutResult(status -> {
-                        reEncrypt(rule.getEncryptionKeyVersion(), rule::getIntegrationKeyEncrypted,
-                                rule::getIntegrationKeyIv, rule::setIntegrationKeyEncrypted, rule::setIntegrationKeyIv);
-                        rule.setEncryptionKeyVersion(targetVersion);
-                        alertRuleRepository.save(rule);
-                    });
+                    transactionTemplate.executeWithoutResult(status -> rotateAlertRule(rule, targetVersion));
                     rotated.incrementAndGet();
                 } catch (Exception e) {
                     errors.incrementAndGet();
@@ -275,6 +273,21 @@ public class EncryptionKeyRotationService {
             if (!batch.hasNext()) break;
             page++;
         }
+    }
+
+    private void rotateAlertRule(AlertRule rule, int targetVersion) {
+        Map<String, Map<String, String>> resealed = new LinkedHashMap<>();
+        rule.getChannelConfigEncrypted().forEach((name, sealed) -> {
+            Map<String, String> copy = new LinkedHashMap<>(sealed);
+            reEncrypt(rule.getEncryptionKeyVersion(),
+                    () -> copy.get(AlertChannelConfigs.CIPHERTEXT), () -> copy.get(AlertChannelConfigs.IV),
+                    value -> copy.put(AlertChannelConfigs.CIPHERTEXT, value),
+                    value -> copy.put(AlertChannelConfigs.IV, value));
+            resealed.put(name, copy);
+        });
+        rule.setChannelConfigEncrypted(resealed);
+        rule.setEncryptionKeyVersion(targetVersion);
+        alertRuleRepository.save(rule);
     }
 
     public record RotationResult(
