@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-10-01
+
+### Fixed
+
+- The dashboard sidebar stays in place while a dialog is open. On a scrolled page it moved up by the scroll distance, because the dialog's scroll lock turned the page body into its own scroller.
+
 ## [3.6.0] - 2026-10-01
 
 ### Added

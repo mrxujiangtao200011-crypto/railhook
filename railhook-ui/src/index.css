@@ -334,6 +334,8 @@
 }
 
 html, body { overflow-x: clip; }
+/* A dialog's scroll lock sets overflow: hidden on body, which with html clipped makes body a scroller and unpins the sticky sidebar. */
+html body[data-scroll-locked] { overflow: clip !important; }
 
 .lp-rule { position: relative; border-top: 1px solid hsl(var(--rail)); }
 .lp-rule::before, .lp-rule::after {
