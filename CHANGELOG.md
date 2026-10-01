@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-10-01
+
 ### Added
 
 - `DISCORD` alert channel: one embed per firing with the rule, the value against the threshold and a link to the project's incidents. The webhook URL is stored encrypted and never returned.
