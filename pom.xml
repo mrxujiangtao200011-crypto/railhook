@@ -6,7 +6,7 @@
 
     <groupId>com.webhook.platform</groupId>
     <artifactId>railhook</artifactId>
-    <version>3.5.1</version>
+    <version>3.5.2</version>
     <packaging>pom</packaging>
 
     <name>Webhook Platform</name>

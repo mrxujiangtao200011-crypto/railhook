@@ -20,11 +20,6 @@ GitHub and others, with retries, signatures and a record of every attempt. Self-
 [Website](https://railhook.io) · [Docs](https://railhook.io/docs/) ·
 [API reference](https://railhook.io/docs/api-reference/) · [Railhook Cloud](https://railhook.io/register) · [Changelog](./CHANGELOG.md)
 
-<img src="railhook-ui/public/screens/deliveries.webp" alt="Deliveries: every webhook sent, to which endpoint, and how each attempt went" width="100%">
-
-<img src="railhook-ui/public/screens/attempts.webp" alt="One delivery's attempts: a timeout, a 502, then a 202 on the third try" width="49%">
-<img src="railhook-ui/public/screens/incoming.webp" alt="Incoming webhooks from Stripe and GitHub, each signature verified before forwarding" width="49%">
-
 </div>
 
 ## Install
