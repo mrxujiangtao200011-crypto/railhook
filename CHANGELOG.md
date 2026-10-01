@@ -19,9 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `CONSECUTIVE_FAILURES` rule without an endpoint is refused when saved. It was accepted and never fired.
 - A rule's threshold is required only by the conditions that read it.
 
-### Fixed
+## [3.5.3] - 2026-10-01
 
-- The audit log no longer stores an alert rule's channel settings. It recorded the request as sent, so a PagerDuty routing key or Opsgenie API key was kept there in plain text.
+### Security
+
+- The audit log no longer keeps credentials sent in a request. It stored each request body as sent, so an endpoint's signing secret, a PagerDuty routing key or an Opsgenie API key was kept there in plain text. Any field named like a secret, password, token or key is now written as `[redacted]`.
 
 ## [3.5.2] - 2026-10-01
 

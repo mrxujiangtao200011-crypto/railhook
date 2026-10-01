@@ -22,15 +22,21 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @Aspect
 @Component
@@ -39,6 +45,10 @@ public class AuditLogAspect {
 
     private final AuditLogRepository auditLogRepository;
     private final TrustedProxyResolver trustedProxyResolver;
+    // Matched on the field name, so a request DTO added later cannot leak a credential by forgetting to opt out.
+    private static final Pattern SECRET_FIELD =
+            Pattern.compile("(?i)(secret|password|token|apikey|api_key|routingkey|integrationkey|privatekey|credential)");
+
     private final ObjectMapper objectMapper;
     /**
      * Single-threaded so audit writes stay ordered, daemon so they never hold up shutdown. Wrapped
@@ -231,10 +241,28 @@ public class AuditLogAspect {
                 }
             }
             if (details.isEmpty()) return null;
-            String json = objectMapper.writeValueAsString(details);
+            JsonNode tree = objectMapper.valueToTree(details);
+            redactSecrets(tree);
+            String json = objectMapper.writeValueAsString(tree);
             return json.length() > 2000 ? json.substring(0, 2000) : json;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private static void redactSecrets(JsonNode node) {
+        if (node instanceof ObjectNode object) {
+            List<String> names = new ArrayList<>();
+            object.fieldNames().forEachRemaining(names::add);
+            for (String name : names) {
+                if (SECRET_FIELD.matcher(name).find() && !object.get(name).isNull()) {
+                    object.put(name, "[redacted]");
+                } else {
+                    redactSecrets(object.get(name));
+                }
+            }
+        } else if (node instanceof ArrayNode array) {
+            array.forEach(AuditLogAspect::redactSecrets);
         }
     }
 
