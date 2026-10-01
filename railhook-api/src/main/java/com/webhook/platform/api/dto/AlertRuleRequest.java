@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -33,6 +34,8 @@ public class AlertRuleRequest {
 
     @Schema(description = "Settings named by the channel's configSchema. On update a setting left out is kept; "
             + "a blank one clears it, except a secret, which is kept so an edit need not re-enter it.")
+    // Write-only, or the audit log, which serializes requests, would keep the secrets in it.
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private Map<String, String> channelConfig;
 
     @Positive

@@ -9733,6 +9733,7 @@ components:
           description: "Settings named by the channel's configSchema. On update a\
             \ setting left out is kept; a blank one clears it, except a secret, which\
             \ is kept so an edit need not re-enter it."
+          writeOnly: true
         thresholdValue:
           type: number
           format: double

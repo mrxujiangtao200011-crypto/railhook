@@ -20,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -130,6 +131,7 @@ class AlertIncidentIntegrationTest extends AbstractIntegrationTest {
                 "SELECT channel_config_encrypted::text FROM alert_rules WHERE id = ?", String.class,
                 UUID.fromString(json(created).get("id").asText()));
         assertThat(stored).isNotBlank().doesNotContain(ROUTING_KEY);
+        assertThat(auditedRuleCreations()).as("the audit log of the creation").isNotBlank().doesNotContain(ROUTING_KEY);
     }
 
     @Test
@@ -163,6 +165,20 @@ class AlertIncidentIntegrationTest extends AbstractIntegrationTest {
                                 + "\"thresholdValue\":10,\"channel\":\"PAGERDUTY\",\"channelConfig\":{\"routingKey\":\""
                                 + ROUTING_KEY + "\"}}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // The audit row is written on another thread, after the response.
+    private String auditedRuleCreations() throws InterruptedException {
+        for (int i = 0; i < 50; i++) {
+            List<String> details = jdbcTemplate.queryForList("SELECT details FROM audit_log "
+                    + "WHERE resource_type = 'AlertRule' AND action = 'CREATE' AND organization_id = ?",
+                    String.class, organizationId);
+            if (!details.isEmpty()) {
+                return String.join("\n", details);
+            }
+            Thread.sleep(100);
+        }
+        return null;
     }
 
     private AlertRule pagerDutyRule() throws Exception {
