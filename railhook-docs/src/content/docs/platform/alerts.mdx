@@ -14,10 +14,9 @@ Alert rules watch the traffic of one project and notify someone when it crosses 
 
 <Steps>
 1. Open the project's **Alerts** page and create a rule.
-2. Pick a **condition** and a **threshold**.
-3. Pick a **window**. For `CONSECUTIVE_FAILURES`, also pick the **endpoint** to watch.
-4. Pick a **severity** and a **channel**.
-5. Save. Rules are evaluated every minute by default (`ALERTS_EVALUATION_CRON`).
+2. Pick a **condition** and fill in what it asks for: a **threshold** and a **window** for most, the **endpoint** to watch for `CONSECUTIVE_FAILURES`, only a window for `NO_TRAFFIC`.
+3. Pick a **severity** and a **channel**, and fill in the channel's settings.
+4. Save. Rules are evaluated every minute by default (`ALERTS_EVALUATION_CRON`).
 </Steps>
 
 ## Conditions
@@ -25,9 +24,10 @@ Alert rules watch the traffic of one project and notify someone when it crosses 
 | Condition | Fires when |
 |---|---|
 | `FAILURE_RATE` | The share of the project's deliveries created in the window that failed, as a percentage, is at or above the threshold. Right when traffic is degrading rather than dead. |
-| `CONSECUTIVE_FAILURES` | The endpoint's most recent deliveries, as many as the threshold, all failed. Needs an endpoint: a rule without one never fires. Catches an endpoint that has gone away sooner than a rate can, because it does not need volume. |
+| `CONSECUTIVE_FAILURES` | The endpoint's most recent deliveries, as many as the threshold, all failed. Needs an endpoint: a rule without one is refused. Catches an endpoint that has gone away sooner than a rate can, because it does not need volume. |
 | `DLQ_THRESHOLD` | The number of the project's deliveries that became failed messages in the window is at or above the threshold. This is the condition that says deliveries are being abandoned, not just retried. |
 | `LATENCY_THRESHOLD` | The project's p95 response time over the window, in milliseconds, is at or above the threshold. A slow endpoint uses up concurrency and eventually trips the circuit breaker. |
+| `NO_TRAFFIC` | The project received no events in the window. The window is the length of silence that counts as wrong, so set it longer than the quietest normal gap. It takes no threshold, and the next event resolves it. |
 
 A rule fires when its condition **starts** to hold, not on every evaluation while it keeps holding. One outage produces one notification, not one a minute.
 
@@ -52,13 +52,16 @@ One channel per rule. To notify two places, create two rules.
 | `EMAIL` | Up to 10 addresses, separated by commas. Each must belong to a member of the organization who has verified it; any other address is refused when the rule is saved. | Email configured on the deployment: `EMAIL_ENABLED=true` and SMTP settings |
 | `SLACK` | A Slack incoming webhook URL | The URL |
 | `WEBHOOK` | Any URL of yours, as a JSON `POST`. Use it to reach a ticket system or your own routing. | The URL |
+| `DISCORD` | A Discord channel, as one embed with the rule, the value against the threshold, and a link to the project's incidents (built from `APP_BASE_URL`). | The channel's webhook URL |
 | `PAGERDUTY` | A PagerDuty service, through the Events API v2. Triggers when the rule fires and resolves when the condition clears. | The routing key of an Events API v2 integration on the service |
 | `OPSGENIE` | An Opsgenie team, through the Alerts API. Creates an alert when the rule fires and closes it when the condition clears. | The key of an API integration on the team, and its region: `US` or `EU` |
 
-The PagerDuty routing key and the Opsgenie API key are stored encrypted, are never returned by the API, and are re-encrypted by a key rotation. Leave the key field blank when editing a rule to keep the stored one. Changing the rule's channel drops the stored key.
+The PagerDuty routing key, the Opsgenie API key and the Discord webhook URL are secrets: stored encrypted, never returned by the API, and re-encrypted by a key rotation. Leave a secret blank when editing a rule to keep the stored one. Changing the rule's channel drops it.
+
+In the API, a rule names its channel by id and passes the channel's settings in `channelConfig`. `GET /api/v1/alert-channels` lists the installed channels with the settings each takes as a JSON Schema, a secret marked `writeOnly`; `GET /api/v1/alert-conditions` does the same for conditions. See the [API reference](/docs/api-reference/).
 
 <Aside type="caution" title="Alert URLs are checked like delivery URLs">
-Slack and webhook URLs go through the same SSRF protection as endpoint URLs. Private and loopback addresses are refused unless the deployment allows them with `WEBHOOK_ALLOW_PRIVATE_IPS` or `WEBHOOK_ALLOWED_HOSTS`.
+Slack, Discord and webhook URLs go through the same SSRF protection as endpoint URLs. Private and loopback addresses are refused unless the deployment allows them with `WEBHOOK_ALLOW_PRIVATE_IPS` or `WEBHOOK_ALLOWED_HOSTS`.
 </Aside>
 
 ## Incidents
@@ -77,5 +80,4 @@ Resolving an incident by hand does not close the PagerDuty or Opsgenie alert; re
 
 ## Not available yet
 
-- **No alert on silence.** A rule fires on what happened, not on a project that stopped sending traffic when it should not have.
 - **No alert rule for an endpoint Railhook disabled.** It raises an alert of its own, which appears in this list without a rule behind it (see [When Railhook turns an endpoint off](/docs/outgoing/endpoints-subscriptions/#when-railhook-turns-an-endpoint-off)). You cannot change its severity or route it to a channel.

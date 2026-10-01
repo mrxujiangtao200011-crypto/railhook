@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `DISCORD` alert channel: one embed per firing with the rule, the value against the threshold and a link to the project's incidents. The webhook URL is stored encrypted and never returned.
+- `NO_TRAFFIC` alert condition: fires when the project receives no events for the rule's window, and resolves on the next event.
+- Alert rules can be edited from the Alerts page. A stored secret is never shown; leaving it blank keeps it.
+- `GET /api/v1/alert-channels` and `GET /api/v1/alert-conditions` list the installed channels and conditions with a JSON Schema of the settings each takes. The Alerts form is built from them, so adding a channel or condition is one class.
+
+### Changed
+
+- **Breaking API change:** an alert rule's channel settings move into `channelConfig`. `webhookUrl`, `emailRecipients`, `integrationKey` and `opsgenieRegion` are gone from the request and the response; send `channelConfig: {"url": …}`, `{"recipients": …}`, `{"routingKey": …}` or `{"apiKey": …, "region": …}` instead. The response has `configuredSecrets` in place of `integrationKeyConfigured`. `channel` and `alertType` are plain strings. Existing rules are migrated by `V004`.
+- A `CONSECUTIVE_FAILURES` rule without an endpoint is refused when saved. It was accepted and never fired.
+- A rule's threshold is required only by the conditions that read it.
+
 ## [3.5.1] - 2026-10-01
 
 ### Fixed
