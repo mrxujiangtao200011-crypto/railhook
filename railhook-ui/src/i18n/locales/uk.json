@@ -14,7 +14,8 @@
       "SLACK": "Slack",
       "WEBHOOK": "Вебхук",
       "PAGERDUTY": "PagerDuty",
-      "OPSGENIE": "Opsgenie"
+      "OPSGENIE": "Opsgenie",
+      "DISCORD": "Discord"
     },
     "columns": {
       "details": "Деталі",
@@ -39,26 +40,10 @@
       "channel": "Канал сповіщень",
       "description": "Опис (необов'язково)",
       "descriptionPlaceholder": "Для чого це правило",
-      "emailRecipients": "Отримувачі email",
       "name": "Назва",
       "namePlaceholder": "Висока частка невдач",
       "severity": "Важливість",
-      "slackHint": "Щоб отримати URL, створіть Incoming Webhook у налаштуваннях свого робочого простору Slack.",
-      "emailRecipientsHint": "До 10 адрес через кому. Кожна має належати учасникові цієї організації, який її підтвердив.",
-      "slackWebhookUrl": "Slack Webhook URL",
-      "threshold": "Поріг",
-      "type": "Тип сповіщення",
-      "webhookUrl": "Webhook URL",
-      "window": "Вікно (хв)",
-      "pagerDutyRoutingKey": "Routing key PagerDuty",
-      "pagerDutyHint": "Додайте до сервісу PagerDuty інтеграцію Events API v2 і вставте її routing key: правило викликає чергового, коли спрацьовує, і знімає виклик, коли умова минає.",
-      "opsgenieApiKey": "API-ключ Opsgenie",
-      "opsgenieHint": "Додайте до команди в Opsgenie API-інтеграцію і вставте її ключ: правило створює сповіщення, коли спрацьовує, і закриває його, коли умова минає.",
-      "opsgenieRegion": "Регіон Opsgenie",
-      "opsgenieRegions": {
-        "US": "США (api.opsgenie.com)",
-        "EU": "ЄС (api.eu.opsgenie.com)"
-      }
+      "type": "Тип сповіщення"
     },
     "history": {
       "desc": "Усі сповіщення цього проєкту, найновіші вгорі",
@@ -113,7 +98,8 @@
       "ruleDeleted": "Правило сповіщень видалено",
       "snoozed": "Відкладено на {{hours}} год",
       "unmuted": "Правило знову активне",
-      "updateFailed": "Не вдалося оновити правило"
+      "updateFailed": "Не вдалося оновити правило",
+      "ruleUpdated": "Правило сповіщень збережено"
     },
     "toggleRule": "Увімкнути {{name}}",
     "triggeredBy": "Спрацювало правило",
@@ -131,8 +117,12 @@
         "label": "Частка невдач"
       },
       "LATENCY_THRESHOLD": {
-        "hint": "Спрацьовує, коли середня затримка перевищує поріг (мс)",
+        "hint": "Спрацьовує, коли затримка p95 перевищує поріг (мс)",
         "label": "Поріг затримки"
+      },
+      "NO_TRAFFIC": {
+        "hint": "Спрацьовує, коли проєкт не отримує жодної події за все вікно",
+        "label": "Немає трафіку"
       }
     },
     "unmute": "Відновити",
@@ -147,7 +137,8 @@
       "FAILURE_RATE": "Частка збоїв понад {{v}}% за {{w}} хв",
       "DLQ_THRESHOLD": "Понад {{v}} у недоставлених за {{w}} хв",
       "CONSECUTIVE_FAILURES": "{{v}} доставок поспіль не вдаються",
-      "LATENCY_THRESHOLD": "Середня затримка понад {{v}} мс за {{w}} хв"
+      "LATENCY_THRESHOLD": "Затримка p95 понад {{v}} мс за {{w}} хв",
+      "NO_TRAFFIC": "Жодної події за {{w}} хв"
     },
     "state": {
       "firing": "Спрацювало",
@@ -166,6 +157,64 @@
       "firing_other": "Активних сповіщень: {{count}}",
       "armed": "Увімкнено {{armed}} з {{total}} правил",
       "silenced": "Без звуку, відкладено або вимкнено: {{count}}"
+    },
+    "channelFields": {
+      "EMAIL": {
+        "recipients": "Отримувачі email",
+        "recipientsHint": "До 10 адрес через кому. Кожна має належати учасникові цієї організації, який її підтвердив."
+      },
+      "WEBHOOK": {
+        "url": "Webhook URL",
+        "urlHint": "Отримує JSON alert.fired щоразу, коли правило спрацьовує."
+      },
+      "SLACK": {
+        "url": "Slack Webhook URL",
+        "urlHint": "Щоб отримати URL, створіть Incoming Webhook у налаштуваннях свого робочого простору Slack."
+      },
+      "PAGERDUTY": {
+        "routingKey": "Routing key PagerDuty",
+        "routingKeyHint": "Додайте до сервісу PagerDuty інтеграцію Events API v2 і вставте її routing key: правило викликає чергового, коли спрацьовує, і знімає виклик, коли умова минає."
+      },
+      "OPSGENIE": {
+        "apiKey": "API-ключ Opsgenie",
+        "apiKeyHint": "Додайте до команди в Opsgenie API-інтеграцію і вставте її ключ: правило створює сповіщення, коли спрацьовує, і закриває його, коли умова минає.",
+        "region": "Регіон Opsgenie",
+        "regionHint": "ЄС для акаунтів на app.eu.opsgenie.com.",
+        "regionOptions": {
+          "US": "США (api.opsgenie.com)",
+          "EU": "ЄС (api.eu.opsgenie.com)"
+        }
+      },
+      "DISCORD": {
+        "url": "Discord Webhook URL",
+        "urlHint": "У каналі Discord: Редагувати канал → Інтеграції → Вебхуки → Скопіювати URL вебхука. Зберігається зашифрованим."
+      }
+    },
+    "conditionFields": {
+      "FAILURE_RATE": {
+        "thresholdValue": "Частка збоїв (%)",
+        "windowMinutes": "Вікно (хв)"
+      },
+      "DLQ_THRESHOLD": {
+        "thresholdValue": "Доставок у DLQ",
+        "windowMinutes": "Вікно (хв)"
+      },
+      "CONSECUTIVE_FAILURES": {
+        "thresholdValue": "Невдач поспіль",
+        "endpointId": "Ендпоінт"
+      },
+      "LATENCY_THRESHOLD": {
+        "thresholdValue": "Затримка p95 (мс)",
+        "windowMinutes": "Вікно (хв)"
+      },
+      "NO_TRAFFIC": {
+        "windowMinutes": "Тиша (хв)"
+      }
+    },
+    "editRule": "Редагувати {{name}}",
+    "editDialog": {
+      "submit": "Зберегти",
+      "title": "Редагувати правило сповіщень"
     }
   },
   "analytics": {
@@ -4732,5 +4781,9 @@
     "ended": "Демо-сесія завершилася. Ви можете відкрити нову будь-коли.",
     "readOnlyTooltip": "Демо лише для читання — створіть безкоштовний обліковий запис, щоб зробити це",
     "readOnlyError": "Це демо лише для читання. Створіть безкоштовний обліковий запис, щоб вносити зміни."
+  },
+  "configSchema": {
+    "chooseEndpoint": "Оберіть ендпоінт",
+    "secretStored": "Збережено. Залиште порожнім, щоб не змінювати."
   }
 }

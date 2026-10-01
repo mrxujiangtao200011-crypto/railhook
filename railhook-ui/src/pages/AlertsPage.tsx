@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Bell, Check, ChevronDown, Clock, Loader2, Mail, MessageSquare, Plus, Search, Siren,
+  Bell, Check, ChevronDown, Clock, Loader2, Mail, MessageSquare, Pencil, Plus, Search, Siren,
   Trash2, VolumeX, Webhook,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -9,10 +9,12 @@ import { showSuccess, showApiError } from '../lib/toast';
 import {
   useAlertRules, useCreateAlertRule, useDeleteAlertRule, useUpdateAlertRule,
   useAlertEvents, useResolveAlert, useResolveAllAlerts, useUnresolvedAlertCount,
+  useAlertChannels, useAlertConditions, useEndpoints,
 } from '../api/queries';
 import type {
-  AlertRuleRequest, AlertType, AlertSeverity, AlertChannel, OpsgenieRegion,
-} from '../api/alerts.api';
+  AlertRuleRequest, AlertRuleResponse, AlertSeverity, ConfigProperty, ConfigSchema,
+} from '../types/api.types';
+import ConfigSchemaFields, { isFilled } from '../components/ConfigSchemaFields';
 import { formatDateTime, formatRelativeFuture, formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
@@ -40,12 +42,11 @@ import VerificationGate from '../components/VerificationGate';
 import { cn } from '../lib/utils';
 import { STATUS_FILL, STATUS_TEXT, kindOfSeverity } from '../components/charts';
 
-const ALERT_TYPE_VALUES: AlertType[] = ['FAILURE_RATE', 'DLQ_THRESHOLD', 'CONSECUTIVE_FAILURES', 'LATENCY_THRESHOLD'];
 const SEVERITY_VALUES: AlertSeverity[] = ['INFO', 'WARNING', 'CRITICAL'];
-const CHANNEL_VALUES: AlertChannel[] = ['IN_APP', 'EMAIL', 'WEBHOOK', 'SLACK', 'PAGERDUTY', 'OPSGENIE'];
 const SNOOZE_HOURS = [1, 4, 8, 24];
+const NO_SCHEMA: ConfigSchema = { type: 'object', properties: {}, required: [] };
 
-const CHANNEL_ICON: Record<AlertChannel, React.ElementType> = {
+const CHANNEL_ICON: Record<string, React.ElementType> = {
   IN_APP: Bell,
   EMAIL: Mail,
   WEBHOOK: Webhook,
@@ -53,6 +54,15 @@ const CHANNEL_ICON: Record<AlertChannel, React.ElementType> = {
   PAGERDUTY: Siren,
   OPSGENIE: Siren,
 };
+
+function defaults(schema: ConfigSchema, keep: Record<string, string> = {}): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const [name, property] of Object.entries(schema.properties)) {
+    if (property.writeOnly) continue;
+    values[name] = keep[name] ?? (property.default != null ? String(property.default) : '');
+  }
+  return values;
+}
 
 function isArmed(rule: { enabled: boolean; muted: boolean; snoozedUntil: string | null }): boolean {
   if (!rule.enabled || rule.muted) return false;
@@ -71,17 +81,14 @@ export default function AlertsPage() {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [snoozeDropdownId, setSnoozeDropdownId] = useState<string | null>(null);
 
+  const [editingRule, setEditingRule] = useState<AlertRuleResponse | null>(null);
   const [formName, setFormName] = useState('');
-  const [formType, setFormType] = useState<AlertType>('FAILURE_RATE');
+  const [formType, setFormType] = useState('');
   const [formSeverity, setFormSeverity] = useState<AlertSeverity>('WARNING');
-  const [formThreshold, setFormThreshold] = useState('10');
-  const [formWindow, setFormWindow] = useState('5');
+  const [formConditionValues, setFormConditionValues] = useState<Record<string, string>>({});
   const [formDescription, setFormDescription] = useState('');
-  const [formChannel, setFormChannel] = useState<AlertChannel>('IN_APP');
-  const [formWebhookUrl, setFormWebhookUrl] = useState('');
-  const [formEmailRecipients, setFormEmailRecipients] = useState('');
-  const [formIntegrationKey, setFormIntegrationKey] = useState('');
-  const [formOpsgenieRegion, setFormOpsgenieRegion] = useState<OpsgenieRegion>('US');
+  const [formChannel, setFormChannel] = useState('IN_APP');
+  const [formConfig, setFormConfig] = useState<Record<string, string>>({});
 
   const {
     data: rules = [], isLoading: rulesLoading, isError: rulesIsError, error: rulesError, refetch: refetchRules,
@@ -90,6 +97,9 @@ export default function AlertsPage() {
     data: eventsData, isLoading: eventsLoading, isError: eventsIsError, error: eventsError, refetch: refetchEvents,
   } = useAlertEvents(projectId, eventsPage, eventsPageSize);
   const { data: unresolvedData } = useUnresolvedAlertCount(projectId);
+  const { data: channels = [] } = useAlertChannels();
+  const { data: conditions = [] } = useAlertConditions();
+  const { data: endpoints = [] } = useEndpoints(projectId);
 
   const createRule = useCreateAlertRule(projectId!);
   const deleteRule = useDeleteAlertRule(projectId!);
@@ -112,43 +122,91 @@ export default function AlertsPage() {
   const STATE_ORDER = { firing: 0, armed: 1, snoozed: 2, muted: 3, off: 4 } as const;
   const sortedRules = [...rules].sort((a, b) => STATE_ORDER[ruleState(a, firingByRule.get(a.id))] - STATE_ORDER[ruleState(b, firingByRule.get(b.id))]);
 
-  const resetForm = () => {
+  const conditionOf = (id: string) => conditions.find((c) => c.id === id);
+  const channelOf = (id: string) => channels.find((c) => c.id === id);
+  const channelLabel = (id: string) => t(`alerts.channels.${id}`, { defaultValue: channelOf(id)?.displayName ?? id });
+  const conditionLabel = (id: string) => t(`alerts.types.${id}.label`, { defaultValue: conditionOf(id)?.displayName ?? id });
+  const conditionSchema = conditionOf(formType)?.configSchema ?? NO_SCHEMA;
+  const channelSchema = channelOf(formChannel)?.configSchema ?? NO_SCHEMA;
+  const storedSecrets = editingRule && editingRule.channel === formChannel ? editingRule.configuredSecrets : [];
+  const endpointOptions = endpoints.map((e) => ({ id: e.id, label: e.description || e.url }));
+
+  const openCreate = () => {
+    const type = conditions[0]?.id ?? '';
+    setEditingRule(null);
     setFormName('');
-    setFormType('FAILURE_RATE');
+    setFormType(type);
     setFormSeverity('WARNING');
-    setFormThreshold('10');
-    setFormWindow('5');
+    setFormConditionValues(defaults(conditionOf(type)?.configSchema ?? NO_SCHEMA));
     setFormDescription('');
     setFormChannel('IN_APP');
-    setFormWebhookUrl('');
-    setFormEmailRecipients('');
-    setFormIntegrationKey('');
-    setFormOpsgenieRegion('US');
+    setFormConfig({});
+    setShowCreateDialog(true);
   };
 
-  const isOnCall = formChannel === 'PAGERDUTY' || formChannel === 'OPSGENIE';
+  const openEdit = (rule: AlertRuleResponse) => {
+    setEditingRule(rule);
+    setFormName(rule.name);
+    setFormType(rule.alertType);
+    setFormSeverity(rule.severity);
+    setFormConditionValues({
+      thresholdValue: rule.thresholdValue != null ? String(rule.thresholdValue) : '',
+      windowMinutes: String(rule.windowMinutes),
+      endpointId: rule.endpointId ?? '',
+    });
+    setFormDescription(rule.description ?? '');
+    setFormChannel(rule.channel);
+    setFormConfig({ ...rule.channelConfig });
+    setShowCreateDialog(true);
+  };
 
-  const handleCreate = async () => {
+  const changeType = (type: string) => {
+    setFormType(type);
+    setFormConditionValues((current) => defaults(conditionOf(type)?.configSchema ?? NO_SCHEMA, current));
+  };
+
+  const changeChannel = (channel: string) => {
+    setFormChannel(channel);
+    const schema = channelOf(channel)?.configSchema ?? NO_SCHEMA;
+    setFormConfig(editingRule?.channel === channel ? { ...editingRule.channelConfig } : defaults(schema));
+  };
+
+  const fieldLabel = (scope: string, owner: string) => (name: string, property: ConfigProperty) =>
+    t(`alerts.${scope}.${owner}.${name}`, { defaultValue: property.title });
+  const fieldHint = (scope: string, owner: string) => (name: string, property: ConfigProperty) =>
+    t(`alerts.${scope}.${owner}.${name}Hint`, { defaultValue: property.description ?? '' }) || undefined;
+
+  const handleSubmit = async () => {
+    const reads = (name: string) => name in conditionSchema.properties && (formConditionValues[name] ?? '') !== '';
+    const channelConfig: Record<string, string> = {};
+    for (const [name, property] of Object.entries(channelSchema.properties)) {
+      const value = formConfig[name] ?? '';
+      // A blank secret keeps the stored one; a blank plain setting clears it.
+      if (property.writeOnly && value.trim() === '') continue;
+      channelConfig[name] = value;
+    }
     const data: AlertRuleRequest = {
       name: formName,
       alertType: formType,
       severity: formSeverity,
-      thresholdValue: parseFloat(formThreshold),
-      windowMinutes: parseInt(formWindow),
-      description: formDescription || undefined,
+      thresholdValue: reads('thresholdValue') ? parseFloat(formConditionValues.thresholdValue) : undefined,
+      windowMinutes: reads('windowMinutes') ? parseInt(formConditionValues.windowMinutes) : undefined,
+      endpointId: reads('endpointId') ? formConditionValues.endpointId : undefined,
+      description: editingRule ? formDescription : formDescription || undefined,
       channel: formChannel,
-      webhookUrl: (formChannel === 'WEBHOOK' || formChannel === 'SLACK') ? formWebhookUrl : undefined,
-      emailRecipients: formChannel === 'EMAIL' ? formEmailRecipients : undefined,
-      integrationKey: isOnCall ? formIntegrationKey : undefined,
-      opsgenieRegion: formChannel === 'OPSGENIE' ? formOpsgenieRegion : undefined,
+      channelConfig,
     };
     try {
-      await createRule.mutateAsync(data);
-      showSuccess(t('alerts.toast.ruleCreated'));
+      if (editingRule) {
+        await updateRule.mutateAsync({ ruleId: editingRule.id, data });
+        showSuccess(t('alerts.toast.ruleUpdated'));
+      } else {
+        await createRule.mutateAsync(data);
+        showSuccess(t('alerts.toast.ruleCreated'));
+      }
       setShowCreateDialog(false);
-      resetForm();
     } catch (err: any) {
-      showApiError(err, 'alerts.toast.createFailed');
+      showApiError(err, editingRule ? 'alerts.toast.updateFailed' : 'alerts.toast.createFailed');
     }
   };
 
@@ -235,7 +293,7 @@ export default function AlertsPage() {
             )}
             <PermissionGate allowed={canManageEndpoints}>
               <VerificationGate>
-                <Button onClick={() => setShowCreateDialog(true)}>
+                <Button onClick={openCreate}>
                   <Plus className="h-4 w-4" /> {t('alerts.createRule')}
                 </Button>
               </VerificationGate>
@@ -270,7 +328,7 @@ export default function AlertsPage() {
               action={
                 <PermissionGate allowed={canManageEndpoints}>
                   <VerificationGate>
-                    <Button onClick={() => setShowCreateDialog(true)}>
+                    <Button onClick={openCreate}>
                       <Plus className="h-4 w-4" /> {t('alerts.createRule')}
                     </Button>
                   </VerificationGate>
@@ -292,6 +350,9 @@ export default function AlertsPage() {
               <TableBody>
                 {sortedRules.map((rule) => {
                   const ChannelIcon = CHANNEL_ICON[rule.channel] ?? Bell;
+                  const conditionText = t(`alerts.condition.${rule.alertType}`, {
+                    v: rule.thresholdValue, w: rule.windowMinutes, defaultValue: conditionLabel(rule.alertType),
+                  });
                   const firing = firingByRule.get(rule.id);
                   const state = ruleState(rule, firing);
                   return (
@@ -302,12 +363,12 @@ export default function AlertsPage() {
                         {rule.description && <p className="truncate text-[12px] text-muted-foreground">{rule.description}</p>}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {t(`alerts.condition.${rule.alertType}`, { v: rule.thresholdValue, w: rule.windowMinutes })}
+                        {conditionText}
                       </TableCell>
                       <TableCell className="hidden xl:table-cell">
                         <span className="flex items-center gap-2 whitespace-nowrap">
                           <ChannelIcon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                          {t(`alerts.channels.${rule.channel}`)}
+                          {channelLabel(rule.channel)}
                         </span>
                       </TableCell>
                       <TableCell className={cn('hidden lg:table-cell', STATUS_TEXT[kindOfSeverity(rule.severity)])}>
@@ -342,6 +403,15 @@ export default function AlertsPage() {
                           />
                           {canManageEndpoints && (
                             <>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => openEdit(rule)}
+                                aria-label={t('alerts.editRule', { name: rule.name })}
+                                title={t('alerts.editRule', { name: rule.name })}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
@@ -496,7 +566,7 @@ export default function AlertsPage() {
                                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                       <span>{t('alerts.triggeredBy')}</span>
                                       <Badge variant="secondary">{rule.name}</Badge>
-                                      <Badge variant="outline">{t(`alerts.types.${rule.alertType}.label`)}</Badge>
+                                      <Badge variant="outline">{conditionLabel(rule.alertType)}</Badge>
                                     </div>
                                   )}
                                   {event.resolvedAt && (
@@ -551,7 +621,7 @@ export default function AlertsPage() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('alerts.createDialog.title')}</DialogTitle>
+            <DialogTitle>{t(editingRule ? 'alerts.editDialog.title' : 'alerts.createDialog.title')}</DialogTitle>
             <DialogDescription>{t('alerts.createDialog.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -566,21 +636,22 @@ export default function AlertsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="alert-type">{t('alerts.form.type')}</Label>
-              <Select id="alert-type" value={formType} onChange={(e) => setFormType(e.target.value as AlertType)}>
-                {ALERT_TYPE_VALUES.map((v) => <option key={v} value={v}>{t(`alerts.types.${v}.label`)}</option>)}
+              <Select id="alert-type" value={formType} onChange={(e) => changeType(e.target.value)}>
+                {conditions.map((c) => <option key={c.id} value={c.id}>{conditionLabel(c.id)}</option>)}
               </Select>
-              <p className="text-xs text-muted-foreground">{t(`alerts.types.${formType}.hint`)}</p>
+              {t(`alerts.types.${formType}.hint`, { defaultValue: '' }) && (
+                <p className="text-xs text-muted-foreground">{t(`alerts.types.${formType}.hint`)}</p>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="alert-threshold">{t('alerts.form.threshold')}</Label>
-                <Input id="alert-threshold" type="number" value={formThreshold} onChange={(e) => setFormThreshold(e.target.value)} min="0" step="0.1" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="alert-window">{t('alerts.form.window')}</Label>
-                <Input id="alert-window" type="number" value={formWindow} onChange={(e) => setFormWindow(e.target.value)} min="1" max="1440" />
-              </div>
-            </div>
+            <ConfigSchemaFields
+              schema={conditionSchema}
+              values={formConditionValues}
+              onChange={(name, value) => setFormConditionValues((v) => ({ ...v, [name]: value }))}
+              idPrefix="alert-condition"
+              label={fieldLabel('conditionFields', formType)}
+              hint={fieldHint('conditionFields', formType)}
+              endpoints={endpointOptions}
+            />
             <div className="space-y-2">
               <Label htmlFor="alert-severity">{t('alerts.form.severity')}</Label>
               <Select id="alert-severity" value={formSeverity} onChange={(e) => setFormSeverity(e.target.value as AlertSeverity)}>
@@ -598,62 +669,35 @@ export default function AlertsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="alert-channel">{t('alerts.form.channel')}</Label>
-              <Select id="alert-channel" value={formChannel} onChange={(e) => setFormChannel(e.target.value as AlertChannel)}>
-                {CHANNEL_VALUES.map((v) => (
-                  <option key={v} value={v} disabled={formSeverity === 'INFO' && (v === 'PAGERDUTY' || v === 'OPSGENIE')}>
-                    {t(`alerts.channels.${v}`)}
+              <Select id="alert-channel" value={formChannel} onChange={(e) => changeChannel(e.target.value)}>
+                {channels.map((c) => (
+                  <option key={c.id} value={c.id} disabled={formSeverity === 'INFO' && c.pages}>
+                    {channelLabel(c.id)}
                   </option>
                 ))}
               </Select>
             </div>
-            {formChannel === 'WEBHOOK' && (
-              <div className="space-y-2">
-                <Label htmlFor="alert-webhook">{t('alerts.form.webhookUrl')}</Label>
-                <Input id="alert-webhook" value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} placeholder="https://example.com/webhook" />
-              </div>
-            )}
-            {formChannel === 'SLACK' && (
-              <div className="space-y-2">
-                <Label htmlFor="alert-slack">{t('alerts.form.slackWebhookUrl')}</Label>
-                <Input id="alert-slack" value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} placeholder="https://hooks.slack.com/services/..." />
-                <p className="text-xs text-muted-foreground">{t('alerts.form.slackHint')}</p>
-              </div>
-            )}
-            {formChannel === 'EMAIL' && (
-              <div className="space-y-2">
-                <Label htmlFor="alert-email">{t('alerts.form.emailRecipients')}</Label>
-                <Input id="alert-email" value={formEmailRecipients} onChange={(e) => setFormEmailRecipients(e.target.value)} placeholder="ops@company.com, dev@company.com" />
-                <p className="text-xs text-muted-foreground">{t('alerts.form.emailRecipientsHint')}</p>
-              </div>
-            )}
-            {formChannel === 'PAGERDUTY' && (
-              <div className="space-y-2">
-                <Label htmlFor="alert-pagerduty-key">{t('alerts.form.pagerDutyRoutingKey')}</Label>
-                <Input id="alert-pagerduty-key" type="password" autoComplete="off" value={formIntegrationKey} onChange={(e) => setFormIntegrationKey(e.target.value)} />
-                <p className="text-xs text-muted-foreground">{t('alerts.form.pagerDutyHint')}</p>
-              </div>
-            )}
-            {formChannel === 'OPSGENIE' && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="alert-opsgenie-key">{t('alerts.form.opsgenieApiKey')}</Label>
-                  <Input id="alert-opsgenie-key" type="password" autoComplete="off" value={formIntegrationKey} onChange={(e) => setFormIntegrationKey(e.target.value)} />
-                  <p className="text-xs text-muted-foreground">{t('alerts.form.opsgenieHint')}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="alert-opsgenie-region">{t('alerts.form.opsgenieRegion')}</Label>
-                  <Select id="alert-opsgenie-region" value={formOpsgenieRegion} onChange={(e) => setFormOpsgenieRegion(e.target.value as OpsgenieRegion)}>
-                    {(['US', 'EU'] as const).map((v) => <option key={v} value={v}>{t(`alerts.form.opsgenieRegions.${v}`)}</option>)}
-                  </Select>
-                </div>
-              </>
-            )}
+            <ConfigSchemaFields
+              schema={channelSchema}
+              values={formConfig}
+              onChange={(name, value) => setFormConfig((v) => ({ ...v, [name]: value }))}
+              idPrefix="alert-channel"
+              storedSecrets={storedSecrets}
+              label={fieldLabel('channelFields', formChannel)}
+              hint={fieldHint('channelFields', formChannel)}
+              optionLabel={(name, option) =>
+                t(`alerts.channelFields.${formChannel}.${name}Options.${option}`, { defaultValue: option })}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>{t('common.cancel')}</Button>
-            <Button onClick={handleCreate} disabled={!formName || !formThreshold || (isOnCall && !formIntegrationKey) || createRule.isPending}>
-              {createRule.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t('alerts.createDialog.submit')}
+            <Button
+              onClick={handleSubmit}
+              disabled={!formName || !formType || !isFilled(conditionSchema, formConditionValues)
+                || !isFilled(channelSchema, formConfig, storedSecrets) || createRule.isPending || updateRule.isPending}
+            >
+              {(createRule.isPending || updateRule.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t(editingRule ? 'alerts.editDialog.submit' : 'alerts.createDialog.submit')}
             </Button>
           </DialogFooter>
         </DialogContent>

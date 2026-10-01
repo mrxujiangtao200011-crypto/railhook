@@ -14,7 +14,8 @@
       "SLACK": "Slack",
       "WEBHOOK": "Webhook",
       "PAGERDUTY": "PagerDuty",
-      "OPSGENIE": "Opsgenie"
+      "OPSGENIE": "Opsgenie",
+      "DISCORD": "Discord"
     },
     "columns": {
       "details": "Details",
@@ -39,26 +40,10 @@
       "channel": "Notification Channel",
       "description": "Description (optional)",
       "descriptionPlaceholder": "What this rule is for",
-      "emailRecipients": "Email Recipients",
       "name": "Name",
       "namePlaceholder": "High failure rate",
       "severity": "Severity",
-      "slackHint": "Create an Incoming Webhook in your Slack workspace settings to get the URL.",
-      "emailRecipientsHint": "Up to 10 addresses, separated by commas. Each must belong to a member of this organization who has verified it.",
-      "slackWebhookUrl": "Slack Webhook URL",
-      "threshold": "Threshold",
-      "type": "Alert Type",
-      "webhookUrl": "Webhook URL",
-      "window": "Window (min)",
-      "pagerDutyRoutingKey": "PagerDuty routing key",
-      "pagerDutyHint": "Add an Events API v2 integration to a PagerDuty service and paste its routing key: the rule pages when it fires and resolves the page when the condition clears.",
-      "opsgenieApiKey": "Opsgenie API key",
-      "opsgenieHint": "Add an API integration to an Opsgenie team and paste its key: the rule creates an alert when it fires and closes it when the condition clears.",
-      "opsgenieRegion": "Opsgenie region",
-      "opsgenieRegions": {
-        "US": "US (api.opsgenie.com)",
-        "EU": "EU (api.eu.opsgenie.com)"
-      }
+      "type": "Alert Type"
     },
     "history": {
       "desc": "Every alert this project has raised, newest first",
@@ -113,7 +98,8 @@
       "ruleDeleted": "Alert rule deleted",
       "snoozed": "Snoozed for {{hours}}h",
       "unmuted": "Rule unmuted",
-      "updateFailed": "Failed to update alert rule"
+      "updateFailed": "Failed to update alert rule",
+      "ruleUpdated": "Alert rule saved"
     },
     "toggleRule": "Enable {{name}}",
     "triggeredBy": "Triggered by",
@@ -131,8 +117,12 @@
         "label": "Failure Rate"
       },
       "LATENCY_THRESHOLD": {
-        "hint": "Triggers when avg latency exceeds threshold (ms)",
+        "hint": "Triggers when the p95 latency exceeds the threshold (ms)",
         "label": "Latency Threshold"
+      },
+      "NO_TRAFFIC": {
+        "hint": "Triggers when the project receives no events for the whole window",
+        "label": "No traffic"
       }
     },
     "unmute": "Unmute",
@@ -147,7 +137,8 @@
       "FAILURE_RATE": "Failure rate above {{v}}% over {{w}} min",
       "DLQ_THRESHOLD": "More than {{v}} in Failed Messages within {{w}} min",
       "CONSECUTIVE_FAILURES": "{{v}} deliveries fail in a row",
-      "LATENCY_THRESHOLD": "Average latency above {{v}} ms over {{w}} min"
+      "LATENCY_THRESHOLD": "p95 latency above {{v}} ms over {{w}} min",
+      "NO_TRAFFIC": "No events for {{w}} min"
     },
     "state": {
       "firing": "Firing",
@@ -166,6 +157,64 @@
       "firing_other": "{{count}} alerts firing",
       "armed": "{{armed}} of {{total}} rules armed",
       "silenced": "{{count}} muted, snoozed or off"
+    },
+    "channelFields": {
+      "EMAIL": {
+        "recipients": "Email Recipients",
+        "recipientsHint": "Up to 10 addresses, separated by commas. Each must belong to a member of this organization who has verified it."
+      },
+      "WEBHOOK": {
+        "url": "Webhook URL",
+        "urlHint": "Receives an alert.fired JSON body every time the rule fires."
+      },
+      "SLACK": {
+        "url": "Slack Webhook URL",
+        "urlHint": "Create an Incoming Webhook in your Slack workspace settings to get the URL."
+      },
+      "PAGERDUTY": {
+        "routingKey": "PagerDuty routing key",
+        "routingKeyHint": "Add an Events API v2 integration to a PagerDuty service and paste its routing key: the rule pages when it fires and resolves the page when the condition clears."
+      },
+      "OPSGENIE": {
+        "apiKey": "Opsgenie API key",
+        "apiKeyHint": "Add an API integration to an Opsgenie team and paste its key: the rule creates an alert when it fires and closes it when the condition clears.",
+        "region": "Opsgenie region",
+        "regionHint": "EU for accounts on app.eu.opsgenie.com.",
+        "regionOptions": {
+          "US": "US (api.opsgenie.com)",
+          "EU": "EU (api.eu.opsgenie.com)"
+        }
+      },
+      "DISCORD": {
+        "url": "Discord webhook URL",
+        "urlHint": "In the Discord channel: Edit Channel → Integrations → Webhooks → Copy Webhook URL. Stored encrypted."
+      }
+    },
+    "conditionFields": {
+      "FAILURE_RATE": {
+        "thresholdValue": "Failure rate (%)",
+        "windowMinutes": "Window (min)"
+      },
+      "DLQ_THRESHOLD": {
+        "thresholdValue": "Deliveries in the DLQ",
+        "windowMinutes": "Window (min)"
+      },
+      "CONSECUTIVE_FAILURES": {
+        "thresholdValue": "Failures in a row",
+        "endpointId": "Endpoint"
+      },
+      "LATENCY_THRESHOLD": {
+        "thresholdValue": "p95 latency (ms)",
+        "windowMinutes": "Window (min)"
+      },
+      "NO_TRAFFIC": {
+        "windowMinutes": "Silence (min)"
+      }
+    },
+    "editRule": "Edit {{name}}",
+    "editDialog": {
+      "submit": "Save",
+      "title": "Edit alert rule"
     }
   },
   "analytics": {
@@ -4732,5 +4781,9 @@
     "ended": "The demo session has ended. You can open a new one any time.",
     "readOnlyTooltip": "Read-only demo — create a free account to do this",
     "readOnlyError": "This is a read-only demo. Create a free account to make changes."
+  },
+  "configSchema": {
+    "chooseEndpoint": "Choose an endpoint",
+    "secretStored": "Stored. Leave blank to keep it."
   }
 }

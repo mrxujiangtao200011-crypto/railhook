@@ -73,6 +73,12 @@ export type PortalSessionInfoResponseConforms = Assert<Conforms<'PortalSessionIn
 export type PortalEndpointRequestConforms = Assert<Conforms<'PortalEndpointRequest', Mirror.PortalEndpointRequest>>;
 export type PortalEndpointResponseConforms = Assert<Conforms<'PortalEndpointResponse', Mirror.PortalEndpointResponse>>;
 export type PortalDeliveryResponseConforms = Assert<Conforms<'PortalDeliveryResponse', Mirror.PortalDeliveryResponse>>;
+export type ConfigSchemaConforms = Assert<Conforms<'ConfigSchema', Mirror.ConfigSchema>>;
+export type AlertChannelResponseConforms = Assert<Conforms<'AlertChannelResponse', Mirror.AlertChannelResponse>>;
+export type AlertConditionResponseConforms = Assert<Conforms<'AlertConditionResponse', Mirror.AlertConditionResponse>>;
+export type AlertRuleRequestConforms = Assert<Conforms<'AlertRuleRequest', Mirror.AlertRuleRequest>>;
+export type AlertRuleResponseConforms = Assert<Conforms<'AlertRuleResponse', Mirror.AlertRuleResponse>>;
+export type AlertEventResponseConforms = Assert<Conforms<'AlertEventResponse', Mirror.AlertEventResponse>>;
 
 /** One concrete Page schema suffices: Spring builds them all from the same serializer. */
 export type PageResponseConforms = Assert<Conforms<'PageEventResponse', Mirror.PageResponse<Mirror.EventResponse>>>;

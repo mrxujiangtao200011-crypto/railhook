@@ -1,9 +1,7 @@
 package com.webhook.platform.api;
 
 import com.webhook.platform.api.domain.entity.AlertRule;
-import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
-import com.webhook.platform.api.domain.enums.AlertType;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.service.AlertNotificationService;
 import com.webhook.platform.api.service.AlertService;
@@ -19,6 +17,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -65,10 +64,10 @@ class AlertNotificationAfterCommitIntegrationTest extends AbstractIntegrationTes
                 ruleRepository.save(AlertRule.builder()
                         .projectId(projectId)
                         .name("Failure rate")
-                        .alertType(AlertType.FAILURE_RATE)
+                        .alertType("FAILURE_RATE")
                         .severity(AlertSeverity.CRITICAL)
-                        .channel(AlertChannel.SLACK)
-                        .webhookUrl("https://hooks.slack.com/services/T000/B000/XXXX")
+                        .channel("SLACK")
+                        .channelConfig(Map.of("url", "https://hooks.slack.com/services/T000/B000/XXXX"))
                         .thresholdValue(10.0)
                         .build())));
     }

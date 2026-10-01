@@ -1,16 +1,14 @@
 package com.webhook.platform.api.dto;
 
-import com.webhook.platform.api.domain.enums.AlertChannel;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
-import com.webhook.platform.api.domain.enums.AlertType;
-import com.webhook.platform.api.domain.enums.OpsgenieRegion;
-import com.webhook.platform.api.dto.validation.EmailRecipientList;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Getter
@@ -25,15 +23,23 @@ public class AlertRuleRequest {
 
     private String description;
 
-    @NotNull
-    private AlertType alertType;
+    @NotBlank
+    @Schema(description = "The id of a condition listed by GET /api/v1/alert-conditions")
+    private String alertType;
 
     private AlertSeverity severity;
 
-    private AlertChannel channel;
+    @Schema(description = "The id of a channel listed by GET /api/v1/alert-channels; IN_APP when left out")
+    private String channel;
 
-    @NotNull
+    @Schema(description = "Settings named by the channel's configSchema. On update a setting left out is kept; "
+            + "a blank one clears it, except a secret, which is kept so an edit need not re-enter it.")
+    // Write-only, or the audit log, which serializes requests, would keep the secrets in it.
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private Map<String, String> channelConfig;
+
     @Positive
+    @Schema(description = "Required when the condition's configSchema lists it")
     private Double thresholdValue;
 
     @Positive
@@ -46,16 +52,4 @@ public class AlertRuleRequest {
     private Boolean muted;
 
     private Instant snoozedUntil;
-
-    private String webhookUrl;
-
-    /** Comma-separated. The service also checks each address is a verified member's. */
-    @EmailRecipientList(max = AlertRuleRequest.MAX_EMAIL_RECIPIENTS)
-    private String emailRecipients;
-
-    private String integrationKey;
-
-    private OpsgenieRegion opsgenieRegion;
-
-    public static final int MAX_EMAIL_RECIPIENTS = 10;
 }

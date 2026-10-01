@@ -1,16 +1,17 @@
 package com.webhook.platform.api.domain.entity;
 
-import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
-import com.webhook.platform.api.domain.enums.AlertType;
-import com.webhook.platform.api.domain.enums.OpsgenieRegion;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -40,21 +41,30 @@ public class AlertRule {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "alert_type", nullable = false, length = 50)
-    private AlertType alertType;
+    private String alertType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
     private AlertSeverity severity = AlertSeverity.WARNING;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private AlertChannel channel = AlertChannel.IN_APP;
+    private String channel = "IN_APP";
 
-    @Column(name = "threshold_value", nullable = false)
+    // Only the settings a channel's schema does not mark secret; those are in channelConfigEncrypted.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "channel_config", columnDefinition = "jsonb", nullable = false)
+    @Builder.Default
+    private Map<String, String> channelConfig = new LinkedHashMap<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "channel_config_encrypted", columnDefinition = "jsonb", nullable = false)
+    @Builder.Default
+    private Map<String, Map<String, String>> channelConfigEncrypted = new LinkedHashMap<>();
+
+    @Column(name = "threshold_value")
     private Double thresholdValue;
 
     @Column(name = "window_minutes", nullable = false)
@@ -75,25 +85,9 @@ public class AlertRule {
     @Column(name = "snoozed_until")
     private Instant snoozedUntil;
 
-    @Column(name = "webhook_url", length = 2048)
-    private String webhookUrl;
-
-    @Column(name = "email_recipients", columnDefinition = "TEXT")
-    private String emailRecipients;
-
-    @Column(name = "integration_key_encrypted", columnDefinition = "TEXT")
-    private String integrationKeyEncrypted;
-
-    @Column(name = "integration_key_iv", columnDefinition = "TEXT")
-    private String integrationKeyIv;
-
     @Column(name = "encryption_key_version", nullable = false)
     @Builder.Default
     private Integer encryptionKeyVersion = 1;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "opsgenie_region", length = 2)
-    private OpsgenieRegion opsgenieRegion;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

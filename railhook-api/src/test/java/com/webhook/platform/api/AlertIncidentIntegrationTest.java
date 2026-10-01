@@ -20,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -116,9 +117,9 @@ class AlertIncidentIntegrationTest extends AbstractIntegrationTest {
     void theRoutingKeyIsStoredEncryptedAndNeverReturned() throws Exception {
         MvcResult created = createRule("{\"name\":\"Payments failing\",\"alertType\":\"FAILURE_RATE\","
                 + "\"severity\":\"CRITICAL\",\"thresholdValue\":10,\"channel\":\"PAGERDUTY\","
-                + "\"integrationKey\":\"" + ROUTING_KEY + "\"}");
+                + "\"channelConfig\":{\"routingKey\":\"" + ROUTING_KEY + "\"}}");
         assertThat(created.getResponse().getContentAsString()).doesNotContain(ROUTING_KEY);
-        assertThat(json(created).get("integrationKeyConfigured").asBoolean()).isTrue();
+        assertThat(json(created).get("configuredSecrets").toString()).isEqualTo("[\"routingKey\"]");
 
         String listed = mockMvc.perform(get("/api/v1/projects/" + projectId + "/alerts/rules")
                         .header("Authorization", "Bearer " + token))
@@ -127,9 +128,10 @@ class AlertIncidentIntegrationTest extends AbstractIntegrationTest {
         assertThat(listed).doesNotContain(ROUTING_KEY);
 
         String stored = jdbcTemplate.queryForObject(
-                "SELECT integration_key_encrypted FROM alert_rules WHERE id = ?", String.class,
+                "SELECT channel_config_encrypted::text FROM alert_rules WHERE id = ?", String.class,
                 UUID.fromString(json(created).get("id").asText()));
         assertThat(stored).isNotBlank().doesNotContain(ROUTING_KEY);
+        assertThat(auditedRuleCreations()).as("the audit log of the creation").isNotBlank().doesNotContain(ROUTING_KEY);
     }
 
     @Test
@@ -160,15 +162,29 @@ class AlertIncidentIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"r\",\"alertType\":\"FAILURE_RATE\",\"severity\":\"INFO\","
-                                + "\"thresholdValue\":10,\"channel\":\"PAGERDUTY\",\"integrationKey\":\""
-                                + ROUTING_KEY + "\"}"))
+                                + "\"thresholdValue\":10,\"channel\":\"PAGERDUTY\",\"channelConfig\":{\"routingKey\":\""
+                                + ROUTING_KEY + "\"}}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // The audit row is written on another thread, after the response.
+    private String auditedRuleCreations() throws InterruptedException {
+        for (int i = 0; i < 50; i++) {
+            List<String> details = jdbcTemplate.queryForList("SELECT details FROM audit_log "
+                    + "WHERE resource_type = 'AlertRule' AND action = 'CREATE' AND organization_id = ?",
+                    String.class, organizationId);
+            if (!details.isEmpty()) {
+                return String.join("\n", details);
+            }
+            Thread.sleep(100);
+        }
+        return null;
     }
 
     private AlertRule pagerDutyRule() throws Exception {
         MvcResult created = createRule("{\"name\":\"Payments failing\",\"alertType\":\"FAILURE_RATE\","
                 + "\"severity\":\"WARNING\",\"thresholdValue\":10,\"channel\":\"PAGERDUTY\","
-                + "\"integrationKey\":\"" + ROUTING_KEY + "\"}");
+                + "\"channelConfig\":{\"routingKey\":\"" + ROUTING_KEY + "\"}}");
         UUID ruleId = UUID.fromString(json(created).get("id").asText());
         return TenantContext.callAs(organizationId, () -> ruleRepository.findById(ruleId).orElseThrow());
     }

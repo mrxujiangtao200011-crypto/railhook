@@ -35,6 +35,7 @@ import com.webhook.platform.common.security.SecretEncryption;
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -119,8 +120,8 @@ class EncryptionKeyRotationServiceTest {
         SecretEncryption.EncryptedData key = SecretEncryption.encrypt("routing-key", KEY_V1, SALT, 1);
         AlertRule rule = AlertRule.builder()
                 .id(UUID.randomUUID())
-                .integrationKeyEncrypted(key.getCiphertext())
-                .integrationKeyIv(key.getIv())
+                .channelConfigEncrypted(Map.of("routingKey",
+                        Map.of("ciphertext", key.getCiphertext(), "iv", key.getIv())))
                 .encryptionKeyVersion(1)
                 .build();
         when(endpointRepository.findAll(any(Pageable.class))).thenReturn(endpointPage(Collections.emptyList()));
@@ -132,7 +133,8 @@ class EncryptionKeyRotationServiceTest {
 
         assertThat(result.alertRulesRotated()).isEqualTo(1);
         assertThat(rule.getEncryptionKeyVersion()).isEqualTo(2);
-        assertThat(SecretEncryption.decrypt(rule.getIntegrationKeyEncrypted(), rule.getIntegrationKeyIv(), KEY_V2, SALT))
+        Map<String, String> sealed = rule.getChannelConfigEncrypted().get("routingKey");
+        assertThat(SecretEncryption.decrypt(sealed.get("ciphertext"), sealed.get("iv"), KEY_V2, SALT))
                 .isEqualTo("routing-key");
     }
 

@@ -306,6 +306,86 @@ export interface IncomingProviderResponse {
   signatureHeader: string | null;
 }
 
+export interface ConfigProperty {
+  type: 'string' | 'number' | 'integer';
+  title: string;
+  description?: string;
+  format?: string;
+  enum?: string[];
+  default?: string | number;
+  writeOnly?: boolean;
+}
+
+export interface ConfigSchema {
+  type: string;
+  properties: Record<string, ConfigProperty>;
+  required: string[];
+}
+
+export interface AlertChannelResponse {
+  id: string;
+  displayName: string;
+  pages: boolean;
+  configSchema: ConfigSchema;
+}
+
+export interface AlertConditionResponse {
+  id: string;
+  displayName: string;
+  configSchema: ConfigSchema;
+}
+
+export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+
+export interface AlertRuleResponse {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  alertType: string;
+  severity: AlertSeverity;
+  channel: string;
+  channelConfig: Record<string, string>;
+  configuredSecrets: string[];
+  thresholdValue: number | null;
+  windowMinutes: number;
+  endpointId: string | null;
+  enabled: boolean;
+  muted: boolean;
+  snoozedUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AlertRuleRequest {
+  name: string;
+  description?: string;
+  alertType: string;
+  severity?: AlertSeverity;
+  channel?: string;
+  channelConfig?: Record<string, string>;
+  thresholdValue?: number;
+  windowMinutes?: number;
+  endpointId?: string;
+  enabled?: boolean;
+  muted?: boolean;
+  snoozedUntil?: string;
+}
+
+export interface AlertEventResponse {
+  id: string;
+  alertRuleId: string;
+  projectId: string;
+  severity: AlertSeverity;
+  title: string;
+  message: string | null;
+  currentValue: number | null;
+  thresholdValue: number | null;
+  resolved: boolean;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
 export type VerificationMode = 'NONE' | 'HMAC_GENERIC' | 'PROVIDER';
 export type IncomingAuthType = 'NONE' | 'BEARER' | 'BASIC' | 'CUSTOM_HEADER';

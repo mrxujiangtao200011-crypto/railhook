@@ -2,22 +2,25 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.entity.Project;
-import com.webhook.platform.api.domain.enums.AlertChannel;
-import com.webhook.platform.api.domain.enums.AlertType;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
+import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.exception.DomainException;
+import com.webhook.platform.api.service.alert.channel.AlertChannelConfigs;
+import com.webhook.platform.api.service.alert.channel.AlertChannelRegistry;
+import com.webhook.platform.api.service.alert.channel.AlertHttpClient;
+import com.webhook.platform.api.service.alert.channel.EmailChannel;
+import com.webhook.platform.api.service.alert.channel.InAppChannel;
+import com.webhook.platform.api.service.alert.channel.WebhookChannel;
+import com.webhook.platform.api.service.alert.condition.AlertConditionRegistry;
+import com.webhook.platform.api.service.alert.condition.FailureRateCondition;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.exception.InvalidUrlException;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
-import org.junit.jupiter.api.AfterAll;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +39,8 @@ import org.springframework.http.HttpStatus;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -48,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,8 +61,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AlertServiceTest {
-
-    private static final ValidatorFactory VALIDATORS = Validation.buildDefaultValidatorFactory();
 
     @Mock private AlertRuleRepository ruleRepository;
     @Mock private AlertEventRepository eventRepository;
@@ -72,17 +76,16 @@ class AlertServiceTest {
     private final UUID projectId = UUID.randomUUID();
     private final UUID ruleId = UUID.randomUUID();
 
-    @AfterAll
-    static void closeValidators() {
-        VALIDATORS.close();
-    }
-
     @BeforeEach
     void setUp() {
         TenantContext.set(organizationId);
-        service = new AlertService(ruleRepository, eventRepository, projectRepository,
-                incidentService, encryptionKeyRegistry, notificationService, membershipRepository,
-                false, Collections.emptyList());
+        AlertHttpClient http = mock(AlertHttpClient.class);
+        AlertChannelRegistry channels = new AlertChannelRegistry(List.of(new InAppChannel(),
+                new EmailChannel(mock(EmailService.class), membershipRepository), new WebhookChannel(http)));
+        service = new AlertService(ruleRepository, eventRepository, projectRepository, incidentService,
+                notificationService, channels,
+                new AlertChannelConfigs(encryptionKeyRegistry, false, Collections.emptyList()),
+                new AlertConditionRegistry(List.of(new FailureRateCondition(mock(DeliveryRepository.class)))));
 
         when(projectRepository.findById(projectId))
                 .thenReturn(Optional.of(Project.builder().id(projectId).organizationId(organizationId).name("p").build()));
@@ -90,7 +93,7 @@ class AlertServiceTest {
         when(ruleRepository.findByIdAndProjectId(ruleId, projectId))
                 .thenReturn(Optional.of(AlertRule.builder()
                         .id(ruleId).projectId(projectId).name("existing")
-                        .alertType(AlertType.FAILURE_RATE).build()));
+                        .alertType("FAILURE_RATE").build()));
     }
 
     @AfterEach
@@ -106,7 +109,11 @@ class AlertServiceTest {
         @Nested
         class RequestValidation {
 
-            private final Validator validator = VALIDATORS.getValidator();
+            @BeforeEach
+            void everyAddressIsAMember() {
+                when(membershipRepository.findVerifiedMemberEmailsIn(anyCollection()))
+                        .thenAnswer(inv -> List.copyOf(inv.<Collection<String>>getArgument(0)));
+            }
 
             static Stream<Arguments> recipients() {
                 return Stream.of(
@@ -129,14 +136,12 @@ class AlertServiceTest {
             @ParameterizedTest
             @MethodSource("recipients")
             void acceptsUpToTenAddressesOrNone(String recipients, boolean valid) {
-                assertThat(violations(recipients).isEmpty()).isEqualTo(valid);
-            }
-
-            private Set<ConstraintViolation<AlertRuleRequest>> violations(String recipients) {
-                AlertRuleRequest request = AlertRuleRequest.builder()
-                        .name("rule").alertType(AlertType.FAILURE_RATE).thresholdValue(10.0)
-                        .emailRecipients(recipients).build();
-                return validator.validate(request);
+                ThrowingCallable create = () -> service.createRule(projectId, emailRequest(recipients));
+                if (valid) {
+                    assertThatCode(create).doesNotThrowAnyException();
+                } else {
+                    assertThatThrownBy(create).isInstanceOf(DomainException.class);
+                }
             }
         }
 
@@ -177,13 +182,11 @@ class AlertServiceTest {
 
                 ArgumentCaptor<AlertRule> saved = ArgumentCaptor.forClass(AlertRule.class);
                 verify(ruleRepository).save(saved.capture());
-                assertThat(saved.getValue().getEmailRecipients()).isEqualTo("ops@company.com,dev@company.com");
+                assertThat(saved.getValue().getChannelConfig().get("recipients")).isEqualTo("ops@company.com,dev@company.com");
             }
 
             private AlertRuleRequest request(String recipients) {
-                return AlertRuleRequest.builder()
-                        .name("rule").alertType(AlertType.FAILURE_RATE).thresholdValue(10.0)
-                        .channel(AlertChannel.EMAIL).emailRecipients(recipients).build();
+                return emailRequest(recipients);
             }
         }
     }
@@ -226,10 +229,18 @@ class AlertServiceTest {
         private AlertRuleRequest request(String webhookUrl) {
             AlertRuleRequest r = new AlertRuleRequest();
             r.setName("rule");
-            r.setAlertType(AlertType.FAILURE_RATE);
+            r.setAlertType("FAILURE_RATE");
             r.setThresholdValue(50.0);
-            r.setWebhookUrl(webhookUrl);
+            r.setChannel("WEBHOOK");
+            r.setChannelConfig(webhookUrl == null ? Map.of() : Map.of("url", webhookUrl));
             return r;
         }
+    }
+
+    private static AlertRuleRequest emailRequest(String recipients) {
+        return AlertRuleRequest.builder()
+                .name("rule").alertType("FAILURE_RATE").thresholdValue(10.0)
+                .channel("EMAIL").channelConfig(recipients == null ? Map.of() : Map.of("recipients", recipients))
+                .build();
     }
 }

@@ -9,10 +9,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.AlertEvent;
 import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.entity.Incident;
-import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
-import com.webhook.platform.api.domain.enums.AlertType;
-import com.webhook.platform.api.domain.enums.OpsgenieRegion;
+import com.webhook.platform.api.service.alert.channel.AlertChannelConfigs;
+import com.webhook.platform.api.service.alert.channel.AlertChannelRegistry;
+import com.webhook.platform.api.service.alert.channel.AlertHttpClient;
+import com.webhook.platform.api.service.alert.channel.InAppChannel;
+import com.webhook.platform.api.service.alert.channel.OpsgenieChannel;
+import com.webhook.platform.api.service.alert.channel.PagerDutyChannel;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,7 +59,7 @@ class AlertNotificationServiceTest {
     @BeforeEach
     void setUp() {
         when(registry.decrypt("cipher", "iv", 1)).thenReturn(KEY);
-        logger = (Logger) LoggerFactory.getLogger(AlertNotificationService.class);
+        logger = (Logger) LoggerFactory.getLogger("com.webhook.platform.api");
         appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
@@ -70,7 +73,7 @@ class AlertNotificationServiceTest {
 
     @Test
     void pagerDutyResolveCarriesTheDedupKeyItsTriggerOpened() throws Exception {
-        AlertRule rule = rule(AlertChannel.PAGERDUTY);
+        AlertRule rule = rule("PAGERDUTY");
 
         service(true).dispatch(rule, event(), incident);
         service(true).dispatchResolved(rule, incident);
@@ -93,8 +96,8 @@ class AlertNotificationServiceTest {
 
     @Test
     void opsgenieClosesTheAlertItCreated_inTheRegionTheRuleNames() throws Exception {
-        AlertRule rule = rule(AlertChannel.OPSGENIE);
-        rule.setOpsgenieRegion(OpsgenieRegion.EU);
+        AlertRule rule = rule("OPSGENIE");
+        rule.setChannelConfig(Map.of("region", "EU"));
 
         service(true).dispatch(rule, event(), incident);
         service(true).dispatchResolved(rule, incident);
@@ -113,10 +116,10 @@ class AlertNotificationServiceTest {
 
     @Test
     void theKeyNeverReachesTheLog_inDryRunOrWhenTheProviderRefuses() {
-        service(false).dispatch(rule(AlertChannel.PAGERDUTY), event(), incident);
+        service(false).dispatch(rule("PAGERDUTY"), event(), incident);
         answer = HttpStatus.BAD_REQUEST;
-        service(true).dispatch(rule(AlertChannel.OPSGENIE), event(), incident);
-        service(true).dispatchResolved(rule(AlertChannel.PAGERDUTY), incident);
+        service(true).dispatch(rule("OPSGENIE"), event(), incident);
+        service(true).dispatchResolved(rule("PAGERDUTY"), incident);
 
         assertThat(appender.list).isNotEmpty();
         assertThat(appender.list).noneSatisfy(logged ->
@@ -128,20 +131,23 @@ class AlertNotificationServiceTest {
             sent.add(request);
             return Mono.just(ClientResponse.create(answer).build());
         });
-        return new AlertNotificationService(stub, mock(EmailService.class), registry, enabled, false, List.of());
+        AlertHttpClient http = new AlertHttpClient(stub, false, List.of());
+        AlertChannelRegistry channels = new AlertChannelRegistry(
+                List.of(new InAppChannel(), new PagerDutyChannel(http), new OpsgenieChannel(http)));
+        return new AlertNotificationService(channels, new AlertChannelConfigs(registry, false, List.of()), enabled);
     }
 
-    private AlertRule rule(AlertChannel channel) {
+    private AlertRule rule(String channel) {
         return AlertRule.builder()
                 .id(UUID.randomUUID())
                 .projectId(UUID.randomUUID())
                 .name("Payments failing")
-                .alertType(AlertType.FAILURE_RATE)
+                .alertType("FAILURE_RATE")
                 .severity(AlertSeverity.CRITICAL)
                 .channel(channel)
                 .thresholdValue(10.0)
-                .integrationKeyEncrypted("cipher")
-                .integrationKeyIv("iv")
+                .channelConfigEncrypted(Map.of(channel.equals("PAGERDUTY") ? "routingKey" : "apiKey",
+                        Map.of("ciphertext", "cipher", "iv", "iv")))
                 .encryptionKeyVersion(1)
                 .build();
     }

@@ -1,23 +1,29 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.AlertRule;
-import com.webhook.platform.api.domain.enums.AlertType;
 import com.webhook.platform.api.domain.enums.IncidentStatus;
 import com.webhook.platform.common.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
+import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.IncidentRepository;
+import com.webhook.platform.api.service.alert.condition.AlertConditionRegistry;
+import com.webhook.platform.api.service.alert.condition.ConsecutiveFailuresCondition;
+import com.webhook.platform.api.service.alert.condition.DlqThresholdCondition;
+import com.webhook.platform.api.service.alert.condition.FailureRateCondition;
+import com.webhook.platform.api.service.alert.condition.LatencyThresholdCondition;
+import com.webhook.platform.api.service.alert.condition.NoTrafficCondition;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -51,14 +57,26 @@ class AlertEvaluatorServiceTest {
     @Mock private AlertEventRepository eventRepository;
     @Mock private DeliveryRepository deliveryRepository;
     @Mock private DeliveryAttemptRepository attemptRepository;
+    @Mock private EventRepository eventsReceived;
     @Mock private IncidentRepository incidentRepository;
     @Mock private AlertService alertService;
 
-    @InjectMocks private AlertEvaluatorService evaluator;
+    private AlertEvaluatorService evaluator;
 
     private final UUID organizationId = UUID.randomUUID();
     private final UUID projectId = UUID.randomUUID();
     private final UUID endpointId = UUID.randomUUID();
+
+    @BeforeEach
+    void setUp() {
+        evaluator = new AlertEvaluatorService(ruleRepository, eventRepository, incidentRepository, alertService,
+                new AlertConditionRegistry(List.of(
+                        new FailureRateCondition(deliveryRepository),
+                        new DlqThresholdCondition(deliveryRepository),
+                        new ConsecutiveFailuresCondition(deliveryRepository),
+                        new LatencyThresholdCondition(attemptRepository),
+                        new NoTrafficCondition(eventsReceived))));
+    }
 
     @AfterEach
     void clearTenant() {
@@ -68,7 +86,7 @@ class AlertEvaluatorServiceTest {
     @Test
     @DisplayName("a breached failure-rate rule fires exactly one alert")
     void failureRateFires() {
-        AlertRule rule = rule(AlertType.FAILURE_RATE, 50.0);
+        AlertRule rule = rule("FAILURE_RATE", 50.0);
         given(rule);
         when(deliveryRepository.countByProjectIdAndCreatedAtBetween(eq(projectId), any(), any()))
                 .thenReturn(10L);
@@ -83,7 +101,7 @@ class AlertEvaluatorServiceTest {
     @Test
     @DisplayName("deliveries that ran out of attempts and went to the DLQ count as failed")
     void failureRateCountsDlq() {
-        AlertRule rule = rule(AlertType.FAILURE_RATE, 50.0);
+        AlertRule rule = rule("FAILURE_RATE", 50.0);
         given(rule);
         when(deliveryRepository.countByProjectIdAndCreatedAtBetween(eq(projectId), any(), any()))
                 .thenReturn(12L);
@@ -98,7 +116,7 @@ class AlertEvaluatorServiceTest {
     @Test
     @DisplayName("an idle project is not a 100% failure rate")
     void noTrafficDoesNotFire() {
-        AlertRule rule = rule(AlertType.FAILURE_RATE, 50.0);
+        AlertRule rule = rule("FAILURE_RATE", 50.0);
         given(rule);
         when(deliveryRepository.countByProjectIdAndCreatedAtBetween(eq(projectId), any(), any()))
                 .thenReturn(0L);
@@ -111,7 +129,7 @@ class AlertEvaluatorServiceTest {
     @Test
     @DisplayName("fire once per crossing: breach fires, recovery resolves, the next breach fires again")
     void firesAgainAfterTheConditionRecovers() {
-        AlertRule rule = rule(AlertType.DLQ_THRESHOLD, 5.0);
+        AlertRule rule = rule("DLQ_THRESHOLD", 5.0);
         given(rule);
         AtomicBoolean open = new AtomicBoolean(false);
         when(eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId())).thenAnswer(inv -> open.get());
@@ -143,7 +161,7 @@ class AlertEvaluatorServiceTest {
     @Test
     @DisplayName("a cleared condition resolves the rule's incident even after a person resolved the alert itself")
     void clearingResolvesTheIncidentAfterTheAlertWasResolvedByHand() {
-        AlertRule rule = rule(AlertType.DLQ_THRESHOLD, 5.0);
+        AlertRule rule = rule("DLQ_THRESHOLD", 5.0);
         given(rule);
         when(eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId())).thenReturn(false);
         when(incidentRepository.existsByAlertRuleIdAndStatusNot(rule.getId(), IncidentStatus.RESOLVED))
@@ -158,9 +176,9 @@ class AlertEvaluatorServiceTest {
     @Test
     @DisplayName("a muted rule is not evaluated, and a snoozed one is quiet until its time")
     void mutedAndSnoozedStayQuiet() {
-        AlertRule muted = rule(AlertType.FAILURE_RATE, 50.0);
+        AlertRule muted = rule("FAILURE_RATE", 50.0);
         muted.setMuted(true);
-        AlertRule snoozed = rule(AlertType.FAILURE_RATE, 50.0);
+        AlertRule snoozed = rule("FAILURE_RATE", 50.0);
         snoozed.setSnoozedUntil(Instant.now().plusSeconds(3600));
         when(ruleRepository.findByEnabledTrue()).thenReturn(List.of(muted, snoozed));
 
@@ -172,7 +190,7 @@ class AlertEvaluatorServiceTest {
     @Test
     @DisplayName("the alert is raised inside the rule's organization, not the scheduler's absence of one")
     void firesInsideTheRulesTenant() {
-        AlertRule rule = rule(AlertType.DLQ_THRESHOLD, 5.0);
+        AlertRule rule = rule("DLQ_THRESHOLD", 5.0);
         given(rule);
         when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(9L);
 
@@ -200,7 +218,7 @@ class AlertEvaluatorServiceTest {
     @ParameterizedTest
     @MethodSource("recentOutcomes")
     void consecutiveFailuresFireOnlyOnAnUnbrokenRunAsLongAsTheThreshold(List<DeliveryStatus> outcomes, boolean fires) {
-        AlertRule rule = rule(AlertType.CONSECUTIVE_FAILURES, 3.0);
+        AlertRule rule = rule("CONSECUTIVE_FAILURES", 3.0);
         rule.setEndpointId(endpointId);
         given(rule);
         when(deliveryRepository.findRecentOutcomesByEndpointId(eq(endpointId), any(Pageable.class)))
@@ -218,8 +236,8 @@ class AlertEvaluatorServiceTest {
     @Test
     @DisplayName("one unevaluatable rule does not stop the rest")
     void oneBadRuleDoesNotStopTheOthers() {
-        AlertRule broken = rule(AlertType.FAILURE_RATE, 50.0);
-        AlertRule healthy = rule(AlertType.DLQ_THRESHOLD, 1.0);
+        AlertRule broken = rule("FAILURE_RATE", 50.0);
+        AlertRule healthy = rule("DLQ_THRESHOLD", 1.0);
         when(ruleRepository.findByEnabledTrue()).thenReturn(List.of(broken, healthy));
         when(deliveryRepository.countByProjectIdAndCreatedAtBetween(eq(projectId), any(), any()))
                 .thenThrow(new IllegalStateException("the query blew up"));
@@ -230,11 +248,34 @@ class AlertEvaluatorServiceTest {
         verify(alertService).fireAlert(eq(healthy), eq(4.0), anyString());
     }
 
+    @Test
+    @DisplayName("a project that falls silent fires NO_TRAFFIC, and its next event resolves it")
+    void silenceFiresAndTrafficResolves() {
+        AlertRule rule = rule("NO_TRAFFIC", null);
+        rule.setWindowMinutes(30);
+        given(rule);
+        AtomicBoolean open = new AtomicBoolean(false);
+        when(eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId())).thenAnswer(inv -> open.get());
+        when(alertService.fireAlert(any(), anyDouble(), anyString())).thenAnswer(inv -> {
+            open.set(true);
+            return null;
+        });
+
+        when(eventsReceived.countByProjectIdAndCreatedAtBetween(eq(projectId), any(), any())).thenReturn(0L);
+        evaluator.evaluate();
+        verify(alertService).fireAlert(eq(rule), eq(0.0), anyString());
+
+        when(eventsReceived.countByProjectIdAndCreatedAtBetween(eq(projectId), any(), any())).thenReturn(1L);
+        evaluator.evaluate();
+        verify(alertService).resolveRecovered(rule);
+        verify(alertService, times(1)).fireAlert(any(), anyDouble(), anyString());
+    }
+
     private void given(AlertRule rule) {
         when(ruleRepository.findByEnabledTrue()).thenReturn(List.of(rule));
     }
 
-    private AlertRule rule(AlertType type, Double threshold) {
+    private AlertRule rule(String type, Double threshold) {
         return AlertRule.builder()
                 .id(UUID.randomUUID())
                 .organizationId(organizationId)

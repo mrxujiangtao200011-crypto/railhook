@@ -1,12 +1,12 @@
 package com.webhook.platform.api.dto;
 
-import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
-import com.webhook.platform.api.domain.enums.AlertType;
-import com.webhook.platform.api.domain.enums.OpsgenieRegion;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Getter
@@ -19,19 +19,19 @@ public class AlertRuleResponse {
     private UUID projectId;
     private String name;
     private String description;
-    private AlertType alertType;
+    private String alertType;
     private AlertSeverity severity;
-    private AlertChannel channel;
+    private String channel;
+    @Schema(description = "The channel's settings, without its secrets")
+    private Map<String, String> channelConfig;
+    @Schema(description = "Names of the secret settings that are stored; their values are never returned")
+    private List<String> configuredSecrets;
     private Double thresholdValue;
     private Integer windowMinutes;
     private UUID endpointId;
     private Boolean enabled;
     private Boolean muted;
     private Instant snoozedUntil;
-    private String webhookUrl;
-    private String emailRecipients;
-    private Boolean integrationKeyConfigured;
-    private OpsgenieRegion opsgenieRegion;
     private Instant createdAt;
     private Instant updatedAt;
 }

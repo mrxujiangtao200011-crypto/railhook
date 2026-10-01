@@ -93,3 +93,73 @@ provider list and the SDKs read the installed providers from `GET /api/v1/incomi
 `InboundProviderIsolationTest` fails if code outside the provider package branches on a
 provider's id. If a provider needs a hook the interface lacks, add a default method to
 `InboundProvider` rather than an `if` in `IngressService`.
+
+## Adding an alert channel
+
+A channel is one class, one test and its name in the two locale files. The API and the Alerts
+form read the installed channels and their settings from `GET /api/v1/alert-channels`.
+
+1. Add a `@Component` implementing `AlertChannelProvider` in
+   `railhook-api/src/main/java/com/webhook/platform/api/service/alert/channel/`:
+
+   ```java
+   @Slf4j
+   @Component
+   @Order(80)
+   @RequiredArgsConstructor
+   public class TeamsChannel implements AlertChannelProvider {
+
+       private static final ConfigSchema SCHEMA = ConfigSchema.of(
+               ConfigProperty.text("url", "Workflow URL").required().secret().format(ConfigProperty.URI));
+
+       private final AlertHttpClient http;
+
+       @Override
+       public String id() {
+           return "TEAMS";
+       }
+
+       @Override
+       public String displayName() {
+           return "Microsoft Teams";
+       }
+
+       @Override
+       public ConfigSchema configSchema() {
+           return SCHEMA;
+       }
+
+       @Override
+       public void fire(AlertRule rule, AlertEvent event, Incident incident, ChannelConfig config) {
+           http.post(config.get("url"), Map.of("text", event.getTitle()));
+           log.info("Teams notification sent for rule '{}'", rule.getName());
+       }
+   }
+   ```
+
+   - `id()` is stored on the rule as `channel`: uppercase, at most 20 characters, never renamed
+     once released.
+   - Each setting is a `ConfigProperty`. `secret()` stores it encrypted, keeps it out of every
+     response and log, and includes it in key rotation. `format(ConfigProperty.URI)` puts the
+     value through the same SSRF check as an endpoint URL. `oneOf(...)` makes it a choice.
+   - Send through `AlertHttpClient`: it is the SSRF-guarded client. Never log the URL or the
+     config, only the host.
+   - `pages()` returns true for a channel that wakes a person: an `INFO` rule is then refused,
+     and `resolve` is called when the incident clears. Key the page on the incident id, as
+     `PagerDutyChannel` does, so the resolve closes the page the trigger opened.
+   - `normalize` is for checks the schema cannot express, such as `EmailChannel` limiting
+     recipients to verified members.
+
+2. Add `TeamsChannelTest`: mock `AlertHttpClient`, call `fire` and assert on the body sent.
+
+3. Add `alerts.channels.TEAMS` to `railhook-ui/src/i18n/locales/en.json` and `uk.json`, and
+   optionally `alerts.channelFields.TEAMS.<setting>` and `<setting>Hint` to translate the
+   setting's title and description. Without them the form shows the schema's English text.
+
+An alert condition works the same way: implement `AlertCondition` in `service/alert/condition/`,
+declare which of the rule's `thresholdValue`, `windowMinutes` and `endpointId` it reads in its
+schema, and return a `Breach` from `assess` while the condition holds. The evaluator fires on the
+crossing and resolves when `assess` returns empty. Its labels live under `alerts.types.<ID>`,
+`alerts.condition.<ID>` and `alerts.conditionFields.<ID>`.
+
+`AlertChannelRegistry` and `AlertConditionRegistry` refuse to start on a duplicate or malformed id.
