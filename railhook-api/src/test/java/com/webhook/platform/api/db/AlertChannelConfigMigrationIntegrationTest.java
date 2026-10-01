@@ -66,7 +66,7 @@ class AlertChannelConfigMigrationIntegrationTest {
 
         assertThat(secrets(pagerDuty).toString()).doesNotContain("pd-routing-key");
         assertThat(keyVersion(pagerDuty)).isEqualTo(2);
-        assertThat(columns()).doesNotContain(
+        assertThat(columns()).as("the previous API still reads these during a rolling deploy").contains(
                 "webhook_url", "email_recipients", "integration_key_encrypted", "integration_key_iv", "opsgenie_region");
     }
 
