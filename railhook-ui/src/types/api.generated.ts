@@ -3850,6 +3850,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/alert-conditions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List alert conditions
+         * @description What a rule can watch, used as its alertType, and which of the rule's thresholdValue, windowMinutes and endpointId each condition reads.
+         */
+        get: operations["listAlertConditions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alert-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List alert channels
+         * @description Where a rule can send its alerts, and the settings each channel takes as a JSON Schema. A property with writeOnly is a secret: stored encrypted and never returned.
+         */
+        get: operations["listAlertChannels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -4726,14 +4766,21 @@ export interface components {
         AlertRuleRequest: {
             name: string;
             description?: string;
-            /** @enum {string} */
-            alertType: "FAILURE_RATE" | "DLQ_THRESHOLD" | "CONSECUTIVE_FAILURES" | "LATENCY_THRESHOLD";
+            /** @description The id of a condition listed by GET /api/v1/alert-conditions */
+            alertType: string;
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
-            /** @enum {string} */
-            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK" | "PAGERDUTY" | "OPSGENIE";
-            /** Format: double */
-            thresholdValue: number;
+            /** @description The id of a channel listed by GET /api/v1/alert-channels; IN_APP when left out */
+            channel?: string;
+            /** @description Settings named by the channel's configSchema. On update a setting left out is kept; a blank one clears it, except a secret, which is kept so an edit need not re-enter it. */
+            channelConfig?: {
+                [key: string]: string;
+            };
+            /**
+             * Format: double
+             * @description Required when the condition's configSchema lists it
+             */
+            thresholdValue?: number;
             /** Format: int32 */
             windowMinutes?: number;
             /** Format: uuid */
@@ -4742,11 +4789,6 @@ export interface components {
             muted?: boolean;
             /** Format: date-time */
             snoozedUntil?: string;
-            webhookUrl?: string;
-            emailRecipients?: string;
-            integrationKey?: string;
-            /** @enum {string} */
-            opsgenieRegion?: "US" | "EU";
         };
         AlertRuleResponse: {
             /** Format: uuid */
@@ -4755,12 +4797,16 @@ export interface components {
             projectId?: string;
             name?: string;
             description?: string;
-            /** @enum {string} */
-            alertType?: "FAILURE_RATE" | "DLQ_THRESHOLD" | "CONSECUTIVE_FAILURES" | "LATENCY_THRESHOLD";
+            alertType?: string;
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
-            /** @enum {string} */
-            channel?: "IN_APP" | "EMAIL" | "WEBHOOK" | "SLACK" | "PAGERDUTY" | "OPSGENIE";
+            channel?: string;
+            /** @description The channel's settings, without its secrets */
+            channelConfig?: {
+                [key: string]: string;
+            };
+            /** @description Names of the secret settings that are stored; their values are never returned */
+            configuredSecrets?: string[];
             /** Format: double */
             thresholdValue?: number;
             /** Format: int32 */
@@ -4771,11 +4817,6 @@ export interface components {
             muted?: boolean;
             /** Format: date-time */
             snoozedUntil?: string;
-            webhookUrl?: string;
-            emailRecipients?: string;
-            integrationKeyConfigured?: boolean;
-            /** @enum {string} */
-            opsgenieRegion?: "US" | "EU";
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -6936,6 +6977,37 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
+        };
+        AlertConditionResponse: {
+            id?: string;
+            displayName?: string;
+            /** @description Which of a rule's thresholdValue, windowMinutes and endpointId the condition reads */
+            configSchema?: components["schemas"]["ConfigSchema"];
+        };
+        /** @description One property of a JSON Schema object. writeOnly marks a secret: it is stored encrypted and never returned. */
+        ConfigProperty: {
+            type?: string;
+            title?: string;
+            description?: string;
+            format?: string;
+            enum?: string[];
+            default?: string | number;
+            writeOnly?: boolean;
+        };
+        /** @description A JSON Schema object describing the settings a form asks for */
+        ConfigSchema: {
+            type?: string;
+            properties?: {
+                [key: string]: components["schemas"]["ConfigProperty"];
+            };
+            required?: string[];
+        };
+        AlertChannelResponse: {
+            id?: string;
+            displayName?: string;
+            /** @description Wakes a person, so an INFO rule cannot use it */
+            pages?: boolean;
+            configSchema?: components["schemas"]["ConfigSchema"];
         };
         Pageable: {
             /** Format: int32 */
@@ -14215,6 +14287,46 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listAlertConditions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AlertConditionResponse"][];
+                };
+            };
+        };
+    };
+    listAlertChannels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AlertChannelResponse"][];
+                };
             };
         };
     };
