@@ -78,14 +78,13 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
             CAST(e.id AS text) as endpoint_id,
             e.url,
             e.enabled,
-            COUNT(d.*) as total_deliveries,
-            COUNT(*) FILTER (WHERE d.status = 'SUCCESS') as successful,
-            COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DLQ')) as failed,
+            COUNT(DISTINCT d.id) as total_deliveries,
+            COUNT(DISTINCT d.id) FILTER (WHERE d.status = 'SUCCESS') as successful,
+            COUNT(DISTINCT d.id) FILTER (WHERE d.status IN ('FAILED', 'DLQ')) as failed,
             AVG(da.duration_ms) as avg_latency,
             PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY da.duration_ms) as p95_latency,
             MAX(d.created_at) as last_delivery
         FROM endpoints e
-        LEFT JOIN subscriptions s ON s.endpoint_id = e.id
         LEFT JOIN deliveries d ON d.endpoint_id = e.id AND d.created_at BETWEEN :from AND :to
         LEFT JOIN delivery_attempts da ON da.delivery_id = d.id
         WHERE e.organization_id = :organizationId AND e.project_id = :projectId
