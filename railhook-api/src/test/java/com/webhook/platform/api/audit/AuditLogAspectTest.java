@@ -2,6 +2,7 @@ package com.webhook.platform.api.audit;
 
 import com.webhook.platform.api.domain.entity.AuditLog;
 import com.webhook.platform.api.domain.repository.AuditLogRepository;
+import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.TrustedProxyResolver;
@@ -93,6 +94,19 @@ class AuditLogAspectTest {
 
         // No organization here: the row states the sentinel rather than leaving it to @TenantId.
         assertThat(savedRow().getOrganizationId()).isEqualTo(TenantContext.SYSTEM);
+    }
+
+    @Test
+    void secretsInTheRequestAreNotWrittenToTheAuditLog() throws Throwable {
+        EndpointRequest request = EndpointRequest.builder()
+                .url("https://hooks.example.com/in").secret("whsec_live_do_not_keep").build();
+
+        aspect.audit(joinPoint(new String[]{"request"}, new Object[]{request}),
+                auditable(AuditAction.CREATE, "Endpoint"));
+
+        assertThat(savedRow().getDetails())
+                .contains("https://hooks.example.com/in")
+                .doesNotContain("whsec_live_do_not_keep");
     }
 
     private AuditLog savedRow() {
