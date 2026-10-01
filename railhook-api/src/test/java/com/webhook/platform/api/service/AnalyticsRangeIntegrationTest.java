@@ -95,6 +95,29 @@ class AnalyticsRangeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void anEndpointCountsEachDeliveryOnceWhateverItsSubscriptionsAndAttempts() {
+        UUID projectId = project("Payments API");
+        Scope own = scope(projectId, "https://payments.test/hook");
+        for (String type : new String[] {"order.*", "invoice.*", "customer.*"}) {
+            jdbc.update("INSERT INTO subscriptions (project_id, endpoint_id, event_type, organization_id) VALUES (?, ?, ?, ?)",
+                    projectId, own.endpointId(), type, orgId);
+        }
+        delivery(own, DeliveryStatus.SUCCESS, "2026-01-10T10:45:00Z", 100);
+        UUID retried = delivery(own, DeliveryStatus.DLQ, "2026-01-10T11:00:00Z", 300);
+        attempt(retried, 2, 400, "2026-01-10T11:01:00Z");
+        attempt(retried, 3, 500, "2026-01-10T11:06:00Z");
+
+        TenantContext.set(orgId);
+        AnalyticsResponse analytics = analyticsService.getAnalytics(projectId,
+                new AnalyticsService.Window(FROM, TO, "HOUR"));
+
+        assertThat(analytics.getEndpointPerformance())
+                .extracting(EndpointPerformance::getTotalDeliveries, EndpointPerformance::getSuccessfulDeliveries,
+                        EndpointPerformance::getFailedDeliveries)
+                .containsExactly(tuple(2L, 1L, 1L));
+    }
+
+    @Test
     void theExportIsNamedAfterTheProjectAndItsRange() {
         UUID projectId = project("Payments API");
 
@@ -118,7 +141,7 @@ class AnalyticsRangeIntegrationTest extends AbstractIntegrationTest {
         return new Scope(projectId, endpointId);
     }
 
-    private void delivery(Scope scope, DeliveryStatus status, String createdAt, Integer attemptMs) {
+    private UUID delivery(Scope scope, DeliveryStatus status, String createdAt, Integer attemptMs) {
         UUID eventId = eventRepository.save(Event.builder()
                 .organizationId(orgId).projectId(scope.projectId())
                 .eventType("payment.succeeded").payload("{}").build()).getId();
@@ -128,11 +151,16 @@ class AnalyticsRangeIntegrationTest extends AbstractIntegrationTest {
         jdbc.update("UPDATE deliveries SET created_at = ? WHERE id = ?",
                 Instant.parse(createdAt).atOffset(ZoneOffset.UTC), delivery.getId());
         if (attemptMs != null) {
-            jdbc.update("""
-                    INSERT INTO delivery_attempts (id, organization_id, delivery_id, attempt_number, http_status_code,
-                                                   duration_ms, created_at)
-                    VALUES (?, ?, ?, 1, 200, ?, ?)""",
-                    UUID.randomUUID(), orgId, delivery.getId(), attemptMs, Instant.parse(createdAt).atOffset(ZoneOffset.UTC));
+            attempt(delivery.getId(), 1, attemptMs, createdAt);
         }
+        return delivery.getId();
+    }
+
+    private void attempt(UUID deliveryId, int number, int durationMs, String createdAt) {
+        jdbc.update("""
+                INSERT INTO delivery_attempts (id, organization_id, delivery_id, attempt_number, http_status_code,
+                                               duration_ms, created_at)
+                VALUES (?, ?, ?, ?, 200, ?, ?)""",
+                UUID.randomUUID(), orgId, deliveryId, number, durationMs, Instant.parse(createdAt).atOffset(ZoneOffset.UTC));
     }
 }

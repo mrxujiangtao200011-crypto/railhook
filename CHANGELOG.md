@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-10-01
+
+### Fixed
+
+- Per-endpoint analytics count each delivery once. The query joined the endpoint's subscriptions and each delivery's attempts, so an endpoint with three subscriptions showed three times its deliveries, and a retried delivery counted once per attempt.
+
 ## [3.5.0] - 2026-10-01
 
 ### Changed
