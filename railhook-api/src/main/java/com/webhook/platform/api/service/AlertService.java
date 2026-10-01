@@ -2,15 +2,12 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.audit.AuditAction;
-import com.webhook.platform.api.domain.EmailAddresses;
 import com.webhook.platform.api.domain.entity.AlertEvent;
 import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.entity.Incident;
-import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
-import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertEventResponse;
 import com.webhook.platform.api.dto.AlertRuleRequest;
@@ -18,13 +15,15 @@ import com.webhook.platform.api.dto.AlertRuleResponse;
 import com.webhook.platform.api.exception.DomainException;
 import com.webhook.platform.api.exception.ErrorCode;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.service.alert.ConfigProperty;
+import com.webhook.platform.api.service.alert.channel.AlertChannelConfigs;
+import com.webhook.platform.api.service.alert.channel.AlertChannelProvider;
+import com.webhook.platform.api.service.alert.channel.AlertChannelRegistry;
+import com.webhook.platform.api.service.alert.condition.AlertCondition;
+import com.webhook.platform.api.service.alert.condition.AlertConditionRegistry;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.security.SecretEncryption;
-import com.webhook.platform.common.security.UrlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -33,10 +32,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -48,13 +45,10 @@ public class AlertService {
     private final AlertEventRepository eventRepository;
     private final ProjectRepository projectRepository;
     private final IncidentService incidentService;
-    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final AlertNotificationService notificationService;
-    private final MembershipRepository membershipRepository;
-    @Value("${webhook.url-validation.allow-private-ips:false}")
-    private final boolean allowPrivateIps;
-    @Value("${webhook.url-validation.allowed-hosts:}")
-    private final List<String> allowedHosts;
+    private final AlertChannelRegistry channels;
+    private final AlertChannelConfigs channelConfigs;
+    private final AlertConditionRegistry conditions;
 
     /** Resolving the open alerts re-arms the rule for the next crossing. */
     @Transactional
@@ -69,14 +63,6 @@ public class AlertService {
         return resolved;
     }
 
-    // An SSRF sink like an Endpoint URL. Blank means "unset" in updateRule.
-    private void validateNotificationUrl(String webhookUrl) {
-        if (webhookUrl == null || webhookUrl.isBlank()) {
-            return;
-        }
-        UrlValidator.validateWebhookUrl(webhookUrl, allowPrivateIps, allowedHosts);
-    }
-
     @Transactional(readOnly = true)
     public List<AlertRuleResponse> listRules(UUID projectId) {
         validateProjectAccess(projectId);
@@ -85,53 +71,31 @@ public class AlertService {
                 .toList();
     }
 
-    // Verified members only, or a rule could mail anyone once a minute.
-    private String requireMemberRecipients(String recipients) {
-        if (recipients == null || recipients.isBlank()) {
-            return null;
-        }
-        List<String> addresses = EmailAddresses.splitList(recipients).stream().distinct().toList();
-        if (addresses.size() > AlertRuleRequest.MAX_EMAIL_RECIPIENTS
-                || !addresses.stream().allMatch(EmailAddresses::isPlausible)) {
-            throw new DomainException(ErrorCode.INVALID_REQUEST,
-                    "Email recipients must be at most " + AlertRuleRequest.MAX_EMAIL_RECIPIENTS
-                            + " addresses, separated by commas");
-        }
-        Set<String> members = new HashSet<>(membershipRepository.findVerifiedMemberEmailsIn(addresses));
-        List<String> outsiders = addresses.stream().filter(address -> !members.contains(address)).toList();
-        if (!outsiders.isEmpty()) {
-            throw new DomainException(ErrorCode.INVALID_REQUEST,
-                    "Alert emails can only go to members of this organization who have verified their "
-                            + "address. Not a verified member: " + String.join(", ", outsiders));
-        }
-        return String.join(",", addresses);
-    }
-
     @Auditable(action = AuditAction.CREATE, resourceType = "AlertRule")
     @Transactional
     public AlertRuleResponse createRule(UUID projectId, AlertRuleRequest request) {
         validateProjectAccess(projectId);
-        validateNotificationUrl(request.getWebhookUrl());
-        String emailRecipients = requireMemberRecipients(request.getEmailRecipients());
+        AlertCondition condition = conditions.require(request.getAlertType());
+        AlertChannelProvider channel = channels.require(
+                request.getChannel() != null ? request.getChannel() : AlertChannelRegistry.IN_APP);
 
         AlertRule rule = AlertRule.builder()
                 .projectId(projectId)
                 .name(request.getName())
                 .description(request.getDescription())
-                .alertType(request.getAlertType())
+                .alertType(condition.id())
                 .severity(request.getSeverity() != null ? request.getSeverity() : AlertSeverity.WARNING)
-                .channel(request.getChannel() != null ? request.getChannel() : AlertChannel.IN_APP)
+                .channel(channel.id())
                 .thresholdValue(request.getThresholdValue())
                 .windowMinutes(request.getWindowMinutes() != null ? request.getWindowMinutes() : 5)
                 .endpointId(request.getEndpointId())
                 .enabled(request.getEnabled() != null ? request.getEnabled() : true)
                 .muted(request.getMuted() != null ? request.getMuted() : false)
                 .snoozedUntil(request.getSnoozedUntil())
-                .webhookUrl(request.getWebhookUrl())
-                .emailRecipients(emailRecipients)
-                .opsgenieRegion(request.getOpsgenieRegion())
                 .build();
-        applyIntegrationKey(rule, request.getIntegrationKey());
+        channelConfigs.apply(rule, channel, request.getChannelConfig(), true);
+        requireConditionSettings(rule, condition);
+        requirePageableSeverity(rule, channel);
 
         rule = ruleRepository.save(rule);
         log.debug("Created alert rule '{}' ({}) for project {}", rule.getName(), rule.getAlertType(), projectId);
@@ -143,30 +107,29 @@ public class AlertService {
     public AlertRuleResponse updateRule(UUID projectId, UUID ruleId, AlertRuleRequest request) {
         validateProjectAccess(projectId);
 
-        validateNotificationUrl(request.getWebhookUrl());
-
         AlertRule rule = ruleRepository.findByIdAndProjectId(ruleId, projectId)
                 .orElseThrow(() -> new NotFoundException("Alert rule not found"));
 
         if (request.getName() != null) rule.setName(request.getName());
         if (request.getDescription() != null) rule.setDescription(request.getDescription());
-        if (request.getAlertType() != null) rule.setAlertType(request.getAlertType());
+        if (request.getAlertType() != null) rule.setAlertType(conditions.require(request.getAlertType()).id());
         if (request.getSeverity() != null) rule.setSeverity(request.getSeverity());
-        if (request.getChannel() != null && request.getChannel() != rule.getChannel()) {
-            rule.setChannel(request.getChannel());
-            rule.setIntegrationKeyEncrypted(null);
-            rule.setIntegrationKeyIv(null);
-        }
-        if (request.getOpsgenieRegion() != null) rule.setOpsgenieRegion(request.getOpsgenieRegion());
-        applyIntegrationKey(rule, request.getIntegrationKey());
         if (request.getThresholdValue() != null) rule.setThresholdValue(request.getThresholdValue());
         if (request.getWindowMinutes() != null) rule.setWindowMinutes(request.getWindowMinutes());
         if (request.getEndpointId() != null) rule.setEndpointId(request.getEndpointId());
         if (request.getEnabled() != null) rule.setEnabled(request.getEnabled());
         if (request.getMuted() != null) rule.setMuted(request.getMuted());
         if (request.getSnoozedUntil() != null) rule.setSnoozedUntil(request.getSnoozedUntil());
-        if (request.getWebhookUrl() != null) rule.setWebhookUrl(request.getWebhookUrl().isBlank() ? null : request.getWebhookUrl());
-        if (request.getEmailRecipients() != null) rule.setEmailRecipients(requireMemberRecipients(request.getEmailRecipients()));
+
+        // A new channel starts empty: the old channel's key must not travel to wherever the new one sends.
+        boolean switching = request.getChannel() != null && !request.getChannel().equals(rule.getChannel());
+        AlertChannelProvider channel = channels.require(switching ? request.getChannel() : rule.getChannel());
+        if (switching || request.getChannelConfig() != null) {
+            rule.setChannel(channel.id());
+            channelConfigs.apply(rule, channel, request.getChannelConfig(), switching);
+        }
+        requireConditionSettings(rule, conditions.require(rule.getAlertType()));
+        requirePageableSeverity(rule, channel);
 
         rule = ruleRepository.save(rule);
         log.debug("Updated alert rule '{}' for project {}", rule.getName(), projectId);
@@ -267,22 +230,24 @@ public class AlertService {
                 });
     }
 
-    // Blank keeps the stored key, so an edit need not re-enter it.
-    private void applyIntegrationKey(AlertRule rule, String integrationKey) {
-        if (integrationKey != null && !integrationKey.isBlank()) {
-            SecretEncryption.EncryptedData encrypted = encryptionKeyRegistry.encrypt(integrationKey.trim());
-            rule.setIntegrationKeyEncrypted(encrypted.getCiphertext());
-            rule.setIntegrationKeyIv(encrypted.getIv());
-            rule.setEncryptionKeyVersion(encrypted.getKeyVersion());
+    private static void requireConditionSettings(AlertRule rule, AlertCondition condition) {
+        for (String name : condition.configSchema().required()) {
+            Object value = switch (name) {
+                case AlertCondition.THRESHOLD -> rule.getThresholdValue();
+                case AlertCondition.WINDOW -> rule.getWindowMinutes();
+                case AlertCondition.ENDPOINT -> rule.getEndpointId();
+                default -> throw new IllegalStateException("A rule has no setting " + name);
+            };
+            if (value == null) {
+                String title = condition.configSchema().field(name).map(ConfigProperty::title).orElse(name);
+                throw new DomainException(ErrorCode.INVALID_REQUEST,
+                        condition.displayName() + ": " + title + " is required");
+            }
         }
-        boolean onCall = rule.getChannel() == AlertChannel.PAGERDUTY || rule.getChannel() == AlertChannel.OPSGENIE;
-        if (onCall && rule.getIntegrationKeyEncrypted() == null) {
-            throw new DomainException(ErrorCode.INVALID_REQUEST,
-                    rule.getChannel() == AlertChannel.PAGERDUTY
-                            ? "A PagerDuty rule needs the routing key of a PagerDuty service"
-                            : "An Opsgenie rule needs an Opsgenie API key");
-        }
-        if (onCall && rule.getSeverity() == AlertSeverity.INFO) {
+    }
+
+    private static void requirePageableSeverity(AlertRule rule, AlertChannelProvider channel) {
+        if (channel.pages() && rule.getSeverity() == AlertSeverity.INFO) {
             throw new DomainException(ErrorCode.INVALID_REQUEST, "An INFO rule cannot page anyone; use WARNING or CRITICAL");
         }
     }
@@ -296,16 +261,14 @@ public class AlertService {
                 .alertType(rule.getAlertType())
                 .severity(rule.getSeverity())
                 .channel(rule.getChannel())
+                .channelConfig(rule.getChannelConfig())
+                .configuredSecrets(channelConfigs.configuredSecrets(rule))
                 .thresholdValue(rule.getThresholdValue())
                 .windowMinutes(rule.getWindowMinutes())
                 .endpointId(rule.getEndpointId())
                 .enabled(rule.getEnabled())
                 .muted(rule.getMuted())
                 .snoozedUntil(rule.getSnoozedUntil())
-                .webhookUrl(rule.getWebhookUrl())
-                .emailRecipients(rule.getEmailRecipients())
-                .integrationKeyConfigured(rule.getIntegrationKeyEncrypted() != null)
-                .opsgenieRegion(rule.getOpsgenieRegion())
                 .createdAt(rule.getCreatedAt())
                 .updatedAt(rule.getUpdatedAt())
                 .build();

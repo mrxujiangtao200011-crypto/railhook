@@ -24,7 +24,6 @@ const ENUM_BACKED: Array<[namespace: string, schema: string, property: string, u
   ['workflows.stepStatus', 'StepExecutionResponse', 'status'],
   ['incidents.statuses', 'IncidentResponse', 'status'],
   ['alerts.severities', 'AlertRuleResponse', 'severity'],
-  ['alerts.channels', 'AlertRuleResponse', 'channel'],
   ['piiRules.maskStyles', 'PiiMaskingRuleResponse', 'maskStyle'],
   ['deliveries.status', 'DeliveryResponse', 'status'],
   ['members.statuses', 'MemberResponse', 'status'],

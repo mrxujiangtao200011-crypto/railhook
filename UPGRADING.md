@@ -3,6 +3,12 @@
 Only the releases that need something from you are listed. Everything else upgrades with
 `./railhook upgrade` (Compose) or `helm upgrade`.
 
+## v3.6.0
+
+- Scripts that create or update alert rules through the API must send the channel's settings in
+  `channelConfig`. `webhookUrl`, `emailRecipients`, `integrationKey` and `opsgenieRegion` are no
+  longer read. Existing rules are migrated on upgrade; nothing to do for rules made in the dashboard.
+
 ## v3.2.0
 
 - `V001__schema.sql` changed (time columns are `timestamptz`), so a database created by 3.1.0 will

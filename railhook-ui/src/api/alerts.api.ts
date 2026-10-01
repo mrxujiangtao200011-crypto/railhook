@@ -1,66 +1,14 @@
 import { http } from './http';
-import type { PageResponse } from '../types/api.types';
-
-export type AlertType = 'FAILURE_RATE' | 'DLQ_THRESHOLD' | 'CONSECUTIVE_FAILURES' | 'LATENCY_THRESHOLD';
-export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
-export type AlertChannel = 'IN_APP' | 'EMAIL' | 'WEBHOOK' | 'SLACK' | 'PAGERDUTY' | 'OPSGENIE';
-export type OpsgenieRegion = 'US' | 'EU';
-
-export interface AlertRuleResponse {
-  id: string;
-  projectId: string;
-  name: string;
-  description: string | null;
-  alertType: AlertType;
-  severity: AlertSeverity;
-  channel: AlertChannel;
-  thresholdValue: number;
-  windowMinutes: number;
-  endpointId: string | null;
-  enabled: boolean;
-  muted: boolean;
-  snoozedUntil: string | null;
-  webhookUrl: string | null;
-  emailRecipients: string | null;
-  integrationKeyConfigured: boolean;
-  opsgenieRegion: OpsgenieRegion | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AlertRuleRequest {
-  name: string;
-  description?: string;
-  alertType: AlertType;
-  severity?: AlertSeverity;
-  channel?: AlertChannel;
-  thresholdValue: number;
-  windowMinutes?: number;
-  endpointId?: string;
-  enabled?: boolean;
-  muted?: boolean;
-  snoozedUntil?: string;
-  webhookUrl?: string;
-  emailRecipients?: string;
-  integrationKey?: string;
-  opsgenieRegion?: OpsgenieRegion;
-}
-
-export interface AlertEventResponse {
-  id: string;
-  alertRuleId: string;
-  projectId: string;
-  severity: AlertSeverity;
-  title: string;
-  message: string | null;
-  currentValue: number | null;
-  thresholdValue: number | null;
-  resolved: boolean;
-  resolvedAt: string | null;
-  createdAt: string;
-}
+import type {
+  AlertChannelResponse, AlertConditionResponse, AlertEventResponse, AlertRuleRequest, AlertRuleResponse,
+  PageResponse,
+} from '../types/api.types';
 
 export const alertsApi = {
+  channels: (): Promise<AlertChannelResponse[]> => http.get('/api/v1/alert-channels'),
+
+  conditions: (): Promise<AlertConditionResponse[]> => http.get('/api/v1/alert-conditions'),
+
   listRules: (projectId: string): Promise<AlertRuleResponse[]> =>
     http.get(`/api/v1/projects/${projectId}/alerts/rules`),
 

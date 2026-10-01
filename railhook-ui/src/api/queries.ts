@@ -17,7 +17,7 @@ import { incomingSourcesApi } from './incomingSources.api';
 import { incomingDestinationsApi } from './incomingDestinations.api';
 import { incomingEventsApi, type IncomingEventFilters } from './incomingEvents.api';
 import { schemasApi, type EventTypeCatalogRequest, type EventSchemaVersionRequest } from './schemas.api';
-import { alertsApi, type AlertRuleRequest } from './alerts.api';
+import { alertsApi } from './alerts.api';
 import { usageApi } from './usage.api';
 import { incidentsApi, type IncidentRequest, type TimelineEntryRequest } from './incidents.api';
 import { transformApi, type TransformPreviewRequest, type DeliveryDryRunRequest } from './transform.api';
@@ -32,7 +32,7 @@ import { debugLinksApi } from './debugLinks.api';
 import { piiRulesApi, type PiiMaskingRuleRequest } from './piiRules.api';
 import { replayApi, type ReplayRequest, type ReplaySessionResponse } from './replay.api';
 import { testEndpointsApi } from './testEndpoints.api';
-import type { ConsumerRequest, PortalEndpointRequest, PortalSessionRequest, EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest } from '../types/api.types';
+import type { ConsumerRequest, PortalEndpointRequest, PortalSessionRequest, EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest, AlertRuleRequest } from '../types/api.types';
 
 export const queryKeys = {
     publicBin: (slug: string) => ['publicBin', slug] as const,
@@ -141,6 +141,8 @@ export const queryKeys = {
         projectChanges: (projectId: string) => ['schemas', projectId, 'all-changes'] as const,
     },
     alerts: {
+        channels: ['alert-channels'] as const,
+        conditions: ['alert-conditions'] as const,
         rules: (projectId: string) => ['alerts', 'rules', projectId] as const,
         events: (projectId: string, page: number, size: number) => ['alerts', 'events', projectId, page, size] as const,
         unresolvedCount: (projectId: string) => ['alerts', 'unresolved', projectId] as const,
@@ -788,6 +790,22 @@ export function useProjectSchemaChanges(projectId: string | undefined) {
         queryKey: queryKeys.schemas.projectChanges(projectId!),
         queryFn: () => schemasApi.listProjectChanges(projectId!),
         enabled: !!projectId,
+    });
+}
+
+export function useAlertChannels() {
+    return useQuery({
+        queryKey: queryKeys.alerts.channels,
+        queryFn: () => alertsApi.channels(),
+        staleTime: Infinity,
+    });
+}
+
+export function useAlertConditions() {
+    return useQuery({
+        queryKey: queryKeys.alerts.conditions,
+        queryFn: () => alertsApi.conditions(),
+        staleTime: Infinity,
     });
 }
 

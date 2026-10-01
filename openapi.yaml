@@ -8158,6 +8158,47 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/alert-conditions:
+    get:
+      tags:
+      - Alerts
+      summary: List alert conditions
+      description: "What a rule can watch, used as its alertType, and which of the\
+        \ rule's thresholdValue, windowMinutes and endpointId each condition reads."
+      operationId: listAlertConditions
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AlertConditionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/alert-channels:
+    get:
+      tags:
+      - Alerts
+      summary: List alert channels
+      description: "Where a rule can send its alerts, and the settings each channel\
+        \ takes as a JSON Schema. A property with writeOnly is a secret: stored encrypted\
+        \ and never returned."
+      operationId: listAlertChannels
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AlertChannelResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/admin/users:
     get:
       tags:
@@ -9673,11 +9714,8 @@ components:
           type: string
         alertType:
           type: string
-          enum:
-          - FAILURE_RATE
-          - DLQ_THRESHOLD
-          - CONSECUTIVE_FAILURES
-          - LATENCY_THRESHOLD
+          description: The id of a condition listed by GET /api/v1/alert-conditions
+          minLength: 1
         severity:
           type: string
           enum:
@@ -9686,16 +9724,20 @@ components:
           - CRITICAL
         channel:
           type: string
-          enum:
-          - IN_APP
-          - EMAIL
-          - WEBHOOK
-          - SLACK
-          - PAGERDUTY
-          - OPSGENIE
+          description: The id of a channel listed by GET /api/v1/alert-channels; IN_APP
+            when left out
+        channelConfig:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Settings named by the channel's configSchema. On update a\
+            \ setting left out is kept; a blank one clears it, except a secret, which\
+            \ is kept so an edit need not re-enter it."
+          writeOnly: true
         thresholdValue:
           type: number
           format: double
+          description: Required when the condition's configSchema lists it
           minimum: 0
         windowMinutes:
           type: integer
@@ -9711,21 +9753,9 @@ components:
         snoozedUntil:
           type: string
           format: date-time
-        webhookUrl:
-          type: string
-        emailRecipients:
-          type: string
-        integrationKey:
-          type: string
-        opsgenieRegion:
-          type: string
-          enum:
-          - US
-          - EU
       required:
       - alertType
       - name
-      - thresholdValue
     AlertRuleResponse:
       type: object
       properties:
@@ -9741,11 +9771,6 @@ components:
           type: string
         alertType:
           type: string
-          enum:
-          - FAILURE_RATE
-          - DLQ_THRESHOLD
-          - CONSECUTIVE_FAILURES
-          - LATENCY_THRESHOLD
         severity:
           type: string
           enum:
@@ -9754,13 +9779,17 @@ components:
           - CRITICAL
         channel:
           type: string
-          enum:
-          - IN_APP
-          - EMAIL
-          - WEBHOOK
-          - SLACK
-          - PAGERDUTY
-          - OPSGENIE
+        channelConfig:
+          type: object
+          additionalProperties:
+            type: string
+          description: "The channel's settings, without its secrets"
+        configuredSecrets:
+          type: array
+          description: Names of the secret settings that are stored; their values
+            are never returned
+          items:
+            type: string
         thresholdValue:
           type: number
           format: double
@@ -9777,17 +9806,6 @@ components:
         snoozedUntil:
           type: string
           format: date-time
-        webhookUrl:
-          type: string
-        emailRecipients:
-          type: string
-        integrationKeyConfigured:
-          type: boolean
-        opsgenieRegion:
-          type: string
-          enum:
-          - US
-          - EU
         createdAt:
           type: string
           format: date-time
@@ -13536,6 +13554,67 @@ components:
           type: boolean
         empty:
           type: boolean
+    AlertConditionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        configSchema:
+          $ref: "#/components/schemas/ConfigSchema"
+          description: "Which of a rule's thresholdValue, windowMinutes and endpointId\
+            \ the condition reads"
+    ConfigProperty:
+      type: object
+      description: "One property of a JSON Schema object. writeOnly marks a secret:\
+        \ it is stored encrypted and never returned."
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        format:
+          type: string
+        enum:
+          type: array
+          items:
+            type: string
+        default:
+          oneOf:
+          - type: string
+          - type: number
+            format: double
+        writeOnly:
+          type: boolean
+    ConfigSchema:
+      type: object
+      description: A JSON Schema object describing the settings a form asks for
+      properties:
+        type:
+          type: string
+        properties:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ConfigProperty"
+        required:
+          type: array
+          items:
+            type: string
+    AlertChannelResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        pages:
+          type: boolean
+          description: "Wakes a person, so an INFO rule cannot use it"
+        configSchema:
+          $ref: "#/components/schemas/ConfigSchema"
     Pageable:
       type: object
       properties:
